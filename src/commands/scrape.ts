@@ -1,6 +1,7 @@
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { create, providers as listProviders } from '../core/registry'
+import { create } from '../core/registry'
+import { resolveProvider } from '../core/resolve'
 
 export default defineCommand({
   meta: {
@@ -16,7 +17,7 @@ export default defineCommand({
     provider: {
       type: 'string',
       alias: 'p',
-      description: 'Browser provider name (default: first available)',
+      description: 'Browser provider name (default: first with API key set)',
     },
     format: {
       type: 'string',
@@ -34,13 +35,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const available = listProviders()
-    const providerName = args.provider || available[0]
-    if (!providerName) {
-      consola.error('No providers available. Set an API key (e.g. STEEL_API_KEY).')
-      process.exit(1)
-    }
-
+    const providerName = resolveProvider(args.provider)
     const provider = create(providerName)
     consola.info(`Scraping via ${providerName}...`)
 

@@ -1,6 +1,7 @@
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { create, providers as listProviders } from '../core/registry'
+import { create } from '../core/registry'
+import { resolveProvider } from '../core/resolve'
 
 export default defineCommand({
   meta: {
@@ -23,12 +24,7 @@ export default defineCommand({
         },
       },
       async run({ args }) {
-        const available = listProviders()
-        const providerName = args.provider || available[0]
-        if (!providerName) {
-          consola.error('No providers available.')
-          process.exit(1)
-        }
+        const providerName = resolveProvider(args.provider)
         const provider = create(providerName)
         try {
           const session = await provider.createSession({ region: args.region })
@@ -57,12 +53,7 @@ export default defineCommand({
         },
       },
       async run({ args }) {
-        const available = listProviders()
-        const providerName = args.provider || available[0]
-        if (!providerName) {
-          consola.error('No providers available.')
-          process.exit(1)
-        }
+        const providerName = resolveProvider(args.provider)
         const provider = create(providerName)
         try {
           await provider.releaseSession(args.sessionId)
@@ -84,12 +75,7 @@ export default defineCommand({
         },
       },
       async run({ args }) {
-        const available = listProviders()
-        const providerName = args.provider || available[0]
-        if (!providerName) {
-          consola.error('No providers available.')
-          process.exit(1)
-        }
+        const providerName = resolveProvider(args.provider)
         const provider = create(providerName)
         try {
           const sessions = await provider.listSessions()

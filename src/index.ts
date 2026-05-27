@@ -36,3 +36,4 @@ export {
 
 export { Client, defaultClient } from './core/client'
 export { register, create, providers, has } from './core/registry'
+export { resolveProvider } from './core/resolve'

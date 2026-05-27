@@ -1,5 +1,5 @@
 import { defineCommand } from 'citty'
-import { providers as listProviders, has } from '../core/registry'
+import { providers as listProviders } from '../core/registry'
 
 export default defineCommand({
   meta: {
@@ -32,8 +32,8 @@ export default defineCommand({
     }
     else {
       for (const name of all) {
-        const configured = has(name)
-        console.log(`${configured ? '●' : '○'} ${name}`)
+        const hasKey = !!process.env[`${name.toUpperCase()}_API_KEY`]
+        console.log(`${hasKey ? '●' : '○'} ${name}${hasKey ? '' : ' (no API key)'}`)
       }
     }
   },

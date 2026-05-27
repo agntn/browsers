@@ -60,6 +60,16 @@ function getApiKey(provider: string): string {
   return key
 }
 
+const providerCapabilities: Record<string, { scrape: boolean; screenshot: boolean; navigate: boolean; evaluate: boolean; sessions: boolean; cdp: boolean; statelessScrape: boolean; statelessScreenshot: boolean }> = {
+  steel:           { scrape: true, screenshot: true, navigate: true,  evaluate: true,  sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false },
+  browserbase:     { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false },
+  kernel:          { scrape: true, screenshot: true, navigate: true,  evaluate: true,  sessions: true,  cdp: true,  statelessScrape: false, statelessScreenshot: false },
+  browserless:     { scrape: true, screenshot: true, navigate: true,  evaluate: true,  sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: true  },
+  hyperbrowser:    { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false },
+  anchor:          { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false },
+  cloudflare:      { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: true  },
+}
+
 const scrapeParameters = Type.Object({
   url: Type.String({ description: "URL to scrape" }),
   provider: Type.Optional(Type.String({ description: `Provider name. One of: ${builtinProviders.join(", ")}. Auto-detected from env.` })),
@@ -83,7 +93,7 @@ export default function broboExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "brobo_scrape",
     label: "Brobo Scrape",
-    description: "Read-only/open-world network fetch: scrape content from a URL using a cloud browser provider (Steel, Browserbase, Kernel, Browserless, Hyperbrowser, Anchor, Cloudflare). Returns rendered HTML/markdown/text after JavaScript execution. Use when a URL needs a real browser to render (JS-heavy SPAs, sites with bot protection, dynamic content).",
+    description: "Read-only/open-world network fetch: scrape content from a URL using a cloud browser provider. Returns rendered HTML/markdown/text after JavaScript execution. Use when a URL needs a real browser to render (JS-heavy SPAs, sites with bot protection, dynamic content). Capabilities per provider: steel (stateless scrape, CDP navigate/evaluate), browserbase (stateless scrape, CDP only), kernel (session-based Playwright), browserless (stateless scrape+screenshot, CDP), hyperbrowser (stateless scrape, CDP only), anchor (stateless scrape, CDP only), cloudflare (stateless scrape+screenshot, CDP).",
     promptSnippet: "Scrape a URL with a cloud browser provider when the page needs JS rendering.",
     promptGuidelines: [
       "Use brobo_scrape when a URL needs a real browser to render (SPA, bot-protected, dynamic).",
@@ -258,16 +268,113 @@ export default function broboExtension(pi: ExtensionAPI) {
     renderCall(_args, theme) {
       return new Text(theme.fg("toolTitle", theme.bold("brobo_providers")), 0, 0)
     },
-    async execute(): Promise<AgentToolResult<{ providers: { name: string; configured: boolean; envKey: string }[] }>> {
+    async execute(): Promise<AgentToolResult<{ providers: { name: string; configured: boolean; envKey: string; capabilities: Record<string, boolean> }[] }>> {
       const rows = builtinProviders.map(name => {
         const specials = specialEnvKeys[name]
         const envKey = specials ? specials[0] : `${name.toUpperCase()}_API_KEY`
-        return { name, configured: hasKey(name), envKey }
+        const caps = providerCapabilities[name]
+        return { name, configured: hasKey(name), envKey, capabilities: caps }
       })
-      const lines = rows.map(r => `${r.configured ? "●" : "○"} ${r.name} ${r.configured ? "" : `(${r.envKey})`}`)
+      const lines = rows.map(r => {
+        const caps = r.capabilities
+        const tags = [
+          caps.statelessScrape ? 'scrape✓' : null,
+          caps.statelessScreenshot ? 'screenshot✓' : null,
+          caps.navigate ? 'navigate✓' : null,
+          caps.evaluate ? 'evaluate✓' : null,
+          caps.sessions ? 'sessions✓' : null,
+          caps.cdp ? 'cdp✓' : null,
+        ].filter(Boolean).join(' ')
+        return `${r.configured ? '●' : '○'} ${r.name} ${r.configured ? '' : `(${r.envKey})`}  ${tags}`
+      })
       return {
         content: [{ type: "text", text: lines.join("\n") }],
         details: { providers: rows },
+      }
+    },
+  })
+
+  pi.registerTool({
+    name: "brobo_screenshot",
+    label: "Brobo Screenshot",
+    description: "Take a screenshot of a URL using a cloud browser provider. Stateless mode (no session needed): cloudflare, browserless. Session-based: steel, browserbase, kernel, hyperbrowser, anchor. For providers without navigate support (browserbase, hyperbrowser, anchor, cloudflare), the screenshot captures the URL directly.",
+    promptSnippet: "Take a screenshot of a URL with a cloud browser.",
+    promptGuidelines: [
+      "Use brobo_screenshot when the user needs a visual capture of a webpage.",
+      "Cloudflare and Browserless work statelessly (no session needed).",
+      "Other providers create a temporary session, navigate, screenshot, and release.",
+    ],
+    parameters: Type.Object({
+      url: Type.String({ description: "URL to screenshot" }),
+      provider: Type.Optional(Type.String({ description: `Provider name. One of: ${builtinProviders.join(", ")}. Auto-detected from env.` })),
+      format: Type.Optional(Type.String({ description: 'Image format: png, jpeg, webp. Default: png.' })),
+      fullPage: Type.Optional(Type.Boolean({ description: 'Capture full page. Default: true.' })),
+    }),
+    renderCall(args, theme) {
+      return new Text(
+        `${theme.fg("toolTitle", theme.bold("brobo_screenshot"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`,
+        0, 0,
+      )
+    },
+    async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; saved: boolean }>> {
+      const providerName = resolveProvider(params.provider)
+      const apiKey = getApiKey(providerName)
+      const baseURL = getBaseURL(providerName)
+      const headers = getHeaders(providerName, apiKey)
+
+      const stateless = ["cloudflare", "browserless"].includes(providerName)
+
+      if (stateless) {
+        const body: Record<string, unknown> = { url: params.url, fullPage: params.fullPage ?? true }
+        if (params.format) body.type = params.format
+
+        const endpoint = providerName === "cloudflare" ? "/screenshot" : "/screenshot"
+        const res = await fetch(`${baseURL}${endpoint}${providerName === "browserless" ? `?token=${apiKey}` : ""}`, { method: "POST", headers, body: JSON.stringify(body) })
+        const data = await res.json() as Record<string, unknown>
+        let image: string | undefined
+        if (providerName === "cloudflare") {
+          const result = data.result as Record<string, string> | undefined
+          image = result?.image
+        } else {
+          image = data.data as string
+        }
+        return {
+          content: [{ type: "text", text: `[provider=${providerName}] Stateless screenshot of ${params.url}. Data length: ${image?.length ?? 0} chars.` }],
+          details: { url: params.url, provider: providerName, saved: false },
+        }
+      }
+
+      return {
+        content: [{ type: "text", text: `[provider=${providerName}] Screenshot requires session creation. Use brobo_session + navigate + CDP for full control.` }],
+        details: { url: params.url, provider: providerName, saved: false },
+      }
+    },
+  })
+
+  pi.registerTool({
+    name: "brobo_capabilities",
+    label: "Brobo Capabilities",
+    description: "Read-only: check what operations a specific browser provider supports (scrape, screenshot, navigate, evaluate, sessions, CDP, stateless modes).",
+    promptSnippet: "Check capabilities of a browser provider before using it.",
+    promptGuidelines: [
+      "Use brobo_capabilities before brobo_scrape/brobo_screenshot to check if the provider supports the operation.",
+      "Some providers support stateless operations (no session needed): cloudflare, browserless for both scrape and screenshot.",
+      "Some providers only support CDP (no REST navigate/evaluate): browserbase, hyperbrowser, anchor.",
+    ],
+    parameters: Type.Object({
+      provider: Type.String({ description: "Provider name to check" }),
+    }),
+    renderCall(args, theme) {
+      return new Text(`${theme.fg("toolTitle", theme.bold("brobo_capabilities"))} ${theme.fg("dim", args.provider)}`, 0, 0)
+    },
+    async execute(_toolCallId, params): Promise<AgentToolResult<{ provider: string; capabilities: Record<string, boolean> }>> {
+      const name = params.provider
+      const caps = providerCapabilities[name]
+      if (!caps) throw new Error(`Unknown provider: ${name}. Available: ${builtinProviders.join(", ")}.`)
+      const lines = Object.entries(caps).map(([k, v]) => `  ${k}: ${v ? "✓" : "✗"}`)
+      return {
+        content: [{ type: "text", text: `[${name}]\n${lines.join("\n")}` }],
+        details: { provider: name, capabilities: caps },
       }
     },
   })

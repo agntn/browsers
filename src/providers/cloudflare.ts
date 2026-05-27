@@ -7,6 +7,14 @@ import type {
   ScreenshotResult,
   ScreenshotOptions,
   EvaluateResult,
+  CrawlResult,
+  CrawlPage,
+  CrawlOptions,
+  PdfResult,
+  PdfOptions,
+  LinksResult,
+  ExtractResult,
+  ExtractOptions,
   ProviderConfig,
   BrowserProviderFactory,
 } from '../core/types'
@@ -230,6 +238,103 @@ class CloudflareProvider implements BrowserProvider {
   getCdpUrl(session: BrowserSession): string | undefined {
     if (!session.id) return undefined
     return `wss://cloudflare.com/browser-run/devtools/browser/${session.id}`
+  }
+
+  async crawl(url: string, options?: CrawlOptions, _session?: BrowserSession): Promise<CrawlResult> {
+    try {
+      const body: Record<string, unknown> = { url }
+      if (options?.maxDepth) body.depth = options.maxDepth
+      if (options?.maxPages) body.limit = options.maxPages
+      if (options?.formats) body.output_format = options.formats[0]
+
+      const res = await this.client.postJSON<CfEnvelope<string | Record<string, unknown>>>(
+        `${this.base()}/crawl`,
+        body,
+        this.headers(),
+      )
+      const result = this.unwrap(res)
+
+      if (typeof result === 'string') {
+        return { pages: [], totalFound: 0, jobId: result, status: 'running' }
+      }
+
+      const pages = (result.pages ?? result.data ?? []) as Array<Record<string, unknown>>
+      return {
+        pages: pages.map(p => ({ url: (p.url ?? '') as string, html: p.html as string, markdown: p.markdown as string, title: p.title as string })),
+        totalFound: pages.length,
+        jobId: result.jobId as string,
+        status: result.status as 'completed' | 'running' | 'failed',
+      }
+    }
+    catch (error) { throw normalizeError(error, 'cloudflare') }
+  }
+
+  async pdf(url: string, options?: PdfOptions, _session?: BrowserSession): Promise<PdfResult> {
+    try {
+      const body: Record<string, unknown> = { url }
+      if (options?.format) body.format = options.format
+      if (options?.landscape !== undefined) body.landscape = options.landscape
+      if (options?.printBackground !== undefined) body.printBackground = options.printBackground
+      if (options?.css) body.css = options.css
+
+      const res = await fetch(
+        `${this.base()}/pdf`,
+        {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify(body),
+        },
+      )
+      if (!res.ok) throw new Error(`Cloudflare PDF HTTP ${res.status}`)
+
+      const contentType = res.headers.get('content-type') ?? ''
+      if (contentType.includes('pdf')) {
+        const buf = await res.arrayBuffer()
+        return { data: `data:application/pdf;base64,${Buffer.from(buf).toString('base64')}`, mimeType: 'application/pdf' }
+      }
+      const data = await res.json() as CfEnvelope<Record<string, unknown>>
+      const result = this.unwrap(data)
+      return { data: (result.data ?? result.content ?? '') as string, mimeType: 'application/pdf' }
+    }
+    catch (error) { throw normalizeError(error, 'cloudflare') }
+  }
+
+  async links(url: string, _session?: BrowserSession): Promise<LinksResult> {
+    try {
+      const res = await this.client.postJSON<CfEnvelope<string[]>>(
+        `${this.base()}/links`,
+        { url },
+        this.headers(),
+      )
+      const result = this.unwrap(res)
+      const rawLinks = Array.isArray(result) ? result : []
+      return {
+        url,
+        links: rawLinks.map(href => ({ href })),
+      }
+    }
+    catch (error) { throw normalizeError(error, 'cloudflare') }
+  }
+
+  async extract(url: string, options?: ExtractOptions, _session?: BrowserSession): Promise<ExtractResult> {
+    try {
+      const body: Record<string, unknown> = { url }
+      if (options?.prompt) body.prompt = options.prompt
+      if (options?.schema) body.response_format = { type: 'json_schema', json_schema: options.schema }
+
+      const res = await this.client.postJSON<CfEnvelope<Record<string, unknown>>>(
+        `${this.base()}/json`,
+        body,
+        this.headers(),
+      )
+      const result = this.unwrap(res)
+      return {
+        url,
+        data: result.data ?? result,
+        markdown: result.markdown as string | undefined,
+      }
+    }
+    catch (error) { throw normalizeError(error, 'cloudflare') }
   }
 
   async isAvailable(): Promise<boolean> {

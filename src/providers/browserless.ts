@@ -7,6 +7,8 @@ import type {
   ScreenshotResult,
   ScreenshotOptions,
   EvaluateResult,
+  PdfResult,
+  PdfOptions,
   ProviderConfig,
   BrowserProviderFactory,
 } from '../core/types'
@@ -162,6 +164,30 @@ class BrowserlessProvider implements BrowserProvider {
   getCdpUrl(session: BrowserSession): string {
     if (session.cdpUrl) return session.cdpUrl
     return `wss://chrome.browserless.io?token=${this.apiKey}`
+  }
+
+  async pdf(url: string, options?: PdfOptions, _session?: BrowserSession): Promise<PdfResult> {
+    try {
+      const body: Record<string, unknown> = { url }
+      if (options?.landscape !== undefined) body.landscape = options.landscape
+      if (options?.printBackground !== undefined) body.printBackground = options.printBackground
+
+      const res = await fetch(
+        `${this.baseURL}/pdf?${this.tokenParam()}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      )
+      if (!res.ok) throw new Error(`Browserless PDF HTTP ${res.status}`)
+      const pdf = await res.arrayBuffer()
+      return {
+        data: `data:application/pdf;base64,${Buffer.from(pdf).toString('base64')}`,
+        mimeType: 'application/pdf',
+      }
+    }
+    catch (error) { throw normalizeError(error, 'browserless') }
   }
 
   async isAvailable(): Promise<boolean> {

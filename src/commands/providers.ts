@@ -1,14 +1,14 @@
 import { defineCommand } from 'citty'
 import { providers as listProviders } from '../core/registry'
 
-const caps: Record<string, { scrape: boolean; screenshot: boolean; navigate: boolean; evaluate: boolean; sessions: boolean; cdp: boolean; statelessScrape: boolean; statelessScreenshot: boolean }> = {
-  steel:        { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false },
-  browserbase:  { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false },
-  kernel:       { scrape: true, screenshot: true, navigate: true,  evaluate: true,  sessions: true,  cdp: true,  statelessScrape: false, statelessScreenshot: false },
-  browserless:  { scrape: true, screenshot: true, navigate: true,  evaluate: true,  sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: true  },
-  hyperbrowser: { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false },
-  anchor:       { scrape: false, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: false, statelessScreenshot: false },
-  cloudflare:   { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: true  },
+const caps: Record<string, { scrape: boolean; screenshot: boolean; navigate: boolean; evaluate: boolean; sessions: boolean; cdp: boolean; statelessScrape: boolean; statelessScreenshot: boolean; crawl: boolean; pdf: boolean; links: boolean; search: boolean; extract: boolean }> = {
+  steel:        { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false, crawl: false, pdf: false, links: false, search: false, extract: false },
+  browserbase:  { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false, crawl: false, pdf: false, links: false, search: false, extract: false },
+  kernel:       { scrape: true, screenshot: true, navigate: true,  evaluate: true,  sessions: true,  cdp: true,  statelessScrape: false, statelessScreenshot: false, crawl: false, pdf: false, links: false, search: false, extract: false },
+  browserless:  { scrape: true, screenshot: true, navigate: true,  evaluate: true,  sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: true,  crawl: false, pdf: true,  links: false, search: false, extract: false },
+  hyperbrowser: { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false, crawl: true,  pdf: false, links: false, search: true,  extract: true },
+  anchor:       { scrape: false, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: false, statelessScreenshot: false, crawl: false, pdf: false, links: false, search: false, extract: false },
+  cloudflare:   { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: true,  crawl: true,  pdf: true,  links: true,  search: false, extract: true },
 }
 
 export default defineCommand({
@@ -60,6 +60,11 @@ export default defineCommand({
         c?.cdp ? 'cdp' : null,
         c?.statelessScrape ? '(stateless)' : null,
         c?.statelessScreenshot ? '(stateless-shot)' : null,
+        c?.crawl ? 'crawl' : null,
+        c?.pdf ? 'pdf' : null,
+        c?.links ? 'links' : null,
+        c?.search ? 'search' : null,
+        c?.extract ? 'extract' : null,
       ].filter(Boolean).join(' ')
 
       console.log(`${hasKey ? '●' : '○'} ${name.padEnd(14)} ${hasKey ? '' : `(${(envKeys[name]?.[0] ?? `${name.toUpperCase()}_API_KEY`).padEnd(25)})`}  ${tags}`)

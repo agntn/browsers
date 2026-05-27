@@ -1,156 +1,167 @@
 /** Browser session handle returned by providers. */
 export interface BrowserSession {
-  /** Provider-specific session identifier. */
   id: string
-  /** CDP WebSocket URL for Puppeteer/Playwright connection. */
   cdpUrl?: string
-  /** Provider name that created this session. */
   provider: string
-  /** Session creation timestamp. */
   createdAt: number
-  /** Provider-specific metadata (region, proxy, fingerprint, etc.). */
   metadata?: Record<string, unknown>
 }
 
 /** Options for session creation. */
 export interface CreateSessionOptions {
-  /** Preferred region (e.g. 'us-east-1', 'eu-west-1'). */
   region?: string
-  /** Run headless (default true). */
   headless?: boolean
-  /** Browser dimensions. */
   viewport?: { width: number; height: number }
-  /** Reuse a persistent profile/cookie set by name. */
   profileId?: string
-  /** Timeout in ms for session creation. */
   timeout?: number
-  /** Proxy configuration. */
-  proxy?: {
-    server: string
-    username?: string
-    password?: string
-  }
-  /** Enable stealth/anti-bot features. */
+  proxy?: { server: string; username?: string; password?: string }
   stealth?: boolean
-  /** Solve CAPTCHAs automatically if provider supports it. */
   captchaSolving?: boolean
-  /** Provider-specific extensions to this options bag. */
   extra?: Record<string, unknown>
 }
 
-/** Content extracted from a page. */
 export interface ScrapeResult {
-  /** Resolved page URL after redirects. */
   url: string
-  /** Page title. */
   title?: string
-  /** Full HTML. */
   html?: string
-  /** Cleaned HTML (scripts/styles removed). */
   cleanedHtml?: string
-  /** Markdown conversion of page content. */
   markdown?: string
-  /** Plain-text readability extraction. */
   text?: string
-  /** HTTP status code of the page load. */
   statusCode?: number
-  /** Extracted outbound links. */
   links?: string[]
-  /** Screenshot of the page as base64 or URL. */
   screenshot?: string
-  /** Provider-specific metadata. */
   metadata?: Record<string, unknown>
 }
 
-/** Options for scraping a URL. */
 export interface ScrapeOptions {
-  /** Content format(s) to return. Default: all available. */
   formats?: ('html' | 'markdown' | 'text' | 'cleanedHtml')[]
-  /** Wait for a CSS selector before extraction. */
   waitFor?: string
-  /** Wait for network idle before extraction. */
   waitForNetworkIdle?: boolean
-  /** Include a screenshot in the result. */
   screenshot?: boolean
-  /** Maximum content length in chars. */
   maxChars?: number
-  /** Request timeout in ms. */
   timeout?: number
-  /** JavaScript to execute before extraction. */
   script?: string
-  /** Custom headers for the page request. */
   headers?: Record<string, string>
 }
 
-/** Options for taking a screenshot. */
 export interface ScreenshotOptions {
-  /** URL to screenshot (stateless mode, no session needed). */
   url?: string
-  /** CSS selector to screenshot (default: full page). */
   selector?: string
-  /** Output format. */
   format?: 'png' | 'jpeg' | 'webp'
-  /** JPEG/WebP quality 0-100. */
   quality?: number
-  /** Full page (beyond viewport). */
   fullPage?: boolean
-  /** Base64 or URL return. */
   encoding?: 'base64' | 'url'
 }
 
-/** Result of a screenshot capture. */
 export interface ScreenshotResult {
-  /** Screenshot as base64 data URL or hosted URL. */
   data: string
-  /** MIME type of the screenshot. */
   mimeType: string
-  /** Width in pixels. */
   width?: number
-  /** Height in pixels. */
   height?: number
 }
 
-/** Result of JS evaluation. */
 export interface EvaluateResult {
-  /** Return value of the script. */
   value: unknown
-  /** Console logs captured during execution. */
   logs?: string[]
 }
 
-/** A browser-as-a-service provider. */
+export interface CrawlResult {
+  pages: CrawlPage[]
+  totalFound: number
+  jobId?: string
+  status?: 'completed' | 'running' | 'failed'
+}
+
+export interface CrawlPage {
+  url: string
+  title?: string
+  html?: string
+  markdown?: string
+  text?: string
+  statusCode?: number
+  links?: string[]
+  depth?: number
+}
+
+export interface CrawlOptions {
+  maxDepth?: number
+  maxPages?: number
+  sameDomain?: boolean
+  formats?: ('html' | 'markdown' | 'text')[]
+  waitFor?: string
+  timeout?: number
+}
+
+export interface PdfResult {
+  data: string
+  mimeType: string
+}
+
+export interface PdfOptions {
+  format?: 'A4' | 'Letter' | 'Legal'
+  landscape?: boolean
+  printBackground?: boolean
+  css?: string
+  timeout?: number
+}
+
+export interface WebSearchResult {
+  url: string
+  title: string
+  snippet: string
+  score?: number
+  publishedDate?: string
+}
+
+export interface WebSearchOptions {
+  maxResults?: number
+  includeDomains?: string[]
+}
+
+export interface ExtractResult {
+  url: string
+  data: unknown
+  markdown?: string
+  usage?: { input?: number; output?: number }
+}
+
+export interface ExtractOptions {
+  schema?: Record<string, unknown>
+  prompt?: string
+  timeout?: number
+}
+
+export interface LinksResult {
+  url: string
+  links: LinkItem[]
+}
+
+export interface LinkItem {
+  href: string
+  text?: string
+  rel?: string
+}
+
 export interface BrowserProvider {
-  /** Unique provider name. */
   name(): string
 
-  /** Create a new browser session. */
   createSession(options?: CreateSessionOptions): Promise<BrowserSession>
-
-  /** Get an existing session by ID. */
   getSession(sessionId: string): Promise<BrowserSession | null>
-
-  /** List active sessions. */
   listSessions(): Promise<BrowserSession[]>
-
-  /** Release/destroy a session. */
   releaseSession(sessionId: string): Promise<void>
 
-  /** Scrape content from a URL (may use session or stateless endpoint). */
   scrape(url: string, options?: ScrapeOptions, session?: BrowserSession): Promise<ScrapeResult>
-
-  /** Take a screenshot. Session required unless options.url is set (stateless mode). */
   screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult>
-
-  /** Navigate session to URL. */
   navigate(url: string, session: BrowserSession): Promise<void>
-
-  /** Execute JavaScript in the session page. */
   evaluate(script: string, session: BrowserSession): Promise<EvaluateResult>
 
-  /** Get CDP WebSocket URL for the session. */
-  getCdpUrl?(session: BrowserSession): string | undefined
+  crawl?(url: string, options?: CrawlOptions, session?: BrowserSession): Promise<CrawlResult>
+  pdf?(url: string, options?: PdfOptions, session?: BrowserSession): Promise<PdfResult>
+  search?(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]>
+  extract?(url: string, options?: ExtractOptions, session?: BrowserSession): Promise<ExtractResult>
+  links?(url: string, session?: BrowserSession): Promise<LinksResult>
 
-  /** Optional reachability probe. */
+  getCdpUrl?(session: BrowserSession): string | undefined
   isAvailable?(): Promise<boolean>
 }
 

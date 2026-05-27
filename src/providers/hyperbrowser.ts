@@ -7,6 +7,12 @@ import type {
   ScreenshotResult,
   ScreenshotOptions,
   EvaluateResult,
+  CrawlResult,
+  CrawlOptions,
+  WebSearchResult,
+  WebSearchOptions,
+  ExtractResult,
+  ExtractOptions,
   ProviderConfig,
   BrowserProviderFactory,
 } from '../core/types'
@@ -178,6 +184,81 @@ class HyperbrowserProvider implements BrowserProvider {
 
   getCdpUrl(session: BrowserSession): string | undefined {
     return session.cdpUrl
+  }
+
+  async crawl(url: string, options?: CrawlOptions, _session?: BrowserSession): Promise<CrawlResult> {
+    try {
+      const body: Record<string, unknown> = {
+        url,
+        outputs: { formats: options?.formats ?? ['markdown'] },
+        crawlOptions: { maxPages: options?.maxPages ?? 10 },
+      }
+
+      const res = await this.client.postJSON<Record<string, unknown>>(
+        `${this.baseURL}/api/web/crawl`,
+        body,
+        this.headers(),
+      )
+
+      const jobId = res.jobId as string
+      const data = res.data as Record<string, unknown> | undefined
+      const pages = (data?.pages ?? data?.results ?? []) as Array<Record<string, unknown>>
+
+      return {
+        pages: pages.map(p => ({
+          url: (p.url ?? p.sourceURL ?? '') as string,
+          title: p.title as string | undefined,
+          markdown: p.markdown as string | undefined,
+          html: p.html as string | undefined,
+        })),
+        totalFound: pages.length,
+        jobId,
+        status: res.status as 'completed' | 'running' | 'failed',
+      }
+    }
+    catch (error) { throw normalizeError(error, 'hyperbrowser') }
+  }
+
+  async search(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]> {
+    try {
+      const body: Record<string, unknown> = { query }
+
+      const res = await this.client.postJSON<Record<string, unknown>>(
+        `${this.baseURL}/api/web/search`,
+        body,
+        this.headers(),
+      )
+
+      const data = res.data as Record<string, unknown> | undefined
+      const results = (data?.results ?? res.results ?? []) as Array<Record<string, unknown>>
+      return results.map(r => ({
+        url: (r.url ?? '') as string,
+        title: (r.title ?? '') as string,
+        snippet: (r.description ?? r.snippet ?? '') as string,
+      }))
+    }
+    catch (error) { throw normalizeError(error, 'hyperbrowser') }
+  }
+
+  async extract(url: string, options?: ExtractOptions, _session?: BrowserSession): Promise<ExtractResult> {
+    try {
+      const body: Record<string, unknown> = { urls: [url] }
+      if (options?.schema) body.schema = options.schema
+      if (options?.prompt) body.prompt = options.prompt
+
+      const res = await this.client.postJSON<Record<string, unknown>>(
+        `${this.baseURL}/api/extract`,
+        body,
+        this.headers(),
+      )
+
+      const jobId = res.jobId as string
+      return {
+        url,
+        data: { jobId, status: 'submitted' },
+      }
+    }
+    catch (error) { throw normalizeError(error, 'hyperbrowser') }
   }
 
   async isAvailable(): Promise<boolean> {

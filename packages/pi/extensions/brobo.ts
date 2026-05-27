@@ -357,6 +357,188 @@ export default function broboExtension(pi: ExtensionAPI) {
   })
 
   pi.registerTool({
+    name: "brobo_extract",
+    label: "Brobo Extract",
+    description: "Extract structured data from a URL using AI. Cloudflare returns synchronous results. Hyperbrowser returns an async job ID.",
+    promptSnippet: "Extract structured data from a URL with AI.",
+    promptGuidelines: [
+      "Use brobo_extract when the user needs structured data from a webpage (product info, pricing, articles).",
+      "Cloudflare returns results synchronously. Hyperbrowser returns a jobId for async processing.",
+      "Pass a prompt describing what to extract.",
+    ],
+    parameters: Type.Object({
+      url: Type.String({ description: "URL to extract data from" }),
+      provider: Type.Optional(Type.String({ description: `Provider. One of: cloudflare, hyperbrowser.` })),
+      prompt: Type.String({ description: "What to extract (e.g. 'Extract product name, price, and description')" }),
+    }),
+    renderCall(args, theme) {
+      return new Text(`${theme.fg("toolTitle", theme.bold("brobo_extract"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`, 0, 0)
+    },
+    async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; data: unknown }>> {
+      const providerName = resolveProvider(params.provider)
+      const apiKey = getApiKey(providerName)
+      const baseURL = getBaseURL(providerName)
+      const headers = getHeaders(providerName, apiKey)
+
+      if (providerName === "cloudflare") {
+        const res = await fetch(`${baseURL}/json`, { method: "POST", headers, body: JSON.stringify({ url: params.url, prompt: params.prompt }) })
+        const data = await res.json() as Record<string, unknown>
+        const result = data.result ?? data
+        return {
+          content: [{ type: "text", text: `[provider=cloudflare] ${params.url}\n\n${JSON.stringify(result, null, 2)}` }],
+          details: { url: params.url, provider: "cloudflare", data: result },
+        }
+      }
+
+      if (providerName === "hyperbrowser") {
+        const res = await fetch(`${baseURL}/api/extract`, { method: "POST", headers, body: JSON.stringify({ urls: [params.url], prompt: params.prompt }) })
+        const data = await res.json() as Record<string, unknown>
+        return {
+          content: [{ type: "text", text: `[provider=hyperbrowser] Extract job submitted: ${data.jobId}` }],
+          details: { url: params.url, provider: "hyperbrowser", data },
+        }
+      }
+
+      throw new Error(`Provider ${providerName} does not support extract.`)
+    },
+  })
+
+  pi.registerTool({
+    name: "brobo_crawl",
+    label: "Brobo Crawl",
+    description: "Crawl a website following links. Cloudflare and Hyperbrowser support async crawl jobs. Returns pages with markdown/HTML content.",
+    promptSnippet: "Crawl a website and extract content from multiple pages.",
+    promptGuidelines: [
+      "Use brobo_crawl when the user needs content from multiple pages of a website.",
+      "Both cloudflare and hyperbrowser return async job IDs. Results may need polling.",
+      "Pass maxPages to limit the crawl scope.",
+    ],
+    parameters: Type.Object({
+      url: Type.String({ description: "Starting URL" }),
+      provider: Type.Optional(Type.String({ description: `Provider. One of: cloudflare, hyperbrowser.` })),
+      maxPages: Type.Optional(Type.Number({ description: "Max pages to crawl. Default: 10." })),
+    }),
+    renderCall(args, theme) {
+      return new Text(`${theme.fg("toolTitle", theme.bold("brobo_crawl"))} ${theme.fg("dim", args.url)}`, 0, 0)
+    },
+    async execute(_toolCallId, params): Promise<AgentToolResult<{ jobId?: string; pages: number }>> {
+      const providerName = resolveProvider(params.provider)
+      const apiKey = getApiKey(providerName)
+      const baseURL = getBaseURL(providerName)
+      const headers = getHeaders(providerName, apiKey)
+
+      if (providerName === "cloudflare") {
+        const res = await fetch(`${baseURL}/crawl`, { method: "POST", headers, body: JSON.stringify({ url: params.url, limit: params.maxPages ?? 10 }) })
+        const data = await res.json() as Record<string, unknown>
+        const jobId = data.result as string
+        return { content: [{ type: "text", text: `[provider=cloudflare] Crawl job started: ${jobId}` }], details: { jobId, pages: 0 } }
+      }
+
+      if (providerName === "hyperbrowser") {
+        const body = { url: params.url, outputs: { formats: ["markdown"] }, crawlOptions: { maxPages: params.maxPages ?? 10 } }
+        const res = await fetch(`${baseURL}/api/web/crawl`, { method: "POST", headers, body: JSON.stringify(body) })
+        const data = await res.json() as Record<string, unknown>
+        return { content: [{ type: "text", text: `[provider=hyperbrowser] Crawl job started: ${data.jobId}` }], details: { jobId: data.jobId as string, pages: 0 } }
+      }
+
+      throw new Error(`Provider ${providerName} does not support crawl.`)
+    },
+  })
+
+  pi.registerTool({
+    name: "brobo_pdf",
+    label: "Brobo PDF",
+    description: "Generate a PDF from a URL. Cloudflare and Browserless support stateless PDF generation.",
+    promptSnippet: "Generate a PDF from a URL.",
+    promptGuidelines: [
+      "Use brobo_pdf when the user needs a PDF of a webpage.",
+      "Cloudflare and Browserless work statelessly (no session needed).",
+    ],
+    parameters: Type.Object({
+      url: Type.String({ description: "URL to convert to PDF" }),
+      provider: Type.Optional(Type.String({ description: `Provider. One of: cloudflare, browserless.` })),
+    }),
+    renderCall(args, theme) {
+      return new Text(`${theme.fg("toolTitle", theme.bold("brobo_pdf"))} ${theme.fg("dim", args.url)}`, 0, 0)
+    },
+    async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; pdfLength: number }>> {
+      const providerName = resolveProvider(params.provider)
+      const apiKey = getApiKey(providerName)
+      const baseURL = getBaseURL(providerName)
+      const headers = getHeaders(providerName, apiKey)
+
+      if (providerName === "cloudflare") {
+        const res = await fetch(`${baseURL}/pdf`, { method: "POST", headers, body: JSON.stringify({ url: params.url }) })
+        const buf = await res.arrayBuffer()
+        return { content: [{ type: "text", text: `[provider=cloudflare] PDF generated: ${buf.byteLength} bytes` }], details: { url: params.url, provider: "cloudflare", pdfLength: buf.byteLength } }
+      }
+
+      if (providerName === "browserless") {
+        const res = await fetch(`${baseURL}/pdf?token=${apiKey}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: params.url }) })
+        const buf = await res.arrayBuffer()
+        return { content: [{ type: "text", text: `[provider=browserless] PDF generated: ${buf.byteLength} bytes` }], details: { url: params.url, provider: "browserless", pdfLength: buf.byteLength } }
+      }
+
+      throw new Error(`Provider ${providerName} does not support PDF generation.`)
+    },
+  })
+
+  pi.registerTool({
+    name: "brobo_links",
+    label: "Brobo Links",
+    description: "Extract all links from a webpage. Cloudflare supports stateless link extraction.",
+    promptSnippet: "Extract links from a webpage.",
+    promptGuidelines: [
+      "Use brobo_links when the user needs all links from a page.",
+      "Only cloudflare supports this currently.",
+    ],
+    parameters: Type.Object({
+      url: Type.String({ description: "URL to extract links from" }),
+    }),
+    renderCall(args, theme) {
+      return new Text(`${theme.fg("toolTitle", theme.bold("brobo_links"))} ${theme.fg("dim", args.url)}`, 0, 0)
+    },
+    async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; links: string[] }>> {
+      const apiKey = getApiKey("cloudflare")
+      const baseURL = getBaseURL("cloudflare")
+      const headers = getHeaders("cloudflare", apiKey)
+      const res = await fetch(`${baseURL}/links`, { method: "POST", headers, body: JSON.stringify({ url: params.url }) })
+      const data = await res.json() as Record<string, unknown>
+      const links = (data.result ?? []) as string[]
+      return { content: [{ type: "text", text: `[provider=cloudflare] ${links.length} links:\n${links.join("\n")}` }], details: { url: params.url, links } }
+    },
+  })
+
+  pi.registerTool({
+    name: "brobo_search",
+    label: "Brobo Search",
+    description: "Web search via browser provider. Hyperbrowser supports native web search.",
+    promptSnippet: "Search the web via browser provider.",
+    promptGuidelines: [
+      "Use brobo_search when the user needs web search results.",
+      "Hyperbrowser supports native web search.",
+    ],
+    parameters: Type.Object({
+      query: Type.String({ description: "Search query" }),
+    }),
+    renderCall(args, theme) {
+      return new Text(`${theme.fg("toolTitle", theme.bold("brobo_search"))} ${theme.fg("dim", args.query)}`, 0, 0)
+    },
+    async execute(_toolCallId, params): Promise<AgentToolResult<{ results: Array<{ url: string; title: string; snippet: string }> }>> {
+      const apiKey = getApiKey("hyperbrowser")
+      const baseURL = getBaseURL("hyperbrowser")
+      const headers = getHeaders("hyperbrowser", apiKey)
+      const res = await fetch(`${baseURL}/api/web/search`, { method: "POST", headers, body: JSON.stringify({ query: params.query }) })
+      const data = await res.json() as Record<string, unknown>
+      const inner = data.data as Record<string, unknown> | undefined
+      const results = (inner?.results ?? []) as Array<{ url: string; title: string; description: string }>
+      const mapped = results.map(r => ({ url: r.url, title: r.title, snippet: r.description }))
+      const lines = mapped.map(r => `${r.title}\n  ${r.url}\n  ${r.snippet}`)
+      return { content: [{ type: "text", text: `[provider=hyperbrowser] ${mapped.length} results:\n\n${lines.join("\n\n")}` }], details: { results: mapped } }
+    },
+  })
+
+  pi.registerTool({
     name: "brobo_capabilities",
     label: "Brobo Capabilities",
     description: "Read-only: check what operations a specific browser provider supports (scrape, screenshot, navigate, evaluate, sessions, CDP, stateless modes).",

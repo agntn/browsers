@@ -14,6 +14,11 @@ const main = defineCommand({
   subCommands: {
     scrape: () => import('./commands/scrape').then(m => m.default),
     screenshot: () => import('./commands/screenshot').then(m => m.default),
+    crawl: () => import('./commands/crawl').then(m => m.default),
+    pdf: () => import('./commands/pdf').then(m => m.default),
+    links: () => import('./commands/links').then(m => m.default),
+    search: () => import('./commands/search').then(m => m.default),
+    extract: () => import('./commands/extract').then(m => m.default),
     session: () => import('./commands/session').then(m => m.default),
     providers: () => import('./commands/providers').then(m => m.default),
   },

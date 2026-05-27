@@ -1,6 +1,11 @@
 const passthroughFirstArgs = new Set([
   'scrape',
   'screenshot',
+  'crawl',
+  'pdf',
+  'links',
+  'search',
+  'extract',
   'session',
   'providers',
 ])

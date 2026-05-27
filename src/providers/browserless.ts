@@ -1,0 +1,179 @@
+import type {
+  BrowserProvider,
+  BrowserSession,
+  CreateSessionOptions,
+  ScrapeResult,
+  ScrapeOptions,
+  ScreenshotResult,
+  ScreenshotOptions,
+  EvaluateResult,
+  ProviderConfig,
+  BrowserProviderFactory,
+} from '../core/types'
+import { defaultClient } from '../core/client'
+import type { Client } from '../core/client'
+import { AuthError, normalizeError } from '../core/errors'
+import { register } from '../core/registry'
+
+class BrowserlessProvider implements BrowserProvider {
+  private readonly client: Client
+  private readonly baseURL: string
+  private readonly apiKey: string
+
+  constructor(config: ProviderConfig) {
+    if (!config.apiKey) {
+      throw new AuthError('Missing API key for Browserless. Set BROWSERLESS_API_KEY', 'browserless')
+    }
+    this.client = defaultClient()
+    this.baseURL = (config.baseURL ?? 'https://chrome.browserless.io').replace(/\/+$/, '')
+    this.apiKey = config.apiKey
+  }
+
+  name(): string { return 'browserless' }
+
+  private tokenParam(): string {
+    return `token=${this.apiKey}`
+  }
+
+  async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
+    try {
+      const body: Record<string, unknown> = { timeout: options?.timeout ?? 300_000 }
+      if (options?.proxy) body.proxy = options.proxy.server
+      if (options?.stealth) body.stealth = true
+      if (options?.extra) Object.assign(body, options.extra)
+
+      const res = await this.client.postJSON<{ id?: string; browserWSEndpoint?: string }>(
+        `${this.baseURL}/sessions?${this.tokenParam()}`,
+        body,
+        { 'Content-Type': 'application/json' },
+      )
+
+      return {
+        id: res.id ?? '',
+        cdpUrl: res.browserWSEndpoint,
+        provider: 'browserless',
+        createdAt: Date.now(),
+      }
+    }
+    catch (error) { throw normalizeError(error, 'browserless') }
+  }
+
+  async getSession(sessionId: string): Promise<BrowserSession | null> {
+    try {
+      const res = await this.client.getJSON<{ id?: string; browserWSEndpoint?: string }>(
+        `${this.baseURL}/sessions/${sessionId}?${this.tokenParam()}`,
+      )
+      if (!res.id) return null
+      return {
+        id: res.id,
+        cdpUrl: res.browserWSEndpoint,
+        provider: 'browserless',
+        createdAt: Date.now(),
+      }
+    }
+    catch { return null }
+  }
+
+  async listSessions(): Promise<BrowserSession[]> {
+    try {
+      const res = await this.client.getJSON<Array<{ id?: string; browserWSEndpoint?: string }>>(
+        `${this.baseURL}/sessions?${this.tokenParam()}`,
+      )
+      return res.map(s => ({
+        id: s.id ?? '',
+        cdpUrl: s.browserWSEndpoint,
+        provider: 'browserless',
+        createdAt: Date.now(),
+      }))
+    }
+    catch { return [] }
+  }
+
+  async releaseSession(sessionId: string): Promise<void> {
+    try {
+      await this.client.deleteJSON(
+        `${this.baseURL}/sessions/${sessionId}?${this.tokenParam()}`,
+      )
+    }
+    catch (error) { throw normalizeError(error, 'browserless') }
+  }
+
+  async scrape(url: string, options?: ScrapeOptions, _session?: BrowserSession): Promise<ScrapeResult> {
+    try {
+      const body: Record<string, unknown> = {
+        url,
+        waitForSelector: options?.waitFor,
+        gotoOptions: { waitUntil: options?.waitForNetworkIdle ? 'networkidle' : 'load' },
+      }
+      if (options?.headers) body.headers = options.headers
+      if (options?.script) body.js = options.script
+
+      const res = await this.client.postJSON<{ data?: string; content?: string }>(
+        `${this.baseURL}/content?${this.tokenParam()}`,
+        body,
+        { 'Content-Type': 'application/json' },
+      )
+
+      return {
+        url,
+        html: res.data ?? res.content,
+      }
+    }
+    catch (error) { throw normalizeError(error, 'browserless') }
+  }
+
+  async screenshot(options: ScreenshotOptions, _session?: BrowserSession): Promise<ScreenshotResult> {
+    try {
+      const body: Record<string, unknown> = {
+        type: options.format ?? 'png',
+        fullPage: options.fullPage ?? true,
+      }
+
+      const res = await this.client.postJSON<{ data?: string }>(
+        `${this.baseURL}/screenshot?${this.tokenParam()}`,
+        body,
+        { 'Content-Type': 'application/json' },
+      )
+
+      return {
+        data: res.data ?? '',
+        mimeType: `image/${options.format ?? 'png'}`,
+      }
+    }
+    catch (error) { throw normalizeError(error, 'browserless') }
+  }
+
+  async navigate(url: string, session: BrowserSession): Promise<void> {
+    await this.evaluate(`await page.goto(${JSON.stringify(url)})`, session)
+  }
+
+  async evaluate(script: string, session: BrowserSession): Promise<EvaluateResult> {
+    try {
+      const res = await this.client.postJSON<{ data?: unknown }>(
+        `${this.baseURL}/function?${this.tokenParam()}`,
+        { code: script },
+        { 'Content-Type': 'application/json' },
+      )
+      return { value: res.data }
+    }
+    catch (error) { throw normalizeError(error, 'browserless') }
+  }
+
+  getCdpUrl(session: BrowserSession): string {
+    if (session.cdpUrl) return session.cdpUrl
+    return `wss://chrome.browserless.io?token=${this.apiKey}`
+  }
+
+  async isAvailable(): Promise<boolean> {
+    try {
+      await this.client.getJSON<{ status?: string }>(
+        `${this.baseURL}/stats?${this.tokenParam()}`,
+      )
+      return true
+    }
+    catch { return false }
+  }
+}
+
+const factory: BrowserProviderFactory = (config) => new BrowserlessProvider(config)
+register('browserless', 'https://chrome.browserless.io', factory)

@@ -1,0 +1,83 @@
+{
+  "name": "brobo",
+  "version": "0.1.0",
+  "description": "Unified browser-as-a-service provider for AI agents and CLI.",
+  "type": "module",
+  "license": "MIT",
+  "author": "oritwoen (https://github.com/oritwoen)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oritwoen/brobo.git"
+  },
+  "homepage": "https://github.com/oritwoen/brobo#readme",
+  "bugs": "https://github.com/oritwoen/brobo/issues",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "bin": {
+    "brobo": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "packages/pi/extensions"
+  ],
+  "pi": {
+    "extensions": [
+      "./packages/pi/extensions/*.ts"
+    ]
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.33.4",
+  "scripts": {
+    "build": "obuild",
+    "dev": "obuild --stub",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.extensions.json",
+    "test": "vitest",
+    "test:run": "vitest --run",
+    "prepack": "pnpm run build",
+    "release": "pnpm test:run && pnpm build && changelogen --release --push"
+  },
+  "keywords": [
+    "browser",
+    "browserbase",
+    "steel",
+    "kernel",
+    "browserless",
+    "hyperbrowser",
+    "anchor",
+    "headless",
+    "automation",
+    "agent",
+    "cdp",
+    "scrape",
+    "screenshot",
+    "cli",
+    "providers",
+    "unified",
+    "typescript",
+    "pi-extension",
+    "pi-package"
+  ],
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "@types/node": "latest",
+    "changelogen": "latest",
+    "obuild": "latest",
+    "tsx": "^4.22.3",
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "dependencies": {
+    "citty": "latest",
+    "consola": "latest",
+    "ofetch": "^1.5.1"
+  }
+}

@@ -167,20 +167,12 @@ class HyperbrowserProvider implements BrowserProvider {
     catch (error) { throw normalizeError(error, 'hyperbrowser') }
   }
 
-  async navigate(url: string, session: BrowserSession): Promise<void> {
-    await this.evaluate(`window.location.href = ${JSON.stringify(url)}`, session)
+  async navigate(_url: string, _session: BrowserSession): Promise<void> {
+    throw new Error('Hyperbrowser does not support navigate via REST. Connect via CDP for full automation.')
   }
 
-  async evaluate(script: string, session: BrowserSession): Promise<EvaluateResult> {
-    try {
-      const res = await this.client.postJSON<{ value?: unknown; logs?: string[] }>(
-        `${this.baseURL}/v1/session/${session.id}/execute`,
-        { code: script },
-        this.headers(),
-      )
-      return { value: res.value, logs: res.logs }
-    }
-    catch (error) { throw normalizeError(error, 'hyperbrowser') }
+  async evaluate(_script: string, _session: BrowserSession): Promise<EvaluateResult> {
+    throw new Error('Hyperbrowser does not support evaluate via REST. Connect via CDP (Puppeteer/Playwright) for script execution.')
   }
 
   getCdpUrl(session: BrowserSession): string | undefined {

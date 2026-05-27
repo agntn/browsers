@@ -164,11 +164,11 @@ class CloudflareProvider implements BrowserProvider {
         body,
         this.headers(),
       )
-      const result = this.unwrap(res)
+      const result = this.unwrap(res) as CfContentResult | string
 
       return {
         url,
-        html: result.content,
+        html: typeof result === 'string' ? result : result.content,
       }
     }
     catch (error) { throw normalizeError(error, 'cloudflare') }

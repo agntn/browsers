@@ -84,6 +84,8 @@ export interface ScrapeOptions {
 
 /** Options for taking a screenshot. */
 export interface ScreenshotOptions {
+  /** URL to screenshot (stateless mode, no session needed). */
+  url?: string
   /** CSS selector to screenshot (default: full page). */
   selector?: string
   /** Output format. */
@@ -136,8 +138,8 @@ export interface BrowserProvider {
   /** Scrape content from a URL (may use session or stateless endpoint). */
   scrape(url: string, options?: ScrapeOptions, session?: BrowserSession): Promise<ScrapeResult>
 
-  /** Take a screenshot (session required for most providers). */
-  screenshot(options: ScreenshotOptions, session: BrowserSession): Promise<ScreenshotResult>
+  /** Take a screenshot. Session required unless options.url is set (stateless mode). */
+  screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult>
 
   /** Navigate session to URL. */
   navigate(url: string, session: BrowserSession): Promise<void>

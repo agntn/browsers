@@ -160,8 +160,9 @@ class SteelProvider implements BrowserProvider {
     catch (error) { throw normalizeError(error, 'steel') }
   }
 
-  async screenshot(options: ScreenshotOptions, session: BrowserSession): Promise<ScreenshotResult> {
+  async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
+      if (!session?.id) throw new Error('Steel screenshot requires a session. Create one first, or use scrape for stateless content.')
       const body: Record<string, unknown> = {
         sessionId: session.id,
         fullPage: options.fullPage ?? true,

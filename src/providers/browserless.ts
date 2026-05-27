@@ -122,11 +122,17 @@ class BrowserlessProvider implements BrowserProvider {
     catch (error) { throw normalizeError(error, 'browserless') }
   }
 
-  async screenshot(options: ScreenshotOptions, _session?: BrowserSession): Promise<ScreenshotResult> {
+  async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
       const body: Record<string, unknown> = {
         type: options.format ?? 'png',
         fullPage: options.fullPage ?? true,
+      }
+      if (options.url) body.url = options.url
+      if (options.selector) body.selector = options.selector
+
+      if (!options.url && !session?.id) {
+        throw new Error('Browserless screenshot requires either options.url or a session')
       }
 
       const res = await this.client.postJSON<{ data?: string }>(

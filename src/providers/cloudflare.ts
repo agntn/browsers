@@ -174,13 +174,19 @@ class CloudflareProvider implements BrowserProvider {
     catch (error) { throw normalizeError(error, 'cloudflare') }
   }
 
-  async screenshot(options: ScreenshotOptions, _session?: BrowserSession): Promise<ScreenshotResult> {
+  async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
       const body: Record<string, unknown> = {}
+      if (options.url) body.url = options.url
+      if (session?.id) body.sessionId = session.id
       if (options.selector) body.selector = options.selector
       if (options.fullPage !== undefined) body.fullPage = options.fullPage
       if (options.format) body.type = options.format
       if (options.quality) body.quality = options.quality
+
+      if (!options.url && !session?.id) {
+        throw new Error('Cloudflare screenshot requires either options.url or a session')
+      }
 
       const res = await this.client.postJSON<CfEnvelope<CfScreenshotResult>>(
         `${this.base()}/screenshot`,

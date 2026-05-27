@@ -139,8 +139,9 @@ class BrowserbaseProvider implements BrowserProvider {
     catch (error) { throw normalizeError(error, 'browserbase') }
   }
 
-  async screenshot(options: ScreenshotOptions, session: BrowserSession): Promise<ScreenshotResult> {
+  async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
+      if (!session?.id) throw new Error('Browserbase screenshot requires a session.')
       const body: Record<string, unknown> = {
         sessionId: session.id,
         fullPage: options.fullPage ?? true,

@@ -138,8 +138,9 @@ class KernelProvider implements BrowserProvider {
     catch (error) { throw normalizeError(error, 'kernel') }
   }
 
-  async screenshot(options: ScreenshotOptions, session: BrowserSession): Promise<ScreenshotResult> {
+  async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
+      if (!session?.id) throw new Error('Kernel screenshot requires a session.')
       const body: Record<string, unknown> = {
         fullPage: options.fullPage ?? true,
       }

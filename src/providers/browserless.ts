@@ -100,50 +100,44 @@ class BrowserlessProvider implements BrowserProvider {
 
   async scrape(url: string, options?: ScrapeOptions, _session?: BrowserSession): Promise<ScrapeResult> {
     try {
-      const body: Record<string, unknown> = {
-        url,
-        waitForSelector: options?.waitFor,
-        gotoOptions: { waitUntil: options?.waitForNetworkIdle ? 'networkidle' : 'load' },
-      }
-      if (options?.headers) body.headers = options.headers
-      if (options?.script) body.js = options.script
-
-      const res = await this.client.postJSON<{ data?: string; content?: string }>(
+      const res = await fetch(
         `${this.baseURL}/content?${this.tokenParam()}`,
-        body,
-        { 'Content-Type': 'application/json' },
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        },
       )
-
-      return {
-        url,
-        html: res.data ?? res.content,
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const html = await res.text()
+      return { url, html }
     }
     catch (error) { throw normalizeError(error, 'browserless') }
   }
 
   async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
-      const body: Record<string, unknown> = {
-        type: options.format ?? 'png',
-        fullPage: options.fullPage ?? true,
-      }
-      if (options.url) body.url = options.url
-      if (options.selector) body.selector = options.selector
-
       if (!options.url && !session?.id) {
         throw new Error('Browserless screenshot requires either options.url or a session')
       }
 
-      const res = await this.client.postJSON<{ data?: string }>(
+      const body: Record<string, unknown> = {}
+      if (options.url) body.url = options.url
+
+      const res = await fetch(
         `${this.baseURL}/screenshot?${this.tokenParam()}`,
-        body,
-        { 'Content-Type': 'application/json' },
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
       )
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const png = await res.arrayBuffer()
 
       return {
-        data: res.data ?? '',
-        mimeType: `image/${options.format ?? 'png'}`,
+        data: `data:image/png;base64,${Buffer.from(png).toString('base64')}`,
+        mimeType: 'image/png',
       }
     }
     catch (error) { throw normalizeError(error, 'browserless') }

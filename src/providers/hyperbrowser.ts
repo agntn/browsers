@@ -34,7 +34,7 @@ class HyperbrowserProvider implements BrowserProvider {
       throw new AuthError('Missing API key for Hyperbrowser. Set HYPERBROWSER_API_KEY', 'hyperbrowser')
     }
     this.client = defaultClient()
-    this.baseURL = (config.baseURL ?? 'https://app.hyperbrowser.ai/api').replace(/\/+$/, '')
+    this.baseURL = (config.baseURL ?? 'https://api.hyperbrowser.ai').replace(/\/+$/, '')
     this.apiKey = config.apiKey
   }
 
@@ -121,24 +121,24 @@ class HyperbrowserProvider implements BrowserProvider {
 
   async scrape(url: string, options?: ScrapeOptions, _session?: BrowserSession): Promise<ScrapeResult> {
     try {
-      const body: Record<string, unknown> = { url }
-      if (options?.waitFor) body.waitFor = options.waitFor
-      if (options?.headers) body.headers = options.headers
-      if (options?.script) body.js = options.script
+      const body: Record<string, unknown> = {
+        url,
+        outputs: { formats: ['markdown'] },
+      }
 
       const res = await this.client.postJSON<Record<string, unknown>>(
-        `${this.baseURL}/v1/scrape`,
+        `${this.baseURL}/api/web/fetch`,
         body,
         this.headers(),
       )
 
+      const data = res.data as Record<string, unknown> | undefined
       return {
         url,
-        title: res.title as string | undefined,
-        html: res.html as string | undefined,
-        markdown: res.markdown as string | undefined,
-        text: res.text as string | undefined,
-        statusCode: res.statusCode as number | undefined,
+        title: data?.metadata ? (data.metadata as Record<string, string>).title : undefined,
+        markdown: data?.markdown as string | undefined,
+        html: data?.html as string | undefined,
+        statusCode: res.status === 'completed' ? 200 : undefined,
       }
     }
     catch (error) { throw normalizeError(error, 'hyperbrowser') }
@@ -193,4 +193,4 @@ class HyperbrowserProvider implements BrowserProvider {
 }
 
 const factory: BrowserProviderFactory = (config) => new HyperbrowserProvider(config)
-register('hyperbrowser', 'https://app.hyperbrowser.ai/api', factory)
+register('hyperbrowser', 'https://api.hyperbrowser.ai', factory)

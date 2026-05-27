@@ -176,25 +176,41 @@ class CloudflareProvider implements BrowserProvider {
 
   async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
+      if (!options.url && !session?.id) {
+        throw new Error('Cloudflare screenshot requires either options.url or a session')
+      }
+
       const body: Record<string, unknown> = {}
       if (options.url) body.url = options.url
       if (session?.id) body.sessionId = session.id
       if (options.selector) body.selector = options.selector
       if (options.fullPage !== undefined) body.fullPage = options.fullPage
-      if (options.format) body.type = options.format
-      if (options.quality) body.quality = options.quality
 
-      if (!options.url && !session?.id) {
-        throw new Error('Cloudflare screenshot requires either options.url or a session')
+      const res = await fetch(
+        `${this.base()}/screenshot`,
+        {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify(body),
+        },
+      )
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        throw new Error(`Cloudflare screenshot HTTP ${res.status}: ${errText.slice(0, 200)}`)
       }
 
-      const res = await this.client.postJSON<CfEnvelope<CfScreenshotResult>>(
-        `${this.base()}/screenshot`,
-        body,
-        this.headers(),
-      )
-      const result = this.unwrap(res)
+      const contentType = res.headers.get('content-type') ?? ''
+      if (contentType.includes('image')) {
+        const png = await res.arrayBuffer()
+        return {
+          data: `data:image/png;base64,${Buffer.from(png).toString('base64')}`,
+          mimeType: 'image/png',
+        }
+      }
 
+      const data = await res.json() as CfEnvelope<CfScreenshotResult>
+      const result = this.unwrap(data)
       return {
         data: result.image ?? '',
         mimeType: `image/${options.format ?? 'png'}`,

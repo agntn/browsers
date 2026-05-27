@@ -53,6 +53,47 @@ export class Client {
     }
   }
 
+  async postText(
+    url: string,
+    body: Record<string, unknown>,
+    headers?: Record<string, string>,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    try {
+      const res = await this.fetch.raw(url, {
+        method: 'POST',
+        body,
+        headers,
+        signal,
+      })
+      return typeof res._data === 'string' ? res._data : String(res._data)
+    }
+    catch (error) {
+      throw this.mapError(error, url)
+    }
+  }
+
+  async postRaw(
+    url: string,
+    body: Record<string, unknown>,
+    headers?: Record<string, string>,
+    signal?: AbortSignal,
+  ): Promise<ArrayBuffer> {
+    try {
+      const res = await this.fetch.raw(url, {
+        method: 'POST',
+        body,
+        headers,
+        signal,
+        responseType: 'arrayBuffer',
+      })
+      return res._data as ArrayBuffer
+    }
+    catch (error) {
+      throw this.mapError(error, url)
+    }
+  }
+
   async deleteJSON<T>(
     url: string,
     headers?: Record<string, string>,

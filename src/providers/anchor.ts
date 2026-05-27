@@ -121,28 +121,8 @@ class AnchorProvider implements BrowserProvider {
     catch (error) { throw normalizeError(error, 'anchor') }
   }
 
-  async scrape(url: string, options?: ScrapeOptions, _session?: BrowserSession): Promise<ScrapeResult> {
-    try {
-      const body: Record<string, unknown> = { url }
-      if (options?.waitFor) body.waitFor = options.waitFor
-      if (options?.headers) body.headers = options.headers
-
-      const res = await this.client.postJSON<Record<string, unknown>>(
-        `${this.baseURL}/v1/scrape`,
-        body,
-        this.headers(),
-      )
-
-      return {
-        url,
-        title: res.title as string | undefined,
-        html: res.html as string | undefined,
-        markdown: res.markdown as string | undefined,
-        text: res.text as string | undefined,
-        statusCode: res.statusCode as number | undefined,
-      }
-    }
-    catch (error) { throw normalizeError(error, 'anchor') }
+  async scrape(_url: string, _options?: ScrapeOptions, _session?: BrowserSession): Promise<ScrapeResult> {
+    throw new Error('Anchor Browser does not support stateless scrape. Use a session with CDP (Puppeteer/Playwright) for content extraction.')
   }
 
   async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {

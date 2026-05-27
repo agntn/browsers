@@ -117,22 +117,18 @@ class BrowserbaseProvider implements BrowserProvider {
 
   async scrape(url: string, options?: ScrapeOptions, _session?: BrowserSession): Promise<ScrapeResult> {
     try {
-      const body: Record<string, unknown> = { url }
-      if (options?.waitFor) body.waitFor = options.waitFor
-      if (options?.headers) body.headers = options.headers
+      const body: Record<string, unknown> = { url, format: 'markdown' }
 
       const res = await this.client.postJSON<Record<string, unknown>>(
-        `${this.baseURL}/v1/scrape`,
+        `${this.baseURL}/v1/fetch`,
         body,
         this.headers(),
       )
 
       return {
         url,
-        title: res.title as string | undefined,
-        html: res.html as string | undefined,
-        markdown: res.markdown as string | undefined,
-        text: res.text as string | undefined,
+        html: res.content as string | undefined,
+        markdown: typeof res.content === 'string' ? res.content : undefined,
         statusCode: res.statusCode as number | undefined,
       }
     }

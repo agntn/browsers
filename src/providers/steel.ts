@@ -162,44 +162,36 @@ class SteelProvider implements BrowserProvider {
 
   async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
-      if (!session?.id) throw new Error('Steel screenshot requires a session. Create one first, or use scrape for stateless content.')
+      if (!session?.id) throw new Error('Steel screenshot requires a session.')
+
       const body: Record<string, unknown> = {
         sessionId: session.id,
         fullPage: options.fullPage ?? true,
       }
+      if (options.url) body.url = options.url
       if (options.selector) body.selector = options.selector
 
-      const res = await this.client.postJSON<{ screenshot?: string; data?: string }>(
+      const res = await this.client.postJSON<Record<string, unknown>>(
         `${this.baseURL}/v1/screenshot`,
         body,
         this.headers(),
       )
 
+      const data = (res.url ?? res.screenshot ?? res.data ?? '') as string
       return {
-        data: res.screenshot ?? res.data ?? '',
+        data,
         mimeType: `image/${options.format ?? 'png'}`,
       }
     }
     catch (error) { throw normalizeError(error, 'steel') }
   }
 
-  async navigate(url: string, session: BrowserSession): Promise<void> {
-    await this.evaluate(`window.location.href = ${JSON.stringify(url)}`, session)
+  async navigate(_url: string, _session: BrowserSession): Promise<void> {
+    throw new Error('Steel does not support navigate via REST. Connect via CDP for full automation.')
   }
 
-  async evaluate(script: string, session: BrowserSession): Promise<EvaluateResult> {
-    try {
-      const res = await this.client.postJSON<{ result?: { value?: unknown }; value?: unknown; logs?: string[] }>(
-        `${this.baseURL}/v1/sessions/${session.id}/execute`,
-        { code: script },
-        this.headers(),
-      )
-      return {
-        value: res.result?.value ?? res.value,
-        logs: res.logs,
-      }
-    }
-    catch (error) { throw normalizeError(error, 'steel') }
+  async evaluate(_script: string, _session: BrowserSession): Promise<EvaluateResult> {
+    throw new Error('Steel does not support evaluate via REST. Connect via CDP (Puppeteer/Playwright) for script execution.')
   }
 
   getCdpUrl(session: BrowserSession): string {

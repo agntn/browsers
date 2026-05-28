@@ -2,13 +2,14 @@ import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-ag
 import { Text } from "@earendil-works/pi-tui"
 import { Type } from "typebox"
 
-const builtinProviders = ["steel", "browserbase", "kernel", "browserless", "hyperbrowser", "anchor", "cloudflare"] as const
+const builtinProviders = ["steel", "browserbase", "kernel", "browserless", "hyperbrowser", "anchor", "cloudflare", "playwright"] as const
 
 const specialEnvKeys: Record<string, string[]> = {
   cloudflare: ["CF_API_TOKEN", "CLOUDFLARE_API_TOKEN"],
 }
 
 function hasKey(provider: string): boolean {
+  if (provider === "playwright") return true
   const specials = specialEnvKeys[provider]
   if (specials) return specials.some(k => !!process.env[k])
   return !!process.env[`${provider.toUpperCase()}_API_KEY`]
@@ -31,6 +32,7 @@ function getHeaders(provider: string, apiKey: string): Record<string, string> {
     case "hyperbrowser": return { "x-api-key": apiKey, "Content-Type": "application/json" }
     case "anchor": return { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
     case "cloudflare": return { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
+    case "playwright": return {}
     default: return { "Content-Type": "application/json" }
   }
 }
@@ -44,6 +46,7 @@ function getBaseURL(provider: string): string {
     case "hyperbrowser": return "https://app.hyperbrowser.ai/api"
     case "anchor": return "https://api.anchorbrowser.io"
     case "cloudflare": return `https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering`
+    case "playwright": return "local"
     default: throw new Error(`Unknown provider: ${provider}`)
   }
 }
@@ -55,6 +58,7 @@ function getApiKey(provider: string): string {
     if (!process.env.CF_ACCOUNT_ID && !process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error("Missing CF_ACCOUNT_ID (or CLOUDFLARE_ACCOUNT_ID)")
     return key
   }
+  if (provider === "playwright") return ""
   const key = process.env[`${provider.toUpperCase()}_API_KEY`]
   if (!key) throw new Error(`Missing API key for ${provider}. Set ${provider.toUpperCase()}_API_KEY`)
   return key
@@ -68,6 +72,7 @@ const providerCapabilities: Record<string, { scrape: boolean; screenshot: boolea
   hyperbrowser:    { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false, crawl: true,  pdf: false, links: false, search: true,  extract: true },
   anchor:          { scrape: false, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: false, statelessScreenshot: false, crawl: false, pdf: false, links: false, search: false, extract: false },
   cloudflare:      { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: true,  crawl: true,  pdf: true,  links: true,  search: false, extract: true },
+  playwright:      { scrape: true, screenshot: true, navigate: true,  evaluate: true,  sessions: true,  cdp: false, statelessScrape: true,  statelessScreenshot: false, crawl: true,  pdf: true,  links: true,  search: false, extract: false },
 }
 
 const scrapeParameters = Type.Object({
@@ -87,6 +92,14 @@ const releaseParameters = Type.Object({
 })
 
 const emptyParameters = Type.Object({})
+
+async function getBroboProvider(name: string) {
+  const mod = await import("brobo").catch(() => {
+    // @ts-ignore — runtime import from same package source
+    return import("../../src/index.ts")
+  })
+  return mod.create(name)
+}
 
 export default function broboExtension(pi: ExtensionAPI) {
 
@@ -110,6 +123,17 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; content: string }>> {
       const providerName = resolveProvider(params.provider)
+
+      if (providerName === "playwright") {
+        const provider = await getBroboProvider("playwright")
+        const result = await provider.scrape(params.url, { waitFor: params.waitFor })
+        const content = result.text || result.markdown || result.html || "No content extracted"
+        return {
+          content: [{ type: "text", text: `[provider=playwright] ${params.url}\n\n${content}` }],
+          details: { url: params.url, provider: "playwright", content },
+        }
+      }
+
       const apiKey = getApiKey(providerName)
       const baseURL = getBaseURL(providerName)
       const headers = getHeaders(providerName, apiKey)
@@ -175,6 +199,16 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ session: Record<string, unknown> }>> {
       const providerName = resolveProvider(params.provider)
+
+      if (providerName === "playwright") {
+        const provider = await getBroboProvider("playwright")
+        const session = await provider.createSession({ region: params.region })
+        return {
+          content: [{ type: "text", text: `[provider=playwright] Session created: ${session.id}` }],
+          details: { session: { id: session.id, provider: session.provider, createdAt: session.createdAt } },
+        }
+      }
+
       const apiKey = getApiKey(providerName)
       const baseURL = getBaseURL(providerName)
       const headers = getHeaders(providerName, apiKey)
@@ -230,6 +264,16 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ released: boolean }>> {
       const providerName = resolveProvider(params.provider)
+
+      if (providerName === "playwright") {
+        const provider = await getBroboProvider("playwright")
+        await provider.releaseSession(params.sessionId)
+        return {
+          content: [{ type: "text", text: `[provider=playwright] Session ${params.sessionId} released.` }],
+          details: { released: true },
+        }
+      }
+
       const apiKey = getApiKey(providerName)
       const baseURL = getBaseURL(providerName)
       const headers = getHeaders(providerName, apiKey)
@@ -323,6 +367,21 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; saved: boolean }>> {
       const providerName = resolveProvider(params.provider)
+
+      if (providerName === "playwright") {
+        const provider = await getBroboProvider("playwright")
+        const session = await provider.createSession()
+        try {
+          const result = await provider.screenshot({ url: params.url, fullPage: params.fullPage, format: params.format as any }, session)
+          return {
+            content: [{ type: "text", text: `[provider=playwright] Screenshot of ${params.url}. Data length: ${result.data.length} chars.` }],
+            details: { url: params.url, provider: "playwright", saved: false },
+          }
+        } finally {
+          await provider.releaseSession(session.id)
+        }
+      }
+
       const apiKey = getApiKey(providerName)
       const baseURL = getBaseURL(providerName)
       const headers = getHeaders(providerName, apiKey)
@@ -423,6 +482,16 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ jobId?: string; pages: number }>> {
       const providerName = resolveProvider(params.provider)
+
+      if (providerName === "playwright") {
+        const provider = await getBroboProvider("playwright")
+        const result = await provider.crawl(params.url, { maxPages: params.maxPages ?? 10 })
+        return {
+          content: [{ type: "text", text: `[provider=playwright] Crawled ${result.pages.length} pages.` }],
+          details: { pages: result.pages.length },
+        }
+      }
+
       const apiKey = getApiKey(providerName)
       const baseURL = getBaseURL(providerName)
       const headers = getHeaders(providerName, apiKey)
@@ -463,6 +532,16 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; pdfLength: number }>> {
       const providerName = resolveProvider(params.provider)
+
+      if (providerName === "playwright") {
+        const provider = await getBroboProvider("playwright")
+        const result = await provider.pdf(params.url)
+        return {
+          content: [{ type: "text", text: `[provider=playwright] PDF generated: ${result.data.length} chars.` }],
+          details: { url: params.url, provider: "playwright", pdfLength: result.data.length },
+        }
+      }
+
       const apiKey = getApiKey(providerName)
       const baseURL = getBaseURL(providerName)
       const headers = getHeaders(providerName, apiKey)
@@ -494,11 +573,24 @@ export default function broboExtension(pi: ExtensionAPI) {
     ],
     parameters: Type.Object({
       url: Type.String({ description: "URL to extract links from" }),
+      provider: Type.Optional(Type.String({ description: `Provider. One of: ${builtinProviders.join(", ")}.` })),
     }),
     renderCall(args, theme) {
       return new Text(`${theme.fg("toolTitle", theme.bold("brobo_links"))} ${theme.fg("dim", args.url)}`, 0, 0)
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; links: string[] }>> {
+      const providerName = resolveProvider(params.provider)
+
+      if (providerName === "playwright") {
+        const provider = await getBroboProvider("playwright")
+        const result = await provider.links(params.url)
+        const links = result.links.map((l: { href: string }) => l.href)
+        return {
+          content: [{ type: "text", text: `[provider=playwright] ${links.length} links:\n${links.join("\n")}` }],
+          details: { url: params.url, links },
+        }
+      }
+
       const apiKey = getApiKey("cloudflare")
       const baseURL = getBaseURL("cloudflare")
       const headers = getHeaders("cloudflare", apiKey)

@@ -79,6 +79,7 @@
   "dependencies": {
     "citty": "latest",
     "consola": "latest",
-    "ofetch": "^1.5.1"
+    "ofetch": "^1.5.1",
+    "playwright": "^1.52.0"
   }
 }

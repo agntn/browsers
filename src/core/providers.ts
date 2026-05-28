@@ -6,6 +6,7 @@ export const builtinProviders = [
   'hyperbrowser',
   'anchor',
   'cloudflare',
+  'playwright',
 ] as const
 
 export type BrowserProviderName = typeof builtinProviders[number]

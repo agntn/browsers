@@ -9,6 +9,7 @@ const caps: Record<string, { scrape: boolean; screenshot: boolean; navigate: boo
   hyperbrowser: { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false, crawl: true,  pdf: false, links: false, search: true,  extract: true },
   anchor:       { scrape: false, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: false, statelessScreenshot: false, crawl: false, pdf: false, links: false, search: false, extract: false },
   cloudflare:   { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: true,  crawl: true,  pdf: true,  links: true,  search: false, extract: true },
+  playwright:   { scrape: true, screenshot: true, navigate: true,  evaluate: true,  sessions: true,  cdp: false, statelessScrape: true,  statelessScreenshot: false, crawl: true,  pdf: true,  links: true,  search: false, extract: false },
 }
 
 export default defineCommand({
@@ -47,9 +48,11 @@ export default defineCommand({
     }
 
     for (const name of all) {
-      const hasKey = envKeys[name]
-        ? envKeys[name].some(k => !!process.env[k])
-        : !!process.env[`${name.toUpperCase()}_API_KEY`]
+      const hasKey = name === 'playwright'
+        ? true
+        : envKeys[name]
+          ? envKeys[name].some(k => !!process.env[k])
+          : !!process.env[`${name.toUpperCase()}_API_KEY`]
       const c = caps[name]
       const tags = [
         c?.scrape ? 'scrape' : null,

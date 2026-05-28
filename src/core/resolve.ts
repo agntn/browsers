@@ -6,6 +6,7 @@ const specialEnvKeys: Record<string, string[]> = {
 }
 
 function hasKey(provider: string): boolean {
+  if (provider === 'playwright') return true
   const specials = specialEnvKeys[provider]
   if (specials) {
     for (const key of specials) {

@@ -172,7 +172,7 @@ class CloudflareProvider implements BrowserProvider {
     try {
       const body: Record<string, unknown> = { url }
       if (options?.waitFor) body.waitForSelector = options.waitFor
-      if (options?.waitForNetworkIdle) body.waitForSelector = options.waitForNetworkIdle
+      if (options?.waitForNetworkIdle) body.waitUntil = 'networkidle'
       if (options?.headers) body.headers = options.headers
       if (options?.script) body.addScriptTag = { content: options.script }
 

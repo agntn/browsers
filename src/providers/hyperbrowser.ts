@@ -15,6 +15,7 @@ import type {
   ExtractOptions,
   ProviderConfig,
   BrowserProviderFactory,
+  ProviderCapabilities,
 } from '../core/types'
 import { defaultClient } from '../core/client'
 import type { Client } from '../core/client'
@@ -45,6 +46,14 @@ class HyperbrowserProvider implements BrowserProvider {
   }
 
   name(): string { return 'hyperbrowser' }
+
+  capabilities(): ProviderCapabilities {
+    return {
+      scrape: true, screenshot: true, navigate: false, evaluate: false,
+      sessions: true, cdp: true, statelessScrape: true, statelessScreenshot: false,
+      crawl: true, pdf: false, links: false, search: true, extract: true,
+    }
+  }
 
   private headers(): Record<string, string> {
     return {

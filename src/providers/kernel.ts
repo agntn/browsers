@@ -9,6 +9,7 @@ import type {
   EvaluateResult,
   ProviderConfig,
   BrowserProviderFactory,
+  ProviderCapabilities,
 } from '../core/types'
 import { defaultClient } from '../core/client'
 import type { Client } from '../core/client'
@@ -39,6 +40,14 @@ class KernelProvider implements BrowserProvider {
   }
 
   name(): string { return 'kernel' }
+
+  capabilities(): ProviderCapabilities {
+    return {
+      scrape: true, screenshot: true, navigate: true, evaluate: true,
+      sessions: true, cdp: true, statelessScrape: false, statelessScreenshot: false,
+      crawl: false, pdf: false, links: false, search: false, extract: false,
+    }
+  }
 
   private headers(): Record<string, string> {
     return {

@@ -13,6 +13,8 @@ import type {
   CrawlOptions,
   PdfResult,
   PdfOptions,
+  ProviderCapabilities,
+  LinksResult,
 } from '../core/types'
 import { BroboError, SessionNotFoundError, normalizeError } from '../core/errors'
 import { register } from '../core/registry'
@@ -55,6 +57,14 @@ class PlaywrightProvider implements BrowserProvider {
     return 'playwright'
   }
 
+  capabilities(): ProviderCapabilities {
+    return {
+      scrape: true, screenshot: true, navigate: true, evaluate: true,
+      sessions: true, cdp: false, statelessScrape: true, statelessScreenshot: false,
+      crawl: true, pdf: true, links: true, search: false, extract: false,
+    }
+  }
+
   private getSessionData(sessionId: string): PlaywrightSession {
     const data = this.sessions.get(sessionId)
     if (!data) throw new SessionNotFoundError(sessionId, 'playwright')
@@ -70,6 +80,7 @@ class PlaywrightProvider implements BrowserProvider {
       const { chromium } = await import('playwright')
       const browser = await chromium.launch({
         headless: options?.headless ?? true,
+        executablePath: resolveSystemChromium(),
       })
       const context = await browser.newContext({
         viewport: options?.viewport ?? { width: 1280, height: 720 },
@@ -282,7 +293,46 @@ class PlaywrightProvider implements BrowserProvider {
     }
   }
 
+  async links(url: string, session?: BrowserSession): Promise<LinksResult> {
+    let browser: Browser | undefined
+    let page: Page
+    let owns = false
+
+    try {
+      if (session) {
+        page = this.getPage(session)
+      }
+      else {
+        const { chromium } = await import('playwright')
+        browser = await chromium.launch({ headless: true, executablePath: resolveSystemChromium() })
+        page = await browser.newPage()
+        owns = true
+      }
+
+      await page.goto(url, { waitUntil: 'load', timeout: 15000 })
+
+      const rawLinks = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('a[href]')).map(a => {
+          const el = a as HTMLAnchorElement
+          return { href: el.href, text: el.textContent?.trim() || undefined, rel: el.rel || undefined }
+        }),
+      )
+
+      if (owns && browser) await browser.close()
+
+      return {
+        url,
+        links: rawLinks,
+      }
+    }
+    catch (error) {
+      if (owns && browser) await browser.close().catch(() => {})
+      throw normalizeError(error, 'playwright')
+    }
+  }
+
   async crawl(url: string, options?: CrawlOptions, session?: BrowserSession): Promise<CrawlResult> {
+
     const maxPages = options?.maxPages ?? 10
     const maxDepth = options?.maxDepth ?? 2
     const sameDomain = options?.sameDomain ?? true

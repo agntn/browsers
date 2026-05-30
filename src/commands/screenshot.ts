@@ -1,7 +1,6 @@
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { create } from '../core/registry'
-import { resolveProvider } from '../core/resolve'
+import { resolveAndCreate } from './_helpers'
 import { writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -50,8 +49,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const providerName = resolveProvider(args.provider)
-    const provider = create(providerName)
+    const { name: providerName, provider } = resolveAndCreate(args.provider)
 
     const screenshotOpts = {
       url: args.url,

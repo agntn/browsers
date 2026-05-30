@@ -24,6 +24,7 @@ export type {
   LinksResult,
   LinkItem,
   BrowserProvider,
+  ProviderCapabilities,
   ProviderConfig,
   BrowserProviderFactory,
   ClientOptions,
@@ -47,4 +48,4 @@ export {
 
 export { Client, defaultClient } from './core/client'
 export { register, create, providers, has } from './core/registry'
-export { resolveProvider } from './core/resolve'
+export { resolveProvider, providerEnvKey } from './core/resolve'

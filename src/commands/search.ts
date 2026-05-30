@@ -1,7 +1,6 @@
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { create } from '../core/registry'
-import { resolveProvider } from '../core/resolve'
+import { resolveAndCreate } from './_helpers'
 
 export default defineCommand({
   meta: {
@@ -26,8 +25,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const providerName = resolveProvider(args.provider)
-    const provider = create(providerName)
+    const { name: providerName, provider } = resolveAndCreate(args.provider)
     if (!provider.search) {
       consola.error(`Provider ${providerName} does not support web search.`)
       process.exit(1)

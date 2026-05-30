@@ -142,8 +142,28 @@ export interface LinkItem {
   rel?: string
 }
 
+/** Declares which optional operations a provider supports. */
+export interface ProviderCapabilities {
+  scrape: boolean
+  screenshot: boolean
+  navigate: boolean
+  evaluate: boolean
+  sessions: boolean
+  cdp: boolean
+  statelessScrape: boolean
+  statelessScreenshot: boolean
+  crawl: boolean
+  pdf: boolean
+  links: boolean
+  search: boolean
+  extract: boolean
+}
+
 export interface BrowserProvider {
   name(): string
+
+  /** Return capability flags for this provider. */
+  capabilities(): ProviderCapabilities
 
   createSession(options?: CreateSessionOptions): Promise<BrowserSession>
   getSession(sessionId: string): Promise<BrowserSession | null>

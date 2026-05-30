@@ -1,7 +1,6 @@
 import { defineCommand } from 'citty'
 import { consola } from 'consola'
-import { create } from '../core/registry'
-import { resolveProvider } from '../core/resolve'
+import { resolveAndCreate } from './_helpers'
 
 export default defineCommand({
   meta: {
@@ -24,8 +23,7 @@ export default defineCommand({
         },
       },
       async run({ args }) {
-        const providerName = resolveProvider(args.provider)
-        const provider = create(providerName)
+        const { provider } = resolveAndCreate(args.provider)
         try {
           const session = await provider.createSession({ region: args.region })
           consola.success(`Session created: ${session.id}`)
@@ -53,8 +51,7 @@ export default defineCommand({
         },
       },
       async run({ args }) {
-        const providerName = resolveProvider(args.provider)
-        const provider = create(providerName)
+        const { provider } = resolveAndCreate(args.provider)
         try {
           await provider.releaseSession(args.sessionId)
           consola.success(`Session ${args.sessionId} released.`)
@@ -75,8 +72,7 @@ export default defineCommand({
         },
       },
       async run({ args }) {
-        const providerName = resolveProvider(args.provider)
-        const provider = create(providerName)
+        const { provider } = resolveAndCreate(args.provider)
         try {
           const sessions = await provider.listSessions()
           if (sessions.length === 0) {

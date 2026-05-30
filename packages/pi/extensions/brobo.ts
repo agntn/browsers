@@ -4,104 +4,38 @@ import { Type } from "typebox"
 
 const builtinProviders = ["steel", "browserbase", "kernel", "browserless", "hyperbrowser", "anchor", "cloudflare", "playwright"] as const
 
-const specialEnvKeys: Record<string, string[]> = {
-  cloudflare: ["CF_API_TOKEN", "CLOUDFLARE_API_TOKEN"],
-}
-
-function hasKey(provider: string): boolean {
-  if (provider === "playwright") return true
-  const specials = specialEnvKeys[provider]
-  if (specials) return specials.some(k => !!process.env[k])
-  return !!process.env[`${provider.toUpperCase()}_API_KEY`]
-}
-
-function resolveProvider(preferred?: string): string {
-  if (preferred && (builtinProviders as readonly string[]).includes(preferred)) return preferred
-  for (const name of builtinProviders) {
-    if (hasKey(name)) return name
-  }
-  throw new Error("No browser provider configured. Set one of: STEEL_API_KEY, BROWSERBASE_API_KEY, KERNEL_API_KEY, BROWSERLESS_API_KEY, HYPERBROWSER_API_KEY, ANCHOR_API_KEY, CF_API_TOKEN + CF_ACCOUNT_ID")
-}
-
-function getHeaders(provider: string, apiKey: string): Record<string, string> {
-  switch (provider) {
-    case "steel": return { "steel-api-key": apiKey, "Content-Type": "application/json" }
-    case "browserbase": return { "X-BB-API-Key": apiKey, "Content-Type": "application/json" }
-    case "kernel": return { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
-    case "browserless": return { "Content-Type": "application/json" }
-    case "hyperbrowser": return { "x-api-key": apiKey, "Content-Type": "application/json" }
-    case "anchor": return { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
-    case "cloudflare": return { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
-    case "playwright": return {}
-    default: return { "Content-Type": "application/json" }
-  }
-}
-
-function getBaseURL(provider: string): string {
-  switch (provider) {
-    case "steel": return "https://api.steel.dev"
-    case "browserbase": return "https://api.browserbase.com"
-    case "kernel": return "https://api.kernel.sh"
-    case "browserless": return "https://chrome.browserless.io"
-    case "hyperbrowser": return "https://app.hyperbrowser.ai/api"
-    case "anchor": return "https://api.anchorbrowser.io"
-    case "cloudflare": return `https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering`
-    case "playwright": return "local"
-    default: throw new Error(`Unknown provider: ${provider}`)
-  }
-}
-
-function getApiKey(provider: string): string {
-  if (provider === "cloudflare") {
-    const key = process.env.CF_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN
-    if (!key) throw new Error("Missing CF_API_TOKEN (or CLOUDFLARE_API_TOKEN)")
-    if (!process.env.CF_ACCOUNT_ID && !process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error("Missing CF_ACCOUNT_ID (or CLOUDFLARE_ACCOUNT_ID)")
-    return key
-  }
-  if (provider === "playwright") return ""
-  const key = process.env[`${provider.toUpperCase()}_API_KEY`]
-  if (!key) throw new Error(`Missing API key for ${provider}. Set ${provider.toUpperCase()}_API_KEY`)
-  return key
-}
-
-const providerCapabilities: Record<string, { scrape: boolean; screenshot: boolean; navigate: boolean; evaluate: boolean; sessions: boolean; cdp: boolean; statelessScrape: boolean; statelessScreenshot: boolean; crawl: boolean; pdf: boolean; links: boolean; search: boolean; extract: boolean }> = {
-  steel:           { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false, crawl: false, pdf: false, links: false, search: false, extract: false },
-  browserbase:     { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false, crawl: false, pdf: false, links: false, search: false, extract: false },
-  kernel:          { scrape: true, screenshot: true, navigate: true,  evaluate: true,  sessions: true,  cdp: true,  statelessScrape: false, statelessScreenshot: false, crawl: false, pdf: false, links: false, search: false, extract: false },
-  browserless:     { scrape: true, screenshot: true, navigate: true,  evaluate: true,  sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: true,  crawl: false, pdf: true,  links: false, search: false, extract: false },
-  hyperbrowser:    { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: false, crawl: true,  pdf: false, links: false, search: true,  extract: true },
-  anchor:          { scrape: false, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: false, statelessScreenshot: false, crawl: false, pdf: false, links: false, search: false, extract: false },
-  cloudflare:      { scrape: true, screenshot: true, navigate: false, evaluate: false, sessions: true,  cdp: true,  statelessScrape: true,  statelessScreenshot: true,  crawl: true,  pdf: true,  links: true,  search: false, extract: true },
-  playwright:      { scrape: true, screenshot: true, navigate: true,  evaluate: true,  sessions: true,  cdp: false, statelessScrape: true,  statelessScreenshot: false, crawl: true,  pdf: true,  links: true,  search: false, extract: false },
-}
-
-const scrapeParameters = Type.Object({
-  url: Type.String({ description: "URL to scrape" }),
-  provider: Type.Optional(Type.String({ description: `Provider name. One of: ${builtinProviders.join(", ")}. Auto-detected from env.` })),
-  waitFor: Type.Optional(Type.String({ description: "CSS selector to wait for before extraction" })),
-})
-
-const sessionParameters = Type.Object({
-  provider: Type.Optional(Type.String({ description: "Provider name (auto-detected from env)" })),
-  region: Type.Optional(Type.String({ description: "Preferred region (e.g. us-east-1, eu-west-1)" })),
-})
-
-const releaseParameters = Type.Object({
-  sessionId: Type.String({ description: "Session ID to release" }),
-  provider: Type.Optional(Type.String({ description: "Provider name (auto-detected from env)" })),
-})
-
-const emptyParameters = Type.Object({})
-
-async function getBroboProvider(name: string) {
+/** Lazy-load the brobo library (registers all providers on import). */
+async function loadBrobo() {
   const mod = await import("brobo").catch(() => {
-    // @ts-ignore — runtime import from same package source
+    // @ts-ignore — runtime fallback for dev (same package source)
     return import("../../src/index.ts")
   })
-  return mod.create(name)
+  return mod as typeof import("brobo")
 }
 
+/**
+ * Resolve provider name: prefer explicit, fallback to first with API key.
+ * Does NOT call create() — caller decides when to instantiate.
+ */
+async function resolveProviderName(preferred?: string): Promise<string> {
+  const brobo = await loadBrobo()
+  return brobo.resolveProvider(preferred)
+}
+
+/**
+ * Resolve + create a provider instance in one call.
+ */
+async function getProvider(preferred?: string) {
+  const brobo = await loadBrobo()
+  const name = brobo.resolveProvider(preferred)
+  return { name, provider: brobo.create(name) }
+}
+
+// ─── Tools ───────────────────────────────────────────────────────────────
+
 export default function broboExtension(pi: ExtensionAPI) {
+
+  // ── brobo_scrape ──────────────────────────────────────────────────────
 
   pi.registerTool({
     name: "brobo_scrape",
@@ -114,7 +48,11 @@ export default function broboExtension(pi: ExtensionAPI) {
       "Steel and Cloudflare have stateless scrape (no session needed). Kernel requires a session.",
       "Pass waitFor to wait for a CSS selector before extraction.",
     ],
-    parameters: scrapeParameters,
+    parameters: Type.Object({
+      url: Type.String({ description: "URL to scrape" }),
+      provider: Type.Optional(Type.String({ description: `Provider name. One of: ${builtinProviders.join(", ")}. Auto-detected from env.` })),
+      waitFor: Type.Optional(Type.String({ description: "CSS selector to wait for before extraction" })),
+    }),
     renderCall(args, theme) {
       return new Text(
         `${theme.fg("toolTitle", theme.bold("brobo_scrape"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`,
@@ -122,63 +60,17 @@ export default function broboExtension(pi: ExtensionAPI) {
       )
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; content: string }>> {
-      const providerName = resolveProvider(params.provider)
-
-      if (providerName === "playwright") {
-        const provider = await getBroboProvider("playwright")
-        const result = await provider.scrape(params.url, { waitFor: params.waitFor })
-        const content = result.text || result.markdown || result.html || "No content extracted"
-        return {
-          content: [{ type: "text", text: `[provider=playwright] ${params.url}\n\n${content}` }],
-          details: { url: params.url, provider: "playwright", content },
-        }
-      }
-
-      const apiKey = getApiKey(providerName)
-      const baseURL = getBaseURL(providerName)
-      const headers = getHeaders(providerName, apiKey)
-
-      if (providerName === "cloudflare") {
-        const body: Record<string, unknown> = { url: params.url }
-        if (params.waitFor) body.waitForSelector = params.waitFor
-        const res = await fetch(`${baseURL}/content`, { method: "POST", headers, body: JSON.stringify(body) })
-        const data = await res.json() as Record<string, unknown>
-        if (!data.success) {
-          const errs = (data.errors as Array<{ message: string }> | undefined)?.map(e => e.message).join("; ") ?? "Unknown error"
-          throw new Error(errs)
-        }
-        const result = data.result as Record<string, string>
-        const content = result?.content || "No content extracted"
-        return {
-          content: [{ type: "text", text: `[provider=cloudflare] ${params.url}\n\n${content}` }],
-          details: { url: params.url, provider: "cloudflare", content },
-        }
-      }
-
-      if (providerName === "steel") {
-        const body: Record<string, unknown> = { url: params.url }
-        if (params.waitFor) body.waitFor = params.waitFor
-        const res = await fetch(`${baseURL}/v1/scrape`, { method: "POST", headers, body: JSON.stringify(body) })
-        const data = await res.json() as Record<string, unknown>
-        const c = data.content as Record<string, string> | undefined
-        const content = c?.markdown || c?.readability || c?.html || "No content extracted"
-        return {
-          content: [{ type: "text", text: `[provider=steel] ${params.url}\n\n${content}` }],
-          details: { url: params.url, provider: "steel", content },
-        }
-      }
-
-      const body: Record<string, unknown> = { url: params.url }
-      if (params.waitFor) body.waitFor = params.waitFor
-      const res = await fetch(`${baseURL}/v1/scrape`, { method: "POST", headers, body: JSON.stringify(body) })
-      const data = await res.json() as Record<string, unknown>
-      const content = (data.markdown as string) || (data.text as string) || (data.html as string) || "No content extracted"
+      const { name, provider } = await getProvider(params.provider)
+      const result = await provider.scrape(params.url, { waitFor: params.waitFor })
+      const content = result.text || result.markdown || result.html || "No content extracted"
       return {
-        content: [{ type: "text", text: `[provider=${providerName}] ${params.url}\n\n${content}` }],
-        details: { url: params.url, provider: providerName, content },
+        content: [{ type: "text", text: `[provider=${name}] ${params.url}\n\n${content}` }],
+        details: { url: params.url, provider: name, content },
       }
     },
   })
+
+  // ── brobo_session ─────────────────────────────────────────────────────
 
   pi.registerTool({
     name: "brobo_session",
@@ -190,7 +82,10 @@ export default function broboExtension(pi: ExtensionAPI) {
       "For simple scrape/screenshot, use brobo_scrape instead (no session needed).",
       "Always release sessions when done with brobo_release.",
     ],
-    parameters: sessionParameters,
+    parameters: Type.Object({
+      provider: Type.Optional(Type.String({ description: "Provider name (auto-detected from env)" })),
+      region: Type.Optional(Type.String({ description: "Preferred region (e.g. us-east-1, eu-west-1)" })),
+    }),
     renderCall(args, theme) {
       return new Text(
         `${theme.fg("toolTitle", theme.bold("brobo_session"))} ${theme.fg("muted", `provider=${args.provider ?? "auto"} region=${args.region ?? "default"}`)}`,
@@ -198,53 +93,18 @@ export default function broboExtension(pi: ExtensionAPI) {
       )
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ session: Record<string, unknown> }>> {
-      const providerName = resolveProvider(params.provider)
-
-      if (providerName === "playwright") {
-        const provider = await getBroboProvider("playwright")
-        const session = await provider.createSession({ region: params.region })
-        return {
-          content: [{ type: "text", text: `[provider=playwright] Session created: ${session.id}` }],
-          details: { session: { id: session.id, provider: session.provider, createdAt: session.createdAt } },
-        }
-      }
-
-      const apiKey = getApiKey(providerName)
-      const baseURL = getBaseURL(providerName)
-      const headers = getHeaders(providerName, apiKey)
-
-      const endpoints: Record<string, string> = {
-        steel: "/v1/sessions",
-        browserbase: "/v1/sessions",
-        kernel: "/v1/browsers",
-        browserless: `/sessions?token=${apiKey}`,
-        hyperbrowser: "/v1/session",
-        anchor: "/v1/sessions",
-        cloudflare: "/devtools/browser",
-      }
-
-      const body: Record<string, unknown> = {}
-      if (params.region) body.region = params.region
-
-      const endpoint = endpoints[providerName]
-      if (!endpoint) throw new Error(`Sessions not supported for provider: ${providerName}`)
-
-      const res = await fetch(`${baseURL}${endpoint}`, { method: "POST", headers, body: JSON.stringify(body) })
-      const data = await res.json() as Record<string, unknown>
-
-      const session = (data.result as Record<string, unknown>) ?? data
-      const sessionId = (session.sessionId as string) ?? (session.id as string) ?? "unknown"
-      const cdpUrl = (session.cdpUrl as string) ?? (session.connectUrl as string) ?? (session.websocketUrl as string)
-
-      const lines = [`[provider=${providerName}] Session created: ${sessionId}`]
-      if (cdpUrl) lines.push(`CDP URL: ${cdpUrl}`)
-
+      const { name, provider } = await getProvider(params.provider)
+      const session = await provider.createSession({ region: params.region })
+      const lines = [`[provider=${name}] Session created: ${session.id}`]
+      if (session.cdpUrl) lines.push(`CDP URL: ${session.cdpUrl}`)
       return {
         content: [{ type: "text", text: lines.join("\n") }],
-        details: { session: data },
+        details: { session: { id: session.id, provider: session.provider, cdpUrl: session.cdpUrl, createdAt: session.createdAt } },
       }
     },
   })
+
+  // ── brobo_release ─────────────────────────────────────────────────────
 
   pi.registerTool({
     name: "brobo_release",
@@ -255,7 +115,10 @@ export default function broboExtension(pi: ExtensionAPI) {
       "Always release sessions after use to avoid unnecessary billing.",
       "Use the same provider that created the session.",
     ],
-    parameters: releaseParameters,
+    parameters: Type.Object({
+      sessionId: Type.String({ description: "Session ID to release" }),
+      provider: Type.Optional(Type.String({ description: "Provider name (auto-detected from env)" })),
+    }),
     renderCall(args, theme) {
       return new Text(
         `${theme.fg("toolTitle", theme.bold("brobo_release"))} ${theme.fg("dim", args.sessionId)}`,
@@ -263,42 +126,16 @@ export default function broboExtension(pi: ExtensionAPI) {
       )
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ released: boolean }>> {
-      const providerName = resolveProvider(params.provider)
-
-      if (providerName === "playwright") {
-        const provider = await getBroboProvider("playwright")
-        await provider.releaseSession(params.sessionId)
-        return {
-          content: [{ type: "text", text: `[provider=playwright] Session ${params.sessionId} released.` }],
-          details: { released: true },
-        }
-      }
-
-      const apiKey = getApiKey(providerName)
-      const baseURL = getBaseURL(providerName)
-      const headers = getHeaders(providerName, apiKey)
-
-      const endpoints: Record<string, string> = {
-        steel: `/v1/sessions/${params.sessionId}/release`,
-        browserbase: `/v1/sessions/${params.sessionId}`,
-        kernel: `/v1/browsers/${params.sessionId}`,
-        browserless: `/sessions/${params.sessionId}?token=${apiKey}`,
-        hyperbrowser: `/v1/session/${params.sessionId}`,
-        anchor: `/v1/sessions/${params.sessionId}`,
-        cloudflare: `/devtools/browser/${params.sessionId}`,
-      }
-
-      const endpoint = endpoints[providerName]
-      if (!endpoint) throw new Error(`Sessions not supported for provider: ${providerName}`)
-
-      const method = providerName === "steel" ? "POST" : "DELETE"
-      await fetch(`${baseURL}${endpoint}`, { method, headers })
+      const { name, provider } = await getProvider(params.provider)
+      await provider.releaseSession(params.sessionId)
       return {
-        content: [{ type: "text", text: `[provider=${providerName}] Session ${params.sessionId} released.` }],
+        content: [{ type: "text", text: `[provider=${name}] Session ${params.sessionId} released.` }],
         details: { released: true },
       }
     },
   })
+
+  // ── brobo_providers ───────────────────────────────────────────────────
 
   pi.registerTool({
     name: "brobo_providers",
@@ -308,40 +145,43 @@ export default function broboExtension(pi: ExtensionAPI) {
     promptGuidelines: [
       "Use brobo_providers to check which browser providers have API keys configured.",
     ],
-    parameters: emptyParameters,
+    parameters: Type.Object({}),
     renderCall(_args, theme) {
       return new Text(theme.fg("toolTitle", theme.bold("brobo_providers")), 0, 0)
     },
-    async execute(): Promise<AgentToolResult<{ providers: { name: string; configured: boolean; envKey: string; capabilities: Record<string, boolean> }[] }>> {
+    async execute(): Promise<AgentToolResult<{ providers: { name: string; configured: boolean; capabilities: Record<string, unknown> }[] }>> {
+      const brobo = await loadBrobo()
       const rows = builtinProviders.map(name => {
-        const specials = specialEnvKeys[name]
-        const envKey = specials ? specials[0] : `${name.toUpperCase()}_API_KEY`
-        const caps = providerCapabilities[name]
-        return { name, configured: hasKey(name), envKey, capabilities: caps }
+        let configured = false
+        let capabilities: Record<string, boolean> = {}
+        try {
+          const provider = brobo.create(name)
+          configured = true
+          capabilities = { ...provider.capabilities() }
+        }
+        catch {
+          // Not configured (missing API key) — still report name
+        }
+        return { name, configured, capabilities }
       })
+
       const lines = rows.map(r => {
-        const caps = r.capabilities
-        const tags = [
-          caps.statelessScrape ? 'scrape✓' : null,
-          caps.statelessScreenshot ? 'screenshot✓' : null,
-          caps.navigate ? 'navigate✓' : null,
-          caps.evaluate ? 'evaluate✓' : null,
-          caps.sessions ? 'sessions✓' : null,
-          caps.cdp ? 'cdp✓' : null,
-          caps.crawl ? 'crawl' : null,
-          caps.pdf ? 'pdf' : null,
-          caps.links ? 'links' : null,
-          caps.search ? 'search' : null,
-          caps.extract ? 'extract' : null,
-        ].filter(Boolean).join(' ')
-        return `${r.configured ? '●' : '○'} ${r.name} ${r.configured ? '' : `(${r.envKey})`}  ${tags}`
+        const c = r.capabilities
+        const tags = Object.entries(c)
+          .filter(([, v]) => v)
+          .map(([k]) => k)
+          .join(' ')
+        return `${r.configured ? '●' : '○'} ${r.name}  ${tags}`
       })
+
       return {
         content: [{ type: "text", text: lines.join("\n") }],
         details: { providers: rows },
       }
     },
   })
+
+  // ── brobo_screenshot ──────────────────────────────────────────────────
 
   pi.registerTool({
     name: "brobo_screenshot",
@@ -366,54 +206,45 @@ export default function broboExtension(pi: ExtensionAPI) {
       )
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; saved: boolean }>> {
-      const providerName = resolveProvider(params.provider)
+      const { name, provider } = await getProvider(params.provider)
+      const caps = { ...provider.capabilities() }
 
-      if (providerName === "playwright") {
-        const provider = await getBroboProvider("playwright")
-        const session = await provider.createSession()
-        try {
-          const result = await provider.screenshot({ url: params.url, fullPage: params.fullPage, format: params.format as any }, session)
-          return {
-            content: [{ type: "text", text: `[provider=playwright] Screenshot of ${params.url}. Data length: ${result.data.length} chars.` }],
-            details: { url: params.url, provider: "playwright", saved: false },
-          }
-        } finally {
-          await provider.releaseSession(session.id)
-        }
-      }
-
-      const apiKey = getApiKey(providerName)
-      const baseURL = getBaseURL(providerName)
-      const headers = getHeaders(providerName, apiKey)
-
-      const stateless = ["cloudflare", "browserless"].includes(providerName)
-
-      if (stateless) {
-        const body: Record<string, unknown> = { url: params.url, fullPage: params.fullPage ?? true }
-        if (params.format) body.type = params.format
-
-        const endpoint = providerName === "cloudflare" ? "/screenshot" : "/screenshot"
-        const res = await fetch(`${baseURL}${endpoint}${providerName === "browserless" ? `?token=${apiKey}` : ""}`, { method: "POST", headers, body: JSON.stringify(body) })
-        const data = await res.json() as Record<string, unknown>
-        let image: string | undefined
-        if (providerName === "cloudflare") {
-          const result = data.result as Record<string, string> | undefined
-          image = result?.image
-        } else {
-          image = data.data as string
-        }
+      if (caps.statelessScreenshot) {
+        // Stateless: no session needed
+        const result = await provider.screenshot({
+          url: params.url,
+          fullPage: params.fullPage,
+          format: params.format as 'png' | 'jpeg' | 'webp',
+        })
         return {
-          content: [{ type: "text", text: `[provider=${providerName}] Stateless screenshot of ${params.url}. Data length: ${image?.length ?? 0} chars.` }],
-          details: { url: params.url, provider: providerName, saved: false },
+          content: [{ type: "text", text: `[provider=${name}] Stateless screenshot of ${params.url}. Data length: ${result.data.length} chars.` }],
+          details: { url: params.url, provider: name, saved: false },
         }
       }
 
-      return {
-        content: [{ type: "text", text: `[provider=${providerName}] Screenshot requires session creation. Use brobo_session + navigate + CDP for full control.` }],
-        details: { url: params.url, provider: providerName, saved: false },
+      // Session-based: create, navigate, screenshot, release
+      const session = await provider.createSession()
+      try {
+        if (caps.navigate) {
+          await provider.navigate(params.url, session).catch(() => {})
+        }
+        const result = await provider.screenshot({
+          url: params.url,
+          fullPage: params.fullPage,
+          format: params.format as 'png' | 'jpeg' | 'webp',
+        }, session)
+        return {
+          content: [{ type: "text", text: `[provider=${name}] Screenshot of ${params.url}. Data length: ${result.data.length} chars.` }],
+          details: { url: params.url, provider: name, saved: false },
+        }
+      }
+      finally {
+        await provider.releaseSession(session.id).catch(() => {})
       }
     },
   })
+
+  // ── brobo_extract ─────────────────────────────────────────────────────
 
   pi.registerTool({
     name: "brobo_extract",
@@ -434,33 +265,17 @@ export default function broboExtension(pi: ExtensionAPI) {
       return new Text(`${theme.fg("toolTitle", theme.bold("brobo_extract"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`, 0, 0)
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; data: unknown }>> {
-      const providerName = resolveProvider(params.provider)
-      const apiKey = getApiKey(providerName)
-      const baseURL = getBaseURL(providerName)
-      const headers = getHeaders(providerName, apiKey)
-
-      if (providerName === "cloudflare") {
-        const res = await fetch(`${baseURL}/json`, { method: "POST", headers, body: JSON.stringify({ url: params.url, prompt: params.prompt }) })
-        const data = await res.json() as Record<string, unknown>
-        const result = data.result ?? data
-        return {
-          content: [{ type: "text", text: `[provider=cloudflare] ${params.url}\n\n${JSON.stringify(result, null, 2)}` }],
-          details: { url: params.url, provider: "cloudflare", data: result },
-        }
+      const { name, provider } = await getProvider(params.provider)
+      if (!provider.extract) throw new Error(`Provider ${name} does not support extract.`)
+      const result = await provider.extract(params.url, { prompt: params.prompt })
+      return {
+        content: [{ type: "text", text: `[provider=${name}] ${params.url}\n\n${JSON.stringify(result.data, null, 2)}` }],
+        details: { url: params.url, provider: name, data: result.data },
       }
-
-      if (providerName === "hyperbrowser") {
-        const res = await fetch(`${baseURL}/api/extract`, { method: "POST", headers, body: JSON.stringify({ urls: [params.url], prompt: params.prompt }) })
-        const data = await res.json() as Record<string, unknown>
-        return {
-          content: [{ type: "text", text: `[provider=hyperbrowser] Extract job submitted: ${data.jobId}` }],
-          details: { url: params.url, provider: "hyperbrowser", data },
-        }
-      }
-
-      throw new Error(`Provider ${providerName} does not support extract.`)
     },
   })
+
+  // ── brobo_crawl ───────────────────────────────────────────────────────
 
   pi.registerTool({
     name: "brobo_crawl",
@@ -474,45 +289,26 @@ export default function broboExtension(pi: ExtensionAPI) {
     ],
     parameters: Type.Object({
       url: Type.String({ description: "Starting URL" }),
-      provider: Type.Optional(Type.String({ description: `Provider. One of: cloudflare, hyperbrowser.` })),
+      provider: Type.Optional(Type.String({ description: `Provider. One of: cloudflare, hyperbrowser, playwright.` })),
       maxPages: Type.Optional(Type.Number({ description: "Max pages to crawl. Default: 10." })),
     }),
     renderCall(args, theme) {
       return new Text(`${theme.fg("toolTitle", theme.bold("brobo_crawl"))} ${theme.fg("dim", args.url)}`, 0, 0)
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ jobId?: string; pages: number }>> {
-      const providerName = resolveProvider(params.provider)
-
-      if (providerName === "playwright") {
-        const provider = await getBroboProvider("playwright")
-        const result = await provider.crawl(params.url, { maxPages: params.maxPages ?? 10 })
-        return {
-          content: [{ type: "text", text: `[provider=playwright] Crawled ${result.pages.length} pages.` }],
-          details: { pages: result.pages.length },
-        }
+      const { name, provider } = await getProvider(params.provider)
+      if (!provider.crawl) throw new Error(`Provider ${name} does not support crawl.`)
+      const result = await provider.crawl(params.url, { maxPages: params.maxPages ?? 10 })
+      const lines = [`[provider=${name}] Crawled ${result.pages.length} pages.`]
+      if (result.jobId) lines.push(`Job ID: ${result.jobId} (status: ${result.status})`)
+      return {
+        content: [{ type: "text", text: lines.join("\n") }],
+        details: { jobId: result.jobId, pages: result.pages.length },
       }
-
-      const apiKey = getApiKey(providerName)
-      const baseURL = getBaseURL(providerName)
-      const headers = getHeaders(providerName, apiKey)
-
-      if (providerName === "cloudflare") {
-        const res = await fetch(`${baseURL}/crawl`, { method: "POST", headers, body: JSON.stringify({ url: params.url, limit: params.maxPages ?? 10 }) })
-        const data = await res.json() as Record<string, unknown>
-        const jobId = data.result as string
-        return { content: [{ type: "text", text: `[provider=cloudflare] Crawl job started: ${jobId}` }], details: { jobId, pages: 0 } }
-      }
-
-      if (providerName === "hyperbrowser") {
-        const body = { url: params.url, outputs: { formats: ["markdown"] }, crawlOptions: { maxPages: params.maxPages ?? 10 } }
-        const res = await fetch(`${baseURL}/api/web/crawl`, { method: "POST", headers, body: JSON.stringify(body) })
-        const data = await res.json() as Record<string, unknown>
-        return { content: [{ type: "text", text: `[provider=hyperbrowser] Crawl job started: ${data.jobId}` }], details: { jobId: data.jobId as string, pages: 0 } }
-      }
-
-      throw new Error(`Provider ${providerName} does not support crawl.`)
     },
   })
+
+  // ── brobo_pdf ─────────────────────────────────────────────────────────
 
   pi.registerTool({
     name: "brobo_pdf",
@@ -525,51 +321,32 @@ export default function broboExtension(pi: ExtensionAPI) {
     ],
     parameters: Type.Object({
       url: Type.String({ description: "URL to convert to PDF" }),
-      provider: Type.Optional(Type.String({ description: `Provider. One of: cloudflare, browserless.` })),
+      provider: Type.Optional(Type.String({ description: `Provider. One of: cloudflare, browserless, playwright.` })),
     }),
     renderCall(args, theme) {
       return new Text(`${theme.fg("toolTitle", theme.bold("brobo_pdf"))} ${theme.fg("dim", args.url)}`, 0, 0)
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; pdfLength: number }>> {
-      const providerName = resolveProvider(params.provider)
-
-      if (providerName === "playwright") {
-        const provider = await getBroboProvider("playwright")
-        const result = await provider.pdf(params.url)
-        return {
-          content: [{ type: "text", text: `[provider=playwright] PDF generated: ${result.data.length} chars.` }],
-          details: { url: params.url, provider: "playwright", pdfLength: result.data.length },
-        }
+      const { name, provider } = await getProvider(params.provider)
+      if (!provider.pdf) throw new Error(`Provider ${name} does not support PDF generation.`)
+      const result = await provider.pdf(params.url)
+      return {
+        content: [{ type: "text", text: `[provider=${name}] PDF generated: ${result.data.length} chars.` }],
+        details: { url: params.url, provider: name, pdfLength: result.data.length },
       }
-
-      const apiKey = getApiKey(providerName)
-      const baseURL = getBaseURL(providerName)
-      const headers = getHeaders(providerName, apiKey)
-
-      if (providerName === "cloudflare") {
-        const res = await fetch(`${baseURL}/pdf`, { method: "POST", headers, body: JSON.stringify({ url: params.url }) })
-        const buf = await res.arrayBuffer()
-        return { content: [{ type: "text", text: `[provider=cloudflare] PDF generated: ${buf.byteLength} bytes` }], details: { url: params.url, provider: "cloudflare", pdfLength: buf.byteLength } }
-      }
-
-      if (providerName === "browserless") {
-        const res = await fetch(`${baseURL}/pdf?token=${apiKey}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: params.url }) })
-        const buf = await res.arrayBuffer()
-        return { content: [{ type: "text", text: `[provider=browserless] PDF generated: ${buf.byteLength} bytes` }], details: { url: params.url, provider: "browserless", pdfLength: buf.byteLength } }
-      }
-
-      throw new Error(`Provider ${providerName} does not support PDF generation.`)
     },
   })
+
+  // ── brobo_links ───────────────────────────────────────────────────────
 
   pi.registerTool({
     name: "brobo_links",
     label: "Brobo Links",
-    description: "Extract all links from a webpage. Cloudflare supports stateless link extraction.",
+    description: "Extract all links from a webpage. Cloudflare and Playwright support stateless link extraction.",
     promptSnippet: "Extract links from a webpage.",
     promptGuidelines: [
       "Use brobo_links when the user needs all links from a page.",
-      "Only cloudflare supports this currently.",
+      "Cloudflare and Playwright support this currently.",
     ],
     parameters: Type.Object({
       url: Type.String({ description: "URL to extract links from" }),
@@ -579,27 +356,18 @@ export default function broboExtension(pi: ExtensionAPI) {
       return new Text(`${theme.fg("toolTitle", theme.bold("brobo_links"))} ${theme.fg("dim", args.url)}`, 0, 0)
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; links: string[] }>> {
-      const providerName = resolveProvider(params.provider)
-
-      if (providerName === "playwright") {
-        const provider = await getBroboProvider("playwright")
-        const result = await provider.links(params.url)
-        const links = result.links.map((l: { href: string }) => l.href)
-        return {
-          content: [{ type: "text", text: `[provider=playwright] ${links.length} links:\n${links.join("\n")}` }],
-          details: { url: params.url, links },
-        }
+      const { name, provider } = await getProvider(params.provider)
+      if (!provider.links) throw new Error(`Provider ${name} does not support link extraction.`)
+      const result = await provider.links(params.url)
+      const links = result.links.map(l => l.href)
+      return {
+        content: [{ type: "text", text: `[provider=${name}] ${links.length} links:\n${links.join("\n")}` }],
+        details: { url: params.url, links },
       }
-
-      const apiKey = getApiKey("cloudflare")
-      const baseURL = getBaseURL("cloudflare")
-      const headers = getHeaders("cloudflare", apiKey)
-      const res = await fetch(`${baseURL}/links`, { method: "POST", headers, body: JSON.stringify({ url: params.url }) })
-      const data = await res.json() as Record<string, unknown>
-      const links = (data.result ?? []) as string[]
-      return { content: [{ type: "text", text: `[provider=cloudflare] ${links.length} links:\n${links.join("\n")}` }], details: { url: params.url, links } }
     },
   })
+
+  // ── brobo_search ──────────────────────────────────────────────────────
 
   pi.registerTool({
     name: "brobo_search",
@@ -617,18 +385,18 @@ export default function broboExtension(pi: ExtensionAPI) {
       return new Text(`${theme.fg("toolTitle", theme.bold("brobo_search"))} ${theme.fg("dim", args.query)}`, 0, 0)
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ results: Array<{ url: string; title: string; snippet: string }> }>> {
-      const apiKey = getApiKey("hyperbrowser")
-      const baseURL = getBaseURL("hyperbrowser")
-      const headers = getHeaders("hyperbrowser", apiKey)
-      const res = await fetch(`${baseURL}/api/web/search`, { method: "POST", headers, body: JSON.stringify({ query: params.query }) })
-      const data = await res.json() as Record<string, unknown>
-      const inner = data.data as Record<string, unknown> | undefined
-      const results = (inner?.results ?? []) as Array<{ url: string; title: string; description: string }>
-      const mapped = results.map(r => ({ url: r.url, title: r.title, snippet: r.description }))
-      const lines = mapped.map(r => `${r.title}\n  ${r.url}\n  ${r.snippet}`)
-      return { content: [{ type: "text", text: `[provider=hyperbrowser] ${mapped.length} results:\n\n${lines.join("\n\n")}` }], details: { results: mapped } }
+      const { name, provider } = await getProvider("hyperbrowser")
+      if (!provider.search) throw new Error(`Provider ${name} does not support web search.`)
+      const results = await provider.search(params.query)
+      const lines = results.map(r => `${r.title}\n  ${r.url}\n  ${r.snippet}`)
+      return {
+        content: [{ type: "text", text: `[provider=${name}] ${results.length} results:\n\n${lines.join("\n\n")}` }],
+        details: { results },
+      }
     },
   })
+
+  // ── brobo_capabilities ────────────────────────────────────────────────
 
   pi.registerTool({
     name: "brobo_capabilities",
@@ -646,10 +414,9 @@ export default function broboExtension(pi: ExtensionAPI) {
     renderCall(args, theme) {
       return new Text(`${theme.fg("toolTitle", theme.bold("brobo_capabilities"))} ${theme.fg("dim", args.provider)}`, 0, 0)
     },
-    async execute(_toolCallId, params): Promise<AgentToolResult<{ provider: string; capabilities: Record<string, boolean> }>> {
-      const name = params.provider
-      const caps = providerCapabilities[name]
-      if (!caps) throw new Error(`Unknown provider: ${name}. Available: ${builtinProviders.join(", ")}.`)
+    async execute(_toolCallId, params): Promise<AgentToolResult<{ provider: string; capabilities: Record<string, unknown> }>> {
+      const { name, provider } = await getProvider(params.provider)
+      const caps = { ...provider.capabilities() }
       const lines = Object.entries(caps).map(([k, v]) => `  ${k}: ${v ? "✓" : "✗"}`)
       return {
         content: [{ type: "text", text: `[${name}]\n${lines.join("\n")}` }],

@@ -17,6 +17,7 @@ import type {
   ExtractOptions,
   ProviderConfig,
   BrowserProviderFactory,
+  ProviderCapabilities,
 } from '../core/types'
 import { defaultClient } from '../core/client'
 import type { Client } from '../core/client'
@@ -72,6 +73,14 @@ class CloudflareProvider implements BrowserProvider {
   }
 
   name(): string { return 'cloudflare' }
+
+  capabilities(): ProviderCapabilities {
+    return {
+      scrape: true, screenshot: true, navigate: false, evaluate: false,
+      sessions: true, cdp: true, statelessScrape: true, statelessScreenshot: true,
+      crawl: true, pdf: true, links: true, search: false, extract: true,
+    }
+  }
 
   private base(): string {
     return `https://api.cloudflare.com/client/v4/accounts/${this.accountID}/browser-rendering`

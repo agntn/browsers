@@ -9,6 +9,7 @@ import type {
   EvaluateResult,
   ProviderConfig,
   BrowserProviderFactory,
+  ProviderCapabilities,
 } from '../core/types'
 import { defaultClient } from '../core/client'
 import type { Client } from '../core/client'
@@ -38,6 +39,14 @@ class BrowserbaseProvider implements BrowserProvider {
   }
 
   name(): string { return 'browserbase' }
+
+  capabilities(): ProviderCapabilities {
+    return {
+      scrape: true, screenshot: true, navigate: false, evaluate: false,
+      sessions: true, cdp: true, statelessScrape: true, statelessScreenshot: false,
+      crawl: false, pdf: false, links: false, search: false, extract: false,
+    }
+  }
 
   private headers(): Record<string, string> {
     return {

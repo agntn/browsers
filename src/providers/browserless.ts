@@ -11,6 +11,7 @@ import type {
   PdfOptions,
   ProviderConfig,
   BrowserProviderFactory,
+  ProviderCapabilities,
 } from '../core/types'
 import { defaultClient } from '../core/client'
 import type { Client } from '../core/client'
@@ -32,6 +33,14 @@ class BrowserlessProvider implements BrowserProvider {
   }
 
   name(): string { return 'browserless' }
+
+  capabilities(): ProviderCapabilities {
+    return {
+      scrape: true, screenshot: true, navigate: true, evaluate: true,
+      sessions: true, cdp: true, statelessScrape: true, statelessScreenshot: true,
+      crawl: false, pdf: true, links: false, search: false, extract: false,
+    }
+  }
 
   private tokenParam(): string {
     return `token=${this.apiKey}`
@@ -102,16 +111,11 @@ class BrowserlessProvider implements BrowserProvider {
 
   async scrape(url: string, options?: ScrapeOptions, _session?: BrowserSession): Promise<ScrapeResult> {
     try {
-      const res = await fetch(
+      const html = await this.client.postText(
         `${this.baseURL}/content?${this.tokenParam()}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url }),
-        },
+        { url },
+        { 'Content-Type': 'application/json' },
       )
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const html = await res.text()
       return { url, html }
     }
     catch (error) { throw normalizeError(error, 'browserless') }
@@ -126,16 +130,11 @@ class BrowserlessProvider implements BrowserProvider {
       const body: Record<string, unknown> = {}
       if (options.url) body.url = options.url
 
-      const res = await fetch(
+      const png = await this.client.postRaw(
         `${this.baseURL}/screenshot?${this.tokenParam()}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        },
+        body,
+        { 'Content-Type': 'application/json' },
       )
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const png = await res.arrayBuffer()
 
       return {
         data: `data:image/png;base64,${Buffer.from(png).toString('base64')}`,
@@ -172,16 +171,11 @@ class BrowserlessProvider implements BrowserProvider {
       if (options?.landscape !== undefined) body.landscape = options.landscape
       if (options?.printBackground !== undefined) body.printBackground = options.printBackground
 
-      const res = await fetch(
+      const pdf = await this.client.postRaw(
         `${this.baseURL}/pdf?${this.tokenParam()}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        },
+        body,
+        { 'Content-Type': 'application/json' },
       )
-      if (!res.ok) throw new Error(`Browserless PDF HTTP ${res.status}`)
-      const pdf = await res.arrayBuffer()
       return {
         data: `data:application/pdf;base64,${Buffer.from(pdf).toString('base64')}`,
         mimeType: 'application/pdf',

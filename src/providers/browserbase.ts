@@ -15,6 +15,7 @@ import { defaultClient } from '../core/client'
 import type { Client } from '../core/client'
 import { AuthError, normalizeError } from '../core/errors'
 import { register } from '../core/registry'
+import { isNotFoundError, assertSessionId, notSupportedViaRest } from '../core/utils'
 
 interface BrowserbaseSessionResponse {
   id: string
@@ -95,7 +96,7 @@ class BrowserbaseProvider implements BrowserProvider {
       }
     }
     catch (error: unknown) {
-      if (error instanceof Error && 'statusCode' in error && (error as { statusCode: number }).statusCode === 404) return null
+      if (isNotFoundError(error)) return null
       throw normalizeError(error, 'browserbase')
     }
   }
@@ -146,7 +147,7 @@ class BrowserbaseProvider implements BrowserProvider {
 
   async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
-      if (!session?.id) throw new Error('Browserbase screenshot requires a session.')
+      assertSessionId(session?.id, 'browserbase', 'screenshot')
       const body: Record<string, unknown> = {
         sessionId: session.id,
         fullPage: options.fullPage ?? true,
@@ -169,11 +170,11 @@ class BrowserbaseProvider implements BrowserProvider {
   }
 
   async navigate(_url: string, _session: BrowserSession): Promise<void> {
-    throw new Error('Browserbase does not support navigate via REST. Connect via CDP for full automation.')
+    notSupportedViaRest('browserbase', 'navigate')
   }
 
   async evaluate(_script: string, _session: BrowserSession): Promise<EvaluateResult> {
-    throw new Error('Browserbase does not support evaluate via REST. Connect via CDP (Puppeteer/Playwright) for script execution.')
+    notSupportedViaRest('browserbase', 'evaluate')
   }
 
   getCdpUrl(session: BrowserSession): string {

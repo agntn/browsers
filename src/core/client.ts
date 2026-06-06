@@ -107,6 +107,35 @@ export class Client {
     }
   }
 
+  /**
+   * POST that returns a Response-like object for content-type inspection.
+   * Use when the endpoint may return binary (image/pdf) or JSON depending
+   * on the request — the caller checks headers.get('content-type').
+   */
+  async postResponse(
+    url: string,
+    body: Record<string, unknown>,
+    headers?: Record<string, string>,
+    signal?: AbortSignal,
+  ): Promise<{ headers: Headers; arrayBuffer(): Promise<ArrayBuffer>; json(): Promise<unknown> }> {
+    try {
+      const res = await this.fetch.raw(url, {
+        method: 'POST',
+        body,
+        headers,
+        signal,
+      })
+      return {
+        headers: res.headers as unknown as Headers,
+        arrayBuffer: () => Promise.resolve(res._data as ArrayBuffer),
+        json: () => Promise.resolve(res._data as unknown),
+      }
+    }
+    catch (error) {
+      throw this.mapError(error, url)
+    }
+  }
+
   private mapError(error: unknown, url: string): Error {
     if (error instanceof FetchError) {
       if (error.statusCode === 429) {

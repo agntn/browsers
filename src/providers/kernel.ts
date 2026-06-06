@@ -15,6 +15,7 @@ import { defaultClient } from '../core/client'
 import type { Client } from '../core/client'
 import { AuthError, normalizeError } from '../core/errors'
 import { register } from '../core/registry'
+import { isNotFoundError, assertSessionId, notSupportedViaRest } from '../core/utils'
 
 interface KernelSessionResponse {
   id: string
@@ -98,7 +99,7 @@ class KernelProvider implements BrowserProvider {
       }
     }
     catch (error: unknown) {
-      if (error instanceof Error && 'statusCode' in error && (error as { statusCode: number }).statusCode === 404) return null
+      if (isNotFoundError(error)) return null
       throw normalizeError(error, 'kernel')
     }
   }
@@ -129,12 +130,11 @@ class KernelProvider implements BrowserProvider {
 
   async scrape(url: string, options?: ScrapeOptions, session?: BrowserSession): Promise<ScrapeResult> {
     try {
-      const sessionId = session?.id
-      if (!sessionId) throw new Error('Kernel requires a session for scrape. Create a session first.')
+      assertSessionId(session?.id, 'kernel', 'scrape')
 
       const result = await this.evaluate(
         `await page.goto(${JSON.stringify(url)}, { waitUntil: 'networkidle' }); return { html: await page.content(), title: await page.title() }`,
-        session,
+        session!,
       )
 
       const data = result.value as { html?: string; title?: string } | undefined
@@ -149,7 +149,7 @@ class KernelProvider implements BrowserProvider {
 
   async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
-      if (!session?.id) throw new Error('Kernel screenshot requires a session.')
+      assertSessionId(session?.id, 'kernel', 'screenshot')
       const body: Record<string, unknown> = {
         fullPage: options.fullPage ?? true,
       }

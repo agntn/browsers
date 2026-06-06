@@ -17,6 +17,7 @@ import { defaultClient } from '../core/client'
 import type { Client } from '../core/client'
 import { AuthError, normalizeError } from '../core/errors'
 import { register } from '../core/registry'
+import { assertUrlOrSession, notSupportedViaRest } from '../core/utils'
 
 class BrowserlessProvider implements BrowserProvider {
   private readonly client: Client
@@ -124,7 +125,7 @@ class BrowserlessProvider implements BrowserProvider {
   async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
       if (!options.url && !session?.id) {
-        throw new Error('Browserless screenshot requires either options.url or a session')
+        assertUrlOrSession(options.url, session, 'browserless', 'screenshot')
       }
 
       const body: Record<string, unknown> = {}

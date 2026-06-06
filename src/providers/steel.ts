@@ -13,8 +13,9 @@ import type {
 } from '../core/types'
 import { defaultClient } from '../core/client'
 import type { Client } from '../core/client'
-import { AuthError, SessionNotFoundError, normalizeError } from '../core/errors'
+import { AuthError, normalizeError } from '../core/errors'
 import { register } from '../core/registry'
+import { isNotFoundError, assertSessionId, notSupportedViaRest } from '../core/utils'
 
 interface SteelSessionResponse {
   id: string
@@ -113,7 +114,7 @@ class SteelProvider implements BrowserProvider {
       }
     }
     catch (error: unknown) {
-      if (error instanceof Error && 'statusCode' in error && (error as { statusCode: number }).statusCode === 404) return null
+      if (isNotFoundError(error)) return null
       throw normalizeError(error, 'steel')
     }
   }
@@ -171,7 +172,7 @@ class SteelProvider implements BrowserProvider {
 
   async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
-      if (!session?.id) throw new Error('Steel screenshot requires a session.')
+      assertSessionId(session?.id, 'steel', 'screenshot')
 
       const body: Record<string, unknown> = {
         sessionId: session.id,
@@ -196,11 +197,11 @@ class SteelProvider implements BrowserProvider {
   }
 
   async navigate(_url: string, _session: BrowserSession): Promise<void> {
-    throw new Error('Steel does not support navigate via REST. Connect via CDP for full automation.')
+    notSupportedViaRest('steel', 'navigate')
   }
 
   async evaluate(_script: string, _session: BrowserSession): Promise<EvaluateResult> {
-    throw new Error('Steel does not support evaluate via REST. Connect via CDP (Puppeteer/Playwright) for script execution.')
+    notSupportedViaRest('steel', 'evaluate')
   }
 
   getCdpUrl(session: BrowserSession): string {

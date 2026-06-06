@@ -43,9 +43,13 @@ export {
   NoProviderAvailableError,
   EmptyUrlError,
   ScrapeNotSupportedError,
+  InvalidInputError,
+  UnsupportedOperationError,
+  PaymentError,
   normalizeError,
 } from './core/errors'
 
 export { Client, defaultClient } from './core/client'
 export { register, create, providers, has } from './core/registry'
 export { resolveProvider, providerEnvKey } from './core/resolve'
+export { isNotFoundError, assertSessionId, assertUrlOrSession, notSupportedViaRest } from './core/utils'

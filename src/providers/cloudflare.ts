@@ -23,6 +23,7 @@ import { defaultClient } from '../core/client'
 import type { Client } from '../core/client'
 import { AuthError, normalizeError } from '../core/errors'
 import { register } from '../core/registry'
+import { assertUrlOrSession, notSupportedViaRest } from '../core/utils'
 
 interface CfEnvelope<T = unknown> {
   success: boolean
@@ -193,9 +194,7 @@ class CloudflareProvider implements BrowserProvider {
 
   async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
-      if (!options.url && !session?.id) {
-        throw new Error('Cloudflare screenshot requires either options.url or a session')
-      }
+      assertUrlOrSession(options.url, session, 'cloudflare', 'screenshot')
 
       const body: Record<string, unknown> = {}
       if (options.url) body.url = options.url
@@ -203,25 +202,17 @@ class CloudflareProvider implements BrowserProvider {
       if (options.selector) body.selector = options.selector
       if (options.fullPage !== undefined) body.fullPage = options.fullPage
 
-      const res = await fetch(
+      const res = await this.client.postResponse(
         `${this.base()}/screenshot`,
-        {
-          method: 'POST',
-          headers: this.headers(),
-          body: JSON.stringify(body),
-        },
+        body,
+        this.headers(),
       )
-
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '')
-        throw new Error(`Cloudflare screenshot HTTP ${res.status}: ${errText.slice(0, 200)}`)
-      }
 
       const contentType = res.headers.get('content-type') ?? ''
       if (contentType.includes('image')) {
-        const png = await res.arrayBuffer()
+        const buf = await res.arrayBuffer()
         return {
-          data: `data:image/png;base64,${Buffer.from(png).toString('base64')}`,
+          data: `data:image/png;base64,${Buffer.from(buf).toString('base64')}`,
           mimeType: 'image/png',
         }
       }
@@ -237,11 +228,11 @@ class CloudflareProvider implements BrowserProvider {
   }
 
   async navigate(_url: string, _session: BrowserSession): Promise<void> {
-    throw new Error('Cloudflare Browser Run does not support navigate on sessions. Use scrape/screenshot for quick actions, or connect via CDP for full automation.')
+    notSupportedViaRest('cloudflare', 'navigate')
   }
 
   async evaluate(_script: string, _session: BrowserSession): Promise<EvaluateResult> {
-    throw new Error('Cloudflare Browser Run does not support evaluate via REST. Connect via CDP (Puppeteer/Playwright) for script execution.')
+    notSupportedViaRest('cloudflare', 'evaluate')
   }
 
   getCdpUrl(session: BrowserSession): string | undefined {
@@ -286,15 +277,11 @@ class CloudflareProvider implements BrowserProvider {
       if (options?.printBackground !== undefined) body.printBackground = options.printBackground
       if (options?.css) body.css = options.css
 
-      const res = await fetch(
+      const res = await this.client.postResponse(
         `${this.base()}/pdf`,
-        {
-          method: 'POST',
-          headers: this.headers(),
-          body: JSON.stringify(body),
-        },
+        body,
+        this.headers(),
       )
-      if (!res.ok) throw new Error(`Cloudflare PDF HTTP ${res.status}`)
 
       const contentType = res.headers.get('content-type') ?? ''
       if (contentType.includes('pdf')) {

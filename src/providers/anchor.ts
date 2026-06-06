@@ -15,6 +15,7 @@ import { defaultClient } from '../core/client'
 import type { Client } from '../core/client'
 import { AuthError, normalizeError } from '../core/errors'
 import { register } from '../core/registry'
+import { isNotFoundError, assertSessionId, notSupportedViaRest } from '../core/utils'
 
 interface AnchorSessionResponse {
   id: string
@@ -98,7 +99,7 @@ class AnchorProvider implements BrowserProvider {
       }
     }
     catch (error: unknown) {
-      if (error instanceof Error && 'statusCode' in error && (error as { statusCode: number }).statusCode === 404) return null
+      if (isNotFoundError(error)) return null
       throw normalizeError(error, 'anchor')
     }
   }
@@ -131,12 +132,12 @@ class AnchorProvider implements BrowserProvider {
   }
 
   async scrape(_url: string, _options?: ScrapeOptions, _session?: BrowserSession): Promise<ScrapeResult> {
-    throw new Error('Anchor Browser does not support stateless scrape. Use a session with CDP (Puppeteer/Playwright) for content extraction.')
+    notSupportedViaRest('anchor', 'scrape')
   }
 
   async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
-      if (!session?.id) throw new Error('Anchor screenshot requires a session.')
+      assertSessionId(session?.id, 'anchor', 'screenshot')
       const body: Record<string, unknown> = {
         sessionId: session.id,
         fullPage: options.fullPage ?? true,
@@ -158,11 +159,11 @@ class AnchorProvider implements BrowserProvider {
   }
 
   async navigate(_url: string, _session: BrowserSession): Promise<void> {
-    throw new Error('Anchor Browser does not support navigate via REST. Connect via CDP for full automation.')
+    notSupportedViaRest('anchor', 'navigate')
   }
 
   async evaluate(_script: string, _session: BrowserSession): Promise<EvaluateResult> {
-    throw new Error('Anchor Browser does not support evaluate via REST. Connect via CDP (Puppeteer/Playwright) for script execution.')
+    notSupportedViaRest('anchor', 'evaluate')
   }
 
   getCdpUrl(session: BrowserSession): string | undefined {

@@ -21,6 +21,7 @@ import { defaultClient } from '../core/client'
 import type { Client } from '../core/client'
 import { AuthError, normalizeError } from '../core/errors'
 import { register } from '../core/registry'
+import { isNotFoundError, assertSessionId, notSupportedViaRest } from '../core/utils'
 
 interface HyperbrowserSessionResponse {
   id: string
@@ -102,7 +103,7 @@ class HyperbrowserProvider implements BrowserProvider {
       }
     }
     catch (error: unknown) {
-      if (error instanceof Error && 'statusCode' in error && (error as { statusCode: number }).statusCode === 404) return null
+      if (isNotFoundError(error)) return null
       throw normalizeError(error, 'hyperbrowser')
     }
   }
@@ -161,7 +162,7 @@ class HyperbrowserProvider implements BrowserProvider {
 
   async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
     try {
-      if (!session?.id) throw new Error('Hyperbrowser screenshot requires a session.')
+      assertSessionId(session?.id, 'hyperbrowser', 'screenshot')
       const body: Record<string, unknown> = {
         sessionId: session.id,
         fullPage: options.fullPage ?? true,
@@ -184,11 +185,11 @@ class HyperbrowserProvider implements BrowserProvider {
   }
 
   async navigate(_url: string, _session: BrowserSession): Promise<void> {
-    throw new Error('Hyperbrowser does not support navigate via REST. Connect via CDP for full automation.')
+    notSupportedViaRest('hyperbrowser', 'navigate')
   }
 
   async evaluate(_script: string, _session: BrowserSession): Promise<EvaluateResult> {
-    throw new Error('Hyperbrowser does not support evaluate via REST. Connect via CDP (Puppeteer/Playwright) for script execution.')
+    notSupportedViaRest('hyperbrowser', 'evaluate')
   }
 
   getCdpUrl(session: BrowserSession): string | undefined {

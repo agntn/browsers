@@ -108,6 +108,33 @@ export class ScrapeNotSupportedError extends BroboError {
   }
 }
 
+export class InvalidInputError extends BroboError {
+  constructor(message: string) {
+    super(message)
+    this.name = 'InvalidInputError'
+  }
+}
+
+export class UnsupportedOperationError extends BroboError {
+  readonly provider: string
+  constructor(message: string, provider: string) {
+    super(message)
+    this.name = 'UnsupportedOperationError'
+    this.provider = provider
+  }
+}
+
+export class PaymentError extends BroboError {
+  readonly statusCode: number
+  readonly provider: string
+  constructor(message: string, statusCode: number, provider: string) {
+    super(message)
+    this.name = 'PaymentError'
+    this.statusCode = statusCode
+    this.provider = provider
+  }
+}
+
 export const DEFAULT_RETRY_AFTER = 60
 
 export function parseRetryAfter(header: string | null | undefined): number {
@@ -143,6 +170,13 @@ export function normalizeError(error: unknown, provider?: string): BroboError {
       case 401:
         return new AuthError(
           `Authentication failed: ${message}`,
+          provider || 'unknown',
+        )
+      case 402:
+      case 403:
+        return new PaymentError(
+          `Payment required: ${message}`,
+          status,
           provider || 'unknown',
         )
       case 429: {

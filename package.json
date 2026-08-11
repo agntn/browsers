@@ -1,5 +1,5 @@
 {
-  "name": "brobo",
+  "name": "@oritwoen/browsers",
   "version": "0.1.0",
   "description": "Unified browser-as-a-service provider for AI agents and CLI.",
   "type": "module",
@@ -7,10 +7,13 @@
   "author": "oritwoen (https://github.com/oritwoen)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/oritwoen/brobo.git"
+    "url": "git+https://github.com/oritwoen/browsers.git"
   },
-  "homepage": "https://github.com/oritwoen/brobo#readme",
-  "bugs": "https://github.com/oritwoen/brobo/issues",
+  "homepage": "https://github.com/oritwoen/browsers#readme",
+  "bugs": "https://github.com/oritwoen/browsers/issues",
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",

@@ -1,4 +1,4 @@
-# brobo
+# @oritwoen/browsers
 
 Unified browser-as-a-service provider for AI agents and CLI.
 
@@ -7,9 +7,9 @@ One API, eight providers: **Steel**, **Browserbase**, **Kernel**, **Browserless*
 ## Install
 
 ```bash
-pnpm add brobo
+pnpm add @oritwoen/browsers
 # or globally
-pnpm add -g brobo
+pnpm add -g @oritwoen/browsers
 ```
 
 ## API Keys
@@ -71,7 +71,7 @@ brobo providers --check
 ## Library
 
 ```typescript
-import { create, resolveProvider } from 'brobo'
+import { create, resolveProvider } from '@oritwoen/browsers'
 
 // Auto-detect provider from env vars
 const providerName = resolveProvider()
@@ -136,7 +136,7 @@ if (provider.extract) {
 ### Capabilities at runtime
 
 ```typescript
-import { create } from 'brobo'
+import { create } from '@oritwoen/browsers'
 
 const provider = create('cloudflare')
 const caps = provider.capabilities()

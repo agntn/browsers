@@ -1,16 +1,17 @@
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent"
+import type * as BrowsersPackage from "@oritwoen/browsers"
 import { Text } from "@earendil-works/pi-tui"
 import { Type } from "typebox"
 
 const builtinProviders = ["steel", "browserbase", "kernel", "browserless", "hyperbrowser", "anchor", "cloudflare", "playwright"] as const
 
-/** Lazy-load the brobo library (registers all providers on import). */
-async function loadBrobo() {
-  const mod = await import("brobo").catch(() => {
+/** Dynamic import keeps the extension loadable from both the installed package and the repository source. */
+async function loadBrobo(): Promise<typeof BrowsersPackage> {
+  const mod = await import("@oritwoen/browsers").catch(() => {
     // @ts-ignore — runtime fallback for dev (same package source)
     return import("../../src/index.ts")
   })
-  return mod as typeof import("brobo")
+  return mod
 }
 
 /**

@@ -12,7 +12,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, six p
 - `src/core/errors.ts` — typed error hierarchy (BroboError, HTTPError, AuthError, SessionError, etc.)
 - `src/providers/*.ts` — one file per provider, self-registers on import
 - `src/commands/*.ts` — CLI subcommands (citty)
-- `packages/pi/extensions/brobo.ts` — Pi agent tools
+- `packages/pi/extensions/browsers.ts` — Pi agent tools
 
 ## Adding a provider
 

@@ -125,10 +125,13 @@ export class Client {
         headers,
         signal,
       })
+      const data = res._data
       return {
         headers: res.headers as unknown as Headers,
-        arrayBuffer: () => Promise.resolve(res._data as ArrayBuffer),
-        json: () => Promise.resolve(res._data as unknown),
+        arrayBuffer: () => data instanceof Blob
+          ? data.arrayBuffer()
+          : Promise.resolve(data as ArrayBuffer),
+        json: () => Promise.resolve(data as unknown),
       }
     }
     catch (error) {

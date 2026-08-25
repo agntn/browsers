@@ -115,10 +115,15 @@ class BrowserbaseProvider implements BrowserProvider {
     }))
   }
 
+  /**
+   * Browserbase has no DELETE route for sessions. The documented way to end
+   * one is POST /v1/sessions/{id} with status REQUEST_RELEASE.
+   */
   async releaseSession(sessionId: string): Promise<void> {
     try {
-      await this.client.deleteJSON(
+      await this.client.postJSON(
         `${this.baseURL}/v1/sessions/${sessionId}`,
+        { status: 'REQUEST_RELEASE' },
         this.headers(),
       )
     }

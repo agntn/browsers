@@ -1,5 +1,5 @@
 {
-  "name": "@oritwoen/browsers",
+  "name": "@agntn/browsers",
   "version": "0.1.0",
   "description": "Unified browser-as-a-service provider for AI agents and CLI.",
   "type": "module",
@@ -7,10 +7,10 @@
   "author": "oritwoen (https://github.com/oritwoen)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/oritwoen/browsers.git"
+    "url": "git+https://github.com/agntn/browsers.git"
   },
-  "homepage": "https://github.com/oritwoen/browsers#readme",
-  "bugs": "https://github.com/oritwoen/browsers/issues",
+  "homepage": "https://github.com/agntn/browsers#readme",
+  "bugs": "https://github.com/agntn/browsers/issues",
   "publishConfig": {
     "access": "public"
   },
@@ -23,7 +23,7 @@
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "bin": {
-    "brobo": "./dist/cli.mjs"
+    "browsers": "./dist/cli.mjs"
   },
   "files": [
     "dist",

@@ -31,7 +31,7 @@ export type {
 } from './core/types'
 
 export {
-  BroboError,
+  BrowserError,
   HTTPError,
   AuthError,
   RateLimitError,

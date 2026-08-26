@@ -1,15 +1,15 @@
-# AGENTS.md — brobo
+# AGENTS.md - browsers
 
 ## What
 
-Unified browser-as-a-service provider library for AI agents. One registry, six providers.
+Unified browser-as-a-service provider library for AI agents. One registry, eight providers.
 
 ## Structure
 
 - `src/core/types.ts` — interfaces: BrowserSession, ScrapeResult, ScreenshotResult, EvaluateResult, BrowserProvider
 - `src/core/registry.ts` — self-registering provider pattern (register/create/providers/has)
 - `src/core/client.ts` — HTTP client with retry, error mapping, URL sanitization
-- `src/core/errors.ts` — typed error hierarchy (BroboError, HTTPError, AuthError, SessionError, etc.)
+- `src/core/errors.ts` - typed error hierarchy (BrowserError, HTTPError, AuthError, SessionError, etc.)
 - `src/providers/*.ts` — one file per provider, self-registers on import
 - `src/commands/*.ts` — CLI subcommands (citty)
 - `packages/pi/extensions/browsers.ts` — Pi agent tools

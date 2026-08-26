@@ -1,4 +1,4 @@
-# @oritwoen/browsers
+# @agntn/browsers
 
 Unified browser-as-a-service provider for AI agents and CLI.
 
@@ -7,9 +7,9 @@ One API, eight providers: **Steel**, **Browserbase**, **Kernel**, **Browserless*
 ## Install
 
 ```bash
-pnpm add @oritwoen/browsers
+pnpm add @agntn/browsers
 # or globally
-pnpm add -g @oritwoen/browsers
+pnpm add -g @agntn/browsers
 ```
 
 ## API Keys
@@ -32,46 +32,46 @@ export CF_ACCOUNT_ID=...         # Cloudflare (required)
 
 ```bash
 # Scrape a URL (defaults to first configured provider)
-brobo scrape https://example.com
+browsers scrape https://example.com
 
 # Scrape with specific provider and format
-brobo scrape https://example.com --provider steel --format html
+browsers scrape https://example.com --provider steel --format html
 
 # Wait for a CSS selector before extraction
-brobo scrape https://example.com --waitFor '#content'
+browsers scrape https://example.com --waitFor '#content'
 
 # Take a screenshot
-brobo screenshot https://example.com -o page.png
+browsers screenshot https://example.com -o page.png
 
 # Generate PDF
-brobo pdf https://example.com -o page.pdf
+browsers pdf https://example.com -o page.pdf
 
 # Crawl a site
-brobo crawl https://example.com --maxPages 20
+browsers crawl https://example.com --maxPages 20
 
 # Extract links
-brobo links https://example.com
+browsers links https://example.com
 
 # Web search (via Hyperbrowser)
-brobo search "browser automation agents"
+browsers search "browser automation agents"
 
 # AI-powered extraction
-brobo extract https://example.com --prompt "Extract all product prices"
+browsers extract https://example.com --prompt "Extract all product prices"
 
 # Manage sessions
-brobo session create --provider kernel --region us-east-1
-brobo session list --provider browserbase
-brobo session release <session-id> --provider steel
+browsers session create --provider kernel --region us-east-1
+browsers session list --provider browserbase
+browsers session release <session-id> --provider steel
 
 # Check configured providers and capabilities
-brobo providers
-brobo providers --check
+browsers providers
+browsers providers --check
 ```
 
 ## Library
 
 ```typescript
-import { create, resolveProvider } from '@oritwoen/browsers'
+import { create, resolveProvider } from '@agntn/browsers'
 
 // Auto-detect provider from env vars
 const providerName = resolveProvider()
@@ -136,7 +136,7 @@ if (provider.extract) {
 ### Capabilities at runtime
 
 ```typescript
-import { create } from '@oritwoen/browsers'
+import { create } from '@agntn/browsers'
 
 const provider = create('cloudflare')
 const caps = provider.capabilities()
@@ -149,7 +149,7 @@ const caps = provider.capabilities()
 
 ## Architecture
 
-Follows the same pattern as [askweb](https://github.com/oritwoen/askweb), [apkx](https://github.com/oritwoen/apkx), and [omnichron](https://github.com/oritwoen/omnichron):
+Follows the same pattern as [@agntn/web](https://github.com/agntn/web), [apkx](https://github.com/oritwoen/apkx), and [omnichron](https://github.com/oritwoen/omnichron):
 
 ```
 src/
@@ -157,7 +157,7 @@ src/
   providers/  — steel, browserbase, kernel, browserless, hyperbrowser, anchor, cloudflare, playwright
   commands/   — CLI subcommands (scrape, screenshot, session, providers, crawl, pdf, links, search, extract)
 packages/
-  pi/extensions/ — Pi agent extension (13 tools: brobo_scrape, brobo_session, etc.)
+  pi/extensions/ - Pi agent extension (11 tools: browsers_scrape, browsers_session, etc.)
 test/
   registry.test.ts, errors.test.ts, resolve.test.ts, capabilities.test.ts, playwright.test.ts
 ```

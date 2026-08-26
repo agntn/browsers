@@ -1,11 +1,11 @@
-export class BroboError extends Error {
+export class BrowserError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options)
-    this.name = 'BroboError'
+    this.name = 'BrowserError'
   }
 }
 
-export class HTTPError extends BroboError {
+export class HTTPError extends BrowserError {
   readonly statusCode: number
   readonly url: string
   readonly body: string
@@ -23,7 +23,7 @@ export class HTTPError extends BroboError {
   isServerError(): boolean { return this.statusCode >= 500 }
 }
 
-export class AuthError extends BroboError {
+export class AuthError extends BrowserError {
   readonly provider: string
   constructor(message: string, provider: string) {
     super(message)
@@ -32,7 +32,7 @@ export class AuthError extends BroboError {
   }
 }
 
-export class RateLimitError extends BroboError {
+export class RateLimitError extends BrowserError {
   readonly retryAfter: number
   constructor(retryAfter: number) {
     super(`Rate limited. Retry after ${retryAfter}s`)
@@ -41,7 +41,7 @@ export class RateLimitError extends BroboError {
   }
 }
 
-export class UnknownProviderError extends BroboError {
+export class UnknownProviderError extends BrowserError {
   readonly provider: string
   constructor(provider: string) {
     super(`Unknown provider: ${provider}`)
@@ -50,7 +50,7 @@ export class UnknownProviderError extends BroboError {
   }
 }
 
-export class SessionError extends BroboError {
+export class SessionError extends BrowserError {
   readonly sessionId: string
   readonly provider: string
   constructor(message: string, sessionId: string, provider: string) {
@@ -75,14 +75,14 @@ export class SessionLimitError extends SessionError {
   }
 }
 
-export class NoProviderConfiguredError extends BroboError {
+export class NoProviderConfiguredError extends BrowserError {
   constructor() {
     super('No browser provider configured. Set an API key env var or register a provider.')
     this.name = 'NoProviderConfiguredError'
   }
 }
 
-export class NoProviderAvailableError extends BroboError {
+export class NoProviderAvailableError extends BrowserError {
   readonly providers: readonly string[]
   constructor(providers: readonly string[]) {
     const list = providers.length > 0 ? providers.join(', ') : 'unknown'
@@ -92,14 +92,14 @@ export class NoProviderAvailableError extends BroboError {
   }
 }
 
-export class EmptyUrlError extends BroboError {
+export class EmptyUrlError extends BrowserError {
   constructor() {
     super('URL cannot be empty')
     this.name = 'EmptyUrlError'
   }
 }
 
-export class ScrapeNotSupportedError extends BroboError {
+export class ScrapeNotSupportedError extends BrowserError {
   readonly provider: string
   constructor(provider: string) {
     super(`Provider does not support stateless scrape: ${provider}`)
@@ -108,14 +108,14 @@ export class ScrapeNotSupportedError extends BroboError {
   }
 }
 
-export class InvalidInputError extends BroboError {
+export class InvalidInputError extends BrowserError {
   constructor(message: string) {
     super(message)
     this.name = 'InvalidInputError'
   }
 }
 
-export class UnsupportedOperationError extends BroboError {
+export class UnsupportedOperationError extends BrowserError {
   readonly provider: string
   constructor(message: string, provider: string) {
     super(message)
@@ -124,7 +124,7 @@ export class UnsupportedOperationError extends BroboError {
   }
 }
 
-export class PaymentError extends BroboError {
+export class PaymentError extends BrowserError {
   readonly statusCode: number
   readonly provider: string
   constructor(message: string, statusCode: number, provider: string) {
@@ -145,14 +145,14 @@ export function parseRetryAfter(header: string | null | undefined): number {
   return parsed > 0 && parsed < 3600 ? parsed : DEFAULT_RETRY_AFTER
 }
 
-export function normalizeError(error: unknown, provider?: string): BroboError {
+export function normalizeError(error: unknown, provider?: string): BrowserError {
   if (error instanceof HTTPError && error.statusCode === 401) {
     return new AuthError(
       `Authentication failed: ${error.body || 'Invalid or missing API key'}`,
       provider || 'unknown',
     )
   }
-  if (error instanceof BroboError) return error
+  if (error instanceof BrowserError) return error
   if (
     error &&
     typeof error === 'object' &&
@@ -187,9 +187,9 @@ export function normalizeError(error: unknown, provider?: string): BroboError {
       }
       default:
         if (status >= 500) return new HTTPError(status, '', message)
-        return new BroboError(message)
+        return new BrowserError(message)
     }
   }
-  if (error instanceof Error) return new BroboError(error.message)
-  return new BroboError(String(error))
+  if (error instanceof Error) return new BrowserError(error.message)
+  return new BrowserError(String(error))
 }

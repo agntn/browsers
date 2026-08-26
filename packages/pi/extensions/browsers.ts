@@ -1,13 +1,13 @@
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent"
-import type * as BrowsersPackage from "@oritwoen/browsers"
+import type * as BrowsersPackage from "@agntn/browsers"
 import { Text } from "@earendil-works/pi-tui"
 import { Type } from "typebox"
 
 const builtinProviders = ["steel", "browserbase", "kernel", "browserless", "hyperbrowser", "anchor", "cloudflare", "playwright"] as const
 
 /** Dynamic import keeps the extension loadable from both the installed package and the repository source. */
-async function loadBrobo(): Promise<typeof BrowsersPackage> {
-  const mod = await import("@oritwoen/browsers").catch(() => {
+async function loadBrowsers(): Promise<typeof BrowsersPackage> {
+  const mod = await import("@agntn/browsers").catch(() => {
     // @ts-ignore — runtime fallback for dev (same package source)
     return import("../../src/index.ts")
   })
@@ -19,33 +19,31 @@ async function loadBrobo(): Promise<typeof BrowsersPackage> {
  * Does NOT call create() — caller decides when to instantiate.
  */
 async function resolveProviderName(preferred?: string): Promise<string> {
-  const brobo = await loadBrobo()
-  return brobo.resolveProvider(preferred)
+  const browsers = await loadBrowsers()
+  return browsers.resolveProvider(preferred)
 }
 
 /**
  * Resolve + create a provider instance in one call.
  */
 async function getProvider(preferred?: string) {
-  const brobo = await loadBrobo()
-  const name = brobo.resolveProvider(preferred)
-  return { name, provider: brobo.create(name) }
+  const browsers = await loadBrowsers()
+  const name = browsers.resolveProvider(preferred)
+  return { name, provider: browsers.create(name) }
 }
 
 // ─── Tools ───────────────────────────────────────────────────────────────
 
-export default function broboExtension(pi: ExtensionAPI) {
-
-  // ── brobo_scrape ──────────────────────────────────────────────────────
+export default function browsersExtension(pi: ExtensionAPI) {
 
   pi.registerTool({
-    name: "brobo_scrape",
-    label: "Brobo Scrape",
+    name: "browsers_scrape",
+    label: "Browser Scrape",
     description: "Read-only/open-world network fetch: scrape content from a URL using a cloud browser provider. Returns rendered HTML/markdown/text after JavaScript execution. Use when a URL needs a real browser to render (JS-heavy SPAs, sites with bot protection, dynamic content). Capabilities per provider: steel (stateless scrape, CDP navigate/evaluate), browserbase (stateless scrape, CDP only), kernel (session-based Playwright), browserless (stateless scrape+screenshot, CDP), hyperbrowser (stateless scrape, CDP only), anchor (stateless scrape, CDP only), cloudflare (stateless scrape+screenshot, CDP).",
     promptSnippet: "Scrape a URL with a cloud browser provider when the page needs JS rendering.",
     promptGuidelines: [
-      "Use brobo_scrape when a URL needs a real browser to render (SPA, bot-protected, dynamic).",
-      "For simple HTML pages prefer askweb_read (cheaper, faster).",
+      "Use browsers_scrape when a URL needs a real browser to render (SPA, bot-protected, dynamic).",
+      "For simple HTML pages prefer web_read (cheaper, faster).",
       "Steel and Cloudflare have stateless scrape (no session needed). Kernel requires a session.",
       "Pass waitFor to wait for a CSS selector before extraction.",
     ],
@@ -56,7 +54,7 @@ export default function broboExtension(pi: ExtensionAPI) {
     }),
     renderCall(args, theme) {
       return new Text(
-        `${theme.fg("toolTitle", theme.bold("brobo_scrape"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`,
+        `${theme.fg("toolTitle", theme.bold("browsers_scrape"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`,
         0, 0,
       )
     },
@@ -71,17 +69,15 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
   })
 
-  // ── brobo_session ─────────────────────────────────────────────────────
-
   pi.registerTool({
-    name: "brobo_session",
-    label: "Brobo Session",
+    name: "browsers_session",
+    label: "Browser Session",
     description: "Create a new cloud browser session. Returns session ID and CDP WebSocket URL for Puppeteer/Playwright connection.",
     promptSnippet: "Create a cloud browser session for full browser automation.",
     promptGuidelines: [
-      "Use brobo_session when you need full browser control (navigate, click, type, evaluate JS).",
-      "For simple scrape/screenshot, use brobo_scrape instead (no session needed).",
-      "Always release sessions when done with brobo_release.",
+      "Use browsers_session when you need full browser control (navigate, click, type, evaluate JS).",
+      "For simple scrape/screenshot, use browsers_scrape instead (no session needed).",
+      "Always release sessions when done with browsers_release.",
     ],
     parameters: Type.Object({
       provider: Type.Optional(Type.String({ description: "Provider name (auto-detected from env)" })),
@@ -89,7 +85,7 @@ export default function broboExtension(pi: ExtensionAPI) {
     }),
     renderCall(args, theme) {
       return new Text(
-        `${theme.fg("toolTitle", theme.bold("brobo_session"))} ${theme.fg("muted", `provider=${args.provider ?? "auto"} region=${args.region ?? "default"}`)}`,
+        `${theme.fg("toolTitle", theme.bold("browsers_session"))} ${theme.fg("muted", `provider=${args.provider ?? "auto"} region=${args.region ?? "default"}`)}`,
         0, 0,
       )
     },
@@ -105,11 +101,9 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
   })
 
-  // ── brobo_release ─────────────────────────────────────────────────────
-
   pi.registerTool({
-    name: "brobo_release",
-    label: "Brobo Release",
+    name: "browsers_release",
+    label: "Browser Release",
     description: "Release/destroy a cloud browser session. Always release sessions when done to avoid billing.",
     promptSnippet: "Release a cloud browser session.",
     promptGuidelines: [
@@ -122,7 +116,7 @@ export default function broboExtension(pi: ExtensionAPI) {
     }),
     renderCall(args, theme) {
       return new Text(
-        `${theme.fg("toolTitle", theme.bold("brobo_release"))} ${theme.fg("dim", args.sessionId)}`,
+        `${theme.fg("toolTitle", theme.bold("browsers_release"))} ${theme.fg("dim", args.sessionId)}`,
         0, 0,
       )
     },
@@ -136,27 +130,25 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
   })
 
-  // ── brobo_providers ───────────────────────────────────────────────────
-
   pi.registerTool({
-    name: "brobo_providers",
-    label: "Brobo Providers",
+    name: "browsers_providers",
+    label: "Browser Providers",
     description: "Read-only/idempotent local/env status: list browser-as-a-service providers and which ones are currently configured via environment variables.",
-    promptSnippet: "List configured brobo browser providers.",
+    promptSnippet: "List configured browser providers.",
     promptGuidelines: [
-      "Use brobo_providers to check which browser providers have API keys configured.",
+      "Use browsers_providers to check which browser providers have API keys configured.",
     ],
     parameters: Type.Object({}),
     renderCall(_args, theme) {
-      return new Text(theme.fg("toolTitle", theme.bold("brobo_providers")), 0, 0)
+      return new Text(theme.fg("toolTitle", theme.bold("browsers_providers")), 0, 0)
     },
     async execute(): Promise<AgentToolResult<{ providers: { name: string; configured: boolean; capabilities: Record<string, unknown> }[] }>> {
-      const brobo = await loadBrobo()
+      const browsers = await loadBrowsers()
       const rows = builtinProviders.map(name => {
         let configured = false
         let capabilities: Record<string, boolean> = {}
         try {
-          const provider = brobo.create(name)
+          const provider = browsers.create(name)
           configured = true
           capabilities = { ...provider.capabilities() }
         }
@@ -182,15 +174,13 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
   })
 
-  // ── brobo_screenshot ──────────────────────────────────────────────────
-
   pi.registerTool({
-    name: "brobo_screenshot",
-    label: "Brobo Screenshot",
+    name: "browsers_screenshot",
+    label: "Browser Screenshot",
     description: "Take a screenshot of a URL using a cloud browser provider. Stateless mode (no session needed): cloudflare, browserless. Session-based: steel, browserbase, kernel, hyperbrowser, anchor. For providers without navigate support (browserbase, hyperbrowser, anchor, cloudflare), the screenshot captures the URL directly.",
     promptSnippet: "Take a screenshot of a URL with a cloud browser.",
     promptGuidelines: [
-      "Use brobo_screenshot when the user needs a visual capture of a webpage.",
+      "Use browsers_screenshot when the user needs a visual capture of a webpage.",
       "Cloudflare and Browserless work statelessly (no session needed).",
       "Other providers create a temporary session, navigate, screenshot, and release.",
     ],
@@ -202,7 +192,7 @@ export default function broboExtension(pi: ExtensionAPI) {
     }),
     renderCall(args, theme) {
       return new Text(
-        `${theme.fg("toolTitle", theme.bold("brobo_screenshot"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`,
+        `${theme.fg("toolTitle", theme.bold("browsers_screenshot"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`,
         0, 0,
       )
     },
@@ -245,15 +235,13 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
   })
 
-  // ── brobo_extract ─────────────────────────────────────────────────────
-
   pi.registerTool({
-    name: "brobo_extract",
-    label: "Brobo Extract",
+    name: "browsers_extract",
+    label: "Browser Extract",
     description: "Extract structured data from a URL using AI. Cloudflare returns synchronous results. Hyperbrowser returns an async job ID.",
     promptSnippet: "Extract structured data from a URL with AI.",
     promptGuidelines: [
-      "Use brobo_extract when the user needs structured data from a webpage (product info, pricing, articles).",
+      "Use browsers_extract when the user needs structured data from a webpage (product info, pricing, articles).",
       "Cloudflare returns results synchronously. Hyperbrowser returns a jobId for async processing.",
       "Pass a prompt describing what to extract.",
     ],
@@ -263,7 +251,7 @@ export default function broboExtension(pi: ExtensionAPI) {
       prompt: Type.String({ description: "What to extract (e.g. 'Extract product name, price, and description')" }),
     }),
     renderCall(args, theme) {
-      return new Text(`${theme.fg("toolTitle", theme.bold("brobo_extract"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`, 0, 0)
+      return new Text(`${theme.fg("toolTitle", theme.bold("browsers_extract"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`, 0, 0)
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; data: unknown }>> {
       const { name, provider } = await getProvider(params.provider)
@@ -276,15 +264,13 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
   })
 
-  // ── brobo_crawl ───────────────────────────────────────────────────────
-
   pi.registerTool({
-    name: "brobo_crawl",
-    label: "Brobo Crawl",
+    name: "browsers_crawl",
+    label: "Browser Crawl",
     description: "Crawl a website following links. Cloudflare and Hyperbrowser support async crawl jobs. Returns pages with markdown/HTML content.",
     promptSnippet: "Crawl a website and extract content from multiple pages.",
     promptGuidelines: [
-      "Use brobo_crawl when the user needs content from multiple pages of a website.",
+      "Use browsers_crawl when the user needs content from multiple pages of a website.",
       "Both cloudflare and hyperbrowser return async job IDs. Results may need polling.",
       "Pass maxPages to limit the crawl scope.",
     ],
@@ -294,7 +280,7 @@ export default function broboExtension(pi: ExtensionAPI) {
       maxPages: Type.Optional(Type.Number({ description: "Max pages to crawl. Default: 10." })),
     }),
     renderCall(args, theme) {
-      return new Text(`${theme.fg("toolTitle", theme.bold("brobo_crawl"))} ${theme.fg("dim", args.url)}`, 0, 0)
+      return new Text(`${theme.fg("toolTitle", theme.bold("browsers_crawl"))} ${theme.fg("dim", args.url)}`, 0, 0)
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ jobId?: string; pages: number }>> {
       const { name, provider } = await getProvider(params.provider)
@@ -309,15 +295,13 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
   })
 
-  // ── brobo_pdf ─────────────────────────────────────────────────────────
-
   pi.registerTool({
-    name: "brobo_pdf",
-    label: "Brobo PDF",
+    name: "browsers_pdf",
+    label: "Browser PDF",
     description: "Generate a PDF from a URL. Cloudflare and Browserless support stateless PDF generation.",
     promptSnippet: "Generate a PDF from a URL.",
     promptGuidelines: [
-      "Use brobo_pdf when the user needs a PDF of a webpage.",
+      "Use browsers_pdf when the user needs a PDF of a webpage.",
       "Cloudflare and Browserless work statelessly (no session needed).",
     ],
     parameters: Type.Object({
@@ -325,7 +309,7 @@ export default function broboExtension(pi: ExtensionAPI) {
       provider: Type.Optional(Type.String({ description: `Provider. One of: cloudflare, browserless, playwright.` })),
     }),
     renderCall(args, theme) {
-      return new Text(`${theme.fg("toolTitle", theme.bold("brobo_pdf"))} ${theme.fg("dim", args.url)}`, 0, 0)
+      return new Text(`${theme.fg("toolTitle", theme.bold("browsers_pdf"))} ${theme.fg("dim", args.url)}`, 0, 0)
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; pdfLength: number }>> {
       const { name, provider } = await getProvider(params.provider)
@@ -338,15 +322,13 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
   })
 
-  // ── brobo_links ───────────────────────────────────────────────────────
-
   pi.registerTool({
-    name: "brobo_links",
-    label: "Brobo Links",
+    name: "browsers_links",
+    label: "Browser Links",
     description: "Extract all links from a webpage. Cloudflare and Playwright support stateless link extraction.",
     promptSnippet: "Extract links from a webpage.",
     promptGuidelines: [
-      "Use brobo_links when the user needs all links from a page.",
+      "Use browsers_links when the user needs all links from a page.",
       "Cloudflare and Playwright support this currently.",
     ],
     parameters: Type.Object({
@@ -354,7 +336,7 @@ export default function broboExtension(pi: ExtensionAPI) {
       provider: Type.Optional(Type.String({ description: `Provider. One of: ${builtinProviders.join(", ")}.` })),
     }),
     renderCall(args, theme) {
-      return new Text(`${theme.fg("toolTitle", theme.bold("brobo_links"))} ${theme.fg("dim", args.url)}`, 0, 0)
+      return new Text(`${theme.fg("toolTitle", theme.bold("browsers_links"))} ${theme.fg("dim", args.url)}`, 0, 0)
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; links: string[] }>> {
       const { name, provider } = await getProvider(params.provider)
@@ -368,22 +350,20 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
   })
 
-  // ── brobo_search ──────────────────────────────────────────────────────
-
   pi.registerTool({
-    name: "brobo_search",
-    label: "Brobo Search",
+    name: "browsers_search",
+    label: "Browser Search",
     description: "Web search via browser provider. Hyperbrowser supports native web search.",
     promptSnippet: "Search the web via browser provider.",
     promptGuidelines: [
-      "Use brobo_search when the user needs web search results.",
+      "Use browsers_search when the user needs web search results.",
       "Hyperbrowser supports native web search.",
     ],
     parameters: Type.Object({
       query: Type.String({ description: "Search query" }),
     }),
     renderCall(args, theme) {
-      return new Text(`${theme.fg("toolTitle", theme.bold("brobo_search"))} ${theme.fg("dim", args.query)}`, 0, 0)
+      return new Text(`${theme.fg("toolTitle", theme.bold("browsers_search"))} ${theme.fg("dim", args.query)}`, 0, 0)
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ results: Array<{ url: string; title: string; snippet: string }> }>> {
       const { name, provider } = await getProvider("hyperbrowser")
@@ -397,15 +377,13 @@ export default function broboExtension(pi: ExtensionAPI) {
     },
   })
 
-  // ── brobo_capabilities ────────────────────────────────────────────────
-
   pi.registerTool({
-    name: "brobo_capabilities",
-    label: "Brobo Capabilities",
+    name: "browsers_capabilities",
+    label: "Browser Capabilities",
     description: "Read-only: check what operations a specific browser provider supports (scrape, screenshot, navigate, evaluate, sessions, CDP, stateless modes).",
     promptSnippet: "Check capabilities of a browser provider before using it.",
     promptGuidelines: [
-      "Use brobo_capabilities before brobo_scrape/brobo_screenshot to check if the provider supports the operation.",
+      "Use browsers_capabilities before browsers_scrape/browsers_screenshot to check if the provider supports the operation.",
       "Some providers support stateless operations (no session needed): cloudflare, browserless for both scrape and screenshot.",
       "Some providers only support CDP (no REST navigate/evaluate): browserbase, hyperbrowser, anchor.",
     ],
@@ -413,7 +391,7 @@ export default function broboExtension(pi: ExtensionAPI) {
       provider: Type.String({ description: "Provider name to check" }),
     }),
     renderCall(args, theme) {
-      return new Text(`${theme.fg("toolTitle", theme.bold("brobo_capabilities"))} ${theme.fg("dim", args.provider)}`, 0, 0)
+      return new Text(`${theme.fg("toolTitle", theme.bold("browsers_capabilities"))} ${theme.fg("dim", args.provider)}`, 0, 0)
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ provider: string; capabilities: Record<string, unknown> }>> {
       const { name, provider } = await getProvider(params.provider)

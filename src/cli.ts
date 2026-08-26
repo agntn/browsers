@@ -7,7 +7,7 @@ import { version } from './version'
 
 const main = defineCommand({
   meta: {
-    name: 'brobo',
+    name: 'browsers',
     version,
     description: 'Unified browser-as-a-service provider for agents and CLI',
   },

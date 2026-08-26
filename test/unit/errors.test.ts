@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest"
-import { BroboError, HTTPError, AuthError, RateLimitError, UnknownProviderError, SessionError, SessionNotFoundError, SessionLimitError, NoProviderConfiguredError, NoProviderAvailableError, EmptyUrlError, ScrapeNotSupportedError, InvalidInputError, UnsupportedOperationError, PaymentError, parseRetryAfter, DEFAULT_RETRY_AFTER, normalizeError } from "../../src/core/errors"
+import { BrowserError, HTTPError, AuthError, RateLimitError, UnknownProviderError, SessionError, SessionNotFoundError, SessionLimitError, NoProviderConfiguredError, NoProviderAvailableError, EmptyUrlError, ScrapeNotSupportedError, InvalidInputError, UnsupportedOperationError, PaymentError, parseRetryAfter, DEFAULT_RETRY_AFTER, normalizeError } from "../../src/core/errors"
 
-describe("BroboError", () => {
+describe("BrowserError", () => {
   it("base", () => {
-    const e = new BroboError("test")
+    const e = new BrowserError("test")
     expect(e).toBeInstanceOf(Error)
   })
   it("HTTPError", () => {
@@ -12,19 +12,19 @@ describe("BroboError", () => {
   })
   it("AuthError", () => {
     const e = new AuthError("x402", "bad")
-    expect(e).toBeInstanceOf(BroboError)
+    expect(e).toBeInstanceOf(BrowserError)
   })
   it("RateLimitError", () => {
     const e = new RateLimitError("x402", 30)
-    expect(e).toBeInstanceOf(BroboError)
+    expect(e).toBeInstanceOf(BrowserError)
   })
   it("UnknownProviderError", () => {
     const e = new UnknownProviderError("foo")
-    expect(e).toBeInstanceOf(BroboError)
+    expect(e).toBeInstanceOf(BrowserError)
   })
   it("SessionError", () => {
     const e = new SessionError("x402", "expired")
-    expect(e).toBeInstanceOf(BroboError)
+    expect(e).toBeInstanceOf(BrowserError)
   })
   it("SessionNotFoundError", () => {
     const e = new SessionNotFoundError("x402", "id-1")
@@ -36,32 +36,32 @@ describe("BroboError", () => {
   })
   it("NoProviderConfiguredError", () => {
     const e = new NoProviderConfiguredError()
-    expect(e).toBeInstanceOf(BroboError)
+    expect(e).toBeInstanceOf(BrowserError)
   })
   it("NoProviderAvailableError takes providers array", () => {
     const e = new NoProviderAvailableError(["a", "b"])
-    expect(e).toBeInstanceOf(BroboError)
+    expect(e).toBeInstanceOf(BrowserError)
     expect(e.providers).toEqual(["a", "b"])
   })
   it("EmptyUrlError", () => {
     const e = new EmptyUrlError()
-    expect(e).toBeInstanceOf(BroboError)
+    expect(e).toBeInstanceOf(BrowserError)
   })
   it("ScrapeNotSupportedError", () => {
     const e = new ScrapeNotSupportedError("x402")
-    expect(e).toBeInstanceOf(BroboError)
+    expect(e).toBeInstanceOf(BrowserError)
   })
   it("InvalidInputError", () => {
     const e = new InvalidInputError("x402", "url", "bad")
-    expect(e).toBeInstanceOf(BroboError)
+    expect(e).toBeInstanceOf(BrowserError)
   })
   it("UnsupportedOperationError", () => {
     const e = new UnsupportedOperationError("x402", "scrape")
-    expect(e).toBeInstanceOf(BroboError)
+    expect(e).toBeInstanceOf(BrowserError)
   })
   it("PaymentError", () => {
     const e = new PaymentError("x402", "no funds")
-    expect(e).toBeInstanceOf(BroboError)
+    expect(e).toBeInstanceOf(BrowserError)
   })
 })
 
@@ -86,10 +86,10 @@ describe("normalizeError", () => {
   })
   it("wraps Error", () => {
     const out = normalizeError(new Error("oops"))
-    expect(out).toBeInstanceOf(BroboError)
+    expect(out).toBeInstanceOf(BrowserError)
   })
   it("wraps non-Error", () => {
     const out = normalizeError("oops" as unknown)
-    expect(out).toBeInstanceOf(BroboError)
+    expect(out).toBeInstanceOf(BrowserError)
   })
 })

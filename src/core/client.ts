@@ -7,7 +7,7 @@ import { version } from '../version'
 const DEFAULT_MAX_RETRIES = 3
 const DEFAULT_BASE_DELAY = 100
 const DEFAULT_TIMEOUT = 30_000
-const DEFAULT_USER_AGENT = `brobo/${version}`
+const DEFAULT_USER_AGENT = `browsers/${version}`
 
 export class Client {
   readonly maxRetries: number

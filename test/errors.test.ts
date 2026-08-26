@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  BroboError,
+  BrowserError,
   HTTPError,
   AuthError,
   RateLimitError,
@@ -18,9 +18,9 @@ import {
 } from '../src/core/errors'
 
 describe('error classes', () => {
-  it('BroboError is base', () => {
-    const err = new BroboError('test')
-    expect(err.name).toBe('BroboError')
+  it('BrowserError is base', () => {
+    const err = new BrowserError('test')
+    expect(err.name).toBe('BrowserError')
     expect(err.message).toBe('test')
     expect(err).toBeInstanceOf(Error)
   })
@@ -131,20 +131,20 @@ describe('parseRetryAfter', () => {
 })
 
 describe('normalizeError', () => {
-  it('passes through BroboError', () => {
-    const err = new BroboError('test')
+  it('passes through BrowserError', () => {
+    const err = new BrowserError('test')
     expect(normalizeError(err)).toBe(err)
   })
 
-  it('converts plain Error to BroboError', () => {
+  it('converts plain Error to BrowserError', () => {
     const result = normalizeError(new Error('plain'))
-    expect(result).toBeInstanceOf(BroboError)
+    expect(result).toBeInstanceOf(BrowserError)
     expect(result.message).toBe('plain')
   })
 
-  it('converts non-Error to BroboError', () => {
+  it('converts non-Error to BrowserError', () => {
     const result = normalizeError('string error')
-    expect(result).toBeInstanceOf(BroboError)
+    expect(result).toBeInstanceOf(BrowserError)
     expect(result.message).toBe('string error')
   })
 })

@@ -16,7 +16,7 @@ import type {
   ProviderCapabilities,
   LinksResult,
 } from '../core/types'
-import { BroboError, SessionNotFoundError, normalizeError } from '../core/errors'
+import { BrowserError, SessionNotFoundError, normalizeError } from '../core/errors'
 import { register } from '../core/registry'
 import { randomUUID } from 'node:crypto'
 import { execSync } from 'node:child_process'
@@ -98,7 +98,7 @@ class PlaywrightProvider implements BrowserProvider {
     catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       if (message.includes('executable') || message.includes('browserType.launch')) {
-        throw new BroboError(
+        throw new BrowserError(
           `Playwright browser not found. Run: npx playwright install chromium`,
         )
       }

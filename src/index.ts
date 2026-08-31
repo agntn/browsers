@@ -1,8 +1,8 @@
-import './providers/index'
+import "./providers/index";
 
-export { version } from './version'
+export { version } from "./version";
 
-export { builtinProviders, type BrowserProviderName } from './core/providers'
+export { builtinProviders, type BrowserProviderName } from "./core/providers";
 
 export type {
   BrowserSession,
@@ -28,7 +28,7 @@ export type {
   ProviderConfig,
   BrowserProviderFactory,
   ClientOptions,
-} from './core/types'
+} from "./core/types";
 
 export {
   BrowserError,
@@ -47,9 +47,14 @@ export {
   UnsupportedOperationError,
   PaymentError,
   normalizeError,
-} from './core/errors'
+} from "./core/errors";
 
-export { Client, defaultClient } from './core/client'
-export { register, create, providers, has } from './core/registry'
-export { resolveProvider, providerEnvKey } from './core/resolve'
-export { isNotFoundError, assertSessionId, assertUrlOrSession, notSupportedViaRest } from './core/utils'
+export { Client, defaultClient } from "./core/client";
+export { register, create, providers, has } from "./core/registry";
+export { resolveProvider, providerEnvKey } from "./core/resolve";
+export {
+  isNotFoundError,
+  assertSessionId,
+  assertUrlOrSession,
+  notSupportedViaRest,
+} from "./core/utils";

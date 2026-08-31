@@ -10,78 +10,95 @@ import type {
   ProviderConfig,
   BrowserProviderFactory,
   ProviderCapabilities,
-} from '../core/types'
-import { defaultClient } from '../core/client'
-import type { Client } from '../core/client'
-import { AuthError, normalizeError } from '../core/errors'
-import { register } from '../core/registry'
-import { isNotFoundError, assertSessionId, notSupportedViaRest } from '../core/utils'
+} from "../core/types";
+import { defaultClient } from "../core/client";
+import type { Client } from "../core/client";
+import { AuthError, normalizeError } from "../core/errors";
+import { register } from "../core/registry";
+import { isNotFoundError, assertSessionId, notSupportedViaRest } from "../core/utils";
 
 interface AnchorSessionResponse {
-  id: string
-  cdpUrl?: string
-  wsEndpoint?: string
-  status?: string
-  createdAt?: string
-  [key: string]: unknown
+  id: string;
+  cdpUrl?: string;
+  wsEndpoint?: string;
+  status?: string;
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
+function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (!options) return body;
+  if (options.region) body.region = options.region;
+  if (options.proxy) body.proxy = options.proxy;
+  if (options.stealth) body.stealth = true;
+  if (options.headless !== undefined) body.headless = options.headless;
+  if (options.viewport) body.viewport = options.viewport;
+  if (options.extra) Object.assign(body, options.extra);
+  return body;
 }
 
 class AnchorProvider implements BrowserProvider {
-  private readonly client: Client
-  private readonly baseURL: string
-  private readonly apiKey: string
+  private readonly client: Client;
+  private readonly baseURL: string;
+  private readonly apiKey: string;
 
   constructor(config: ProviderConfig) {
     if (!config.apiKey) {
-      throw new AuthError('Missing API key for Anchor Browser. Set ANCHOR_API_KEY', 'anchor')
+      throw new AuthError("Missing API key for Anchor Browser. Set ANCHOR_API_KEY", "anchor");
     }
-    this.client = defaultClient()
-    this.baseURL = (config.baseURL ?? 'https://api.anchorbrowser.io').replace(/\/+$/, '')
-    this.apiKey = config.apiKey
+    this.client = defaultClient();
+    this.baseURL = (config.baseURL ?? "https://api.anchorbrowser.io").replace(/\/+$/, "");
+    this.apiKey = config.apiKey;
   }
 
-  name(): string { return 'anchor' }
+  name(): string {
+    return "anchor";
+  }
 
   capabilities(): ProviderCapabilities {
     return {
-      scrape: false, screenshot: true, navigate: false, evaluate: false,
-      sessions: true, cdp: true, statelessScrape: false, statelessScreenshot: false,
-      crawl: false, pdf: false, links: false, search: false, extract: false,
-    }
+      scrape: false,
+      screenshot: true,
+      navigate: false,
+      evaluate: false,
+      sessions: true,
+      cdp: true,
+      statelessScrape: false,
+      statelessScreenshot: false,
+      crawl: false,
+      pdf: false,
+      links: false,
+      search: false,
+      extract: false,
+    };
   }
 
   private headers(): Record<string, string> {
     return {
-      'Authorization': `Bearer ${this.apiKey}`,
-      'Content-Type': 'application/json',
-    }
+      Authorization: `Bearer ${this.apiKey}`,
+      "Content-Type": "application/json",
+    };
   }
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
-      const body: Record<string, unknown> = {}
-      if (options?.region) body.region = options.region
-      if (options?.proxy) body.proxy = options.proxy
-      if (options?.stealth) body.stealth = true
-      if (options?.headless !== undefined) body.headless = options.headless
-      if (options?.viewport) body.viewport = options.viewport
-      if (options?.extra) Object.assign(body, options.extra)
-
       const res = await this.client.postJSON<AnchorSessionResponse>(
         `${this.baseURL}/v1/sessions`,
-        body,
+        createSessionBody(options),
         this.headers(),
-      )
+      );
 
       return {
         id: res.id,
         cdpUrl: res.cdpUrl ?? res.wsEndpoint,
-        provider: 'anchor',
+        provider: "anchor",
         createdAt: Date.now(),
         metadata: { status: res.status },
-      }
+      };
+    } catch (error) {
+      throw normalizeError(error, "anchor");
     }
-    catch (error) { throw normalizeError(error, 'anchor') }
   }
 
   async getSession(sessionId: string): Promise<BrowserSession | null> {
@@ -89,18 +106,17 @@ class AnchorProvider implements BrowserProvider {
       const res = await this.client.getJSON<AnchorSessionResponse>(
         `${this.baseURL}/v1/sessions/${sessionId}`,
         this.headers(),
-      )
+      );
       return {
         id: res.id,
         cdpUrl: res.cdpUrl ?? res.wsEndpoint,
-        provider: 'anchor',
+        provider: "anchor",
         createdAt: res.createdAt ? new Date(res.createdAt).getTime() : Date.now(),
         metadata: { status: res.status },
-      }
-    }
-    catch (error: unknown) {
-      if (isNotFoundError(error)) return null
-      throw normalizeError(error, 'anchor')
+      };
+    } catch (error: unknown) {
+      if (isNotFoundError(error)) return null;
+      throw normalizeError(error, "anchor");
     }
   }
 
@@ -109,78 +125,83 @@ class AnchorProvider implements BrowserProvider {
       const res = await this.client.getJSON<AnchorSessionResponse[]>(
         `${this.baseURL}/v1/sessions`,
         this.headers(),
-      )
-      return res.map(s => ({
+      );
+      return res.map((s) => ({
         id: s.id,
         cdpUrl: s.cdpUrl ?? s.wsEndpoint,
-        provider: 'anchor',
+        provider: "anchor",
         createdAt: s.createdAt ? new Date(s.createdAt).getTime() : Date.now(),
         metadata: { status: s.status },
-      }))
+      }));
+    } catch {
+      return [];
     }
-    catch { return [] }
   }
 
   async releaseSession(sessionId: string): Promise<void> {
     try {
-      await this.client.deleteJSON(
-        `${this.baseURL}/v1/sessions/${sessionId}`,
-        this.headers(),
-      )
+      await this.client.deleteJSON(`${this.baseURL}/v1/sessions/${sessionId}`, this.headers());
+    } catch (error) {
+      throw normalizeError(error, "anchor");
     }
-    catch (error) { throw normalizeError(error, 'anchor') }
   }
 
-  async scrape(_url: string, _options?: ScrapeOptions, _session?: BrowserSession): Promise<ScrapeResult> {
-    notSupportedViaRest('anchor', 'scrape')
+  async scrape(
+    _url: string,
+    _options?: ScrapeOptions,
+    _session?: BrowserSession,
+  ): Promise<ScrapeResult> {
+    notSupportedViaRest("anchor", "scrape");
   }
 
-  async screenshot(options: ScreenshotOptions, session?: BrowserSession): Promise<ScreenshotResult> {
+  async screenshot(
+    options: ScreenshotOptions,
+    session?: BrowserSession,
+  ): Promise<ScreenshotResult> {
     try {
-      assertSessionId(session?.id, 'anchor', 'screenshot')
+      assertSessionId(session?.id, "anchor", "screenshot");
       const body: Record<string, unknown> = {
         sessionId: session.id,
         fullPage: options.fullPage ?? true,
-      }
-      if (options.selector) body.selector = options.selector
+      };
+      if (options.selector) body.selector = options.selector;
 
       const res = await this.client.postJSON<{ data?: string; screenshot?: string }>(
         `${this.baseURL}/v1/screenshot`,
         body,
         this.headers(),
-      )
+      );
 
       return {
-        data: res.data ?? res.screenshot ?? '',
-        mimeType: `image/${options.format ?? 'png'}`,
-      }
+        data: res.data ?? res.screenshot ?? "",
+        mimeType: `image/${options.format ?? "png"}`,
+      };
+    } catch (error) {
+      throw normalizeError(error, "anchor");
     }
-    catch (error) { throw normalizeError(error, 'anchor') }
   }
 
   async navigate(_url: string, _session: BrowserSession): Promise<void> {
-    notSupportedViaRest('anchor', 'navigate')
+    notSupportedViaRest("anchor", "navigate");
   }
 
   async evaluate(_script: string, _session: BrowserSession): Promise<EvaluateResult> {
-    notSupportedViaRest('anchor', 'evaluate')
+    notSupportedViaRest("anchor", "evaluate");
   }
 
   getCdpUrl(session: BrowserSession): string | undefined {
-    return session.cdpUrl
+    return session.cdpUrl;
   }
 
   async isAvailable(): Promise<boolean> {
     try {
-      await this.client.getJSON<{ status?: string }>(
-        `${this.baseURL}/v1/health`,
-        this.headers(),
-      )
-      return true
+      await this.client.getJSON<{ status?: string }>(`${this.baseURL}/v1/health`, this.headers());
+      return true;
+    } catch {
+      return false;
     }
-    catch { return false }
   }
 }
 
-const factory: BrowserProviderFactory = (config) => new AnchorProvider(config)
-register('anchor', 'https://api.anchorbrowser.io', factory)
+const factory: BrowserProviderFactory = (config) => new AnchorProvider(config);
+register("anchor", "https://api.anchorbrowser.io", factory);

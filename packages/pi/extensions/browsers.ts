@@ -9,6 +9,8 @@ const builtinProviders = ["steel", "browserbase", "kernel", "browserless", "hype
 const sourceModuleUrl = new URL("../../../src/index.ts", import.meta.url)
 const distributionModuleUrl = new URL("../../../dist/index.mjs", import.meta.url)
 let browsersModulePromise: Promise<typeof BrowsersPackage> | undefined
+const DEFAULT_SCRAPE_MAX_CHARS = 20_000
+const MAX_SCRAPE_MAX_CHARS = 200_000
 
 /** Return live source in a checkout, otherwise the built distribution module. */
 export function resolveBrowsersModuleUrl(): string {
@@ -19,6 +21,14 @@ export function resolveBrowsersModuleUrl(): string {
 function loadBrowsers(): Promise<typeof BrowsersPackage> {
   browsersModulePromise ??= import(resolveBrowsersModuleUrl()) as Promise<typeof BrowsersPackage>
   return browsersModulePromise
+}
+
+function resolveScrapeMaxChars(value?: number): number {
+  const maxChars = value ?? DEFAULT_SCRAPE_MAX_CHARS
+  if (!Number.isInteger(maxChars) || maxChars < 1 || maxChars > MAX_SCRAPE_MAX_CHARS) {
+    throw new RangeError(`maxChars must be an integer between 1 and ${MAX_SCRAPE_MAX_CHARS}.`)
+  }
+  return maxChars
 }
 
 /**
@@ -58,6 +68,11 @@ export default function browsersExtension(pi: ExtensionAPI) {
       url: Type.String({ description: "URL to scrape" }),
       provider: Type.Optional(Type.String({ description: `Provider name. One of: ${builtinProviders.join(", ")}. Auto-detected from env.` })),
       waitFor: Type.Optional(Type.String({ description: "CSS selector to wait for before extraction" })),
+      maxChars: Type.Optional(Type.Integer({
+        description: `Maximum page content characters to return. Defaults to ${DEFAULT_SCRAPE_MAX_CHARS}; accepted range: 1-${MAX_SCRAPE_MAX_CHARS}.`,
+        minimum: 1,
+        maximum: MAX_SCRAPE_MAX_CHARS,
+      })),
     }),
     renderCall(args, theme) {
       return new Text(
@@ -67,11 +82,19 @@ export default function browsersExtension(pi: ExtensionAPI) {
     },
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; contentLength: number }>> {
       const { name, provider } = await getProvider(params.provider)
-      const result = await provider.scrape(params.url, { waitFor: params.waitFor })
-      const content = result.text || result.markdown || result.html || "No content extracted"
+      const maxChars = resolveScrapeMaxChars(params.maxChars)
+      const result = await provider.scrape(params.url, {
+        waitFor: params.waitFor,
+        maxChars,
+      })
+      const rawContent = result.text || result.markdown || result.html || "No content extracted"
+      const content = rawContent.slice(0, maxChars)
+      const truncation = rawContent.length > maxChars
+        ? `\n\n[truncated ${rawContent.length - maxChars} of ${rawContent.length} characters]`
+        : ""
       return {
-        content: [{ type: "text", text: `[provider=${name}] ${params.url}\n\n${content}` }],
-        details: { url: params.url, provider: name, contentLength: content.length },
+        content: [{ type: "text", text: `[provider=${name}] ${params.url}\n\n${content}${truncation}` }],
+        details: { url: params.url, provider: name, contentLength: rawContent.length },
       }
     },
   })

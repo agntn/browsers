@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import type {
   AgentToolResult,
   ExtensionAPI,
@@ -5,14 +6,16 @@ import type {
   ToolDefinition,
 } from '@earendil-works/pi-coding-agent'
 import { describe, expect, it, vi } from 'vitest'
-import browsersExtension from '../packages/pi/extensions/browsers'
+import browsersExtension, {
+  resolveBrowsersModuleUrl,
+} from '../packages/pi/extensions/browsers'
 
 const browsersMock = vi.hoisted(() => ({
   create: vi.fn(),
   resolveProvider: vi.fn(),
 }))
 
-vi.mock('@agntn/browsers', () => browsersMock)
+vi.mock('../src/index', () => browsersMock)
 
 type ExecutableTool = {
   execute: (
@@ -42,6 +45,12 @@ function requireTool(tools: Map<string, ToolDefinition>, name: string): Executab
 }
 
 describe('browsers Pi extension', () => {
+  it('loads current source instead of a potentially stale build', () => {
+    expect(fileURLToPath(resolveBrowsersModuleUrl())).toBe(
+      fileURLToPath(new URL('../src/index.ts', import.meta.url)),
+    )
+  })
+
   it('keeps session connection credentials out of tool output', async () => {
     const secretUrl = 'wss://connect.example.test?token=secret&signingKey=jwt'
     const provider = {

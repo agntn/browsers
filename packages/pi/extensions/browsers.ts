@@ -1,17 +1,24 @@
+import { existsSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent"
 import type * as BrowsersPackage from "@agntn/browsers"
 import { Text } from "@earendil-works/pi-tui"
 import { Type } from "typebox"
 
 const builtinProviders = ["steel", "browserbase", "kernel", "browserless", "hyperbrowser", "anchor", "cloudflare", "playwright"] as const
+const sourceModuleUrl = new URL("../../../src/index.ts", import.meta.url)
+const distributionModuleUrl = new URL("../../../dist/index.mjs", import.meta.url)
+let browsersModulePromise: Promise<typeof BrowsersPackage> | undefined
 
-/** Dynamic import keeps the extension loadable from both the installed package and the repository source. */
-async function loadBrowsers(): Promise<typeof BrowsersPackage> {
-  const mod = await import("@agntn/browsers").catch(() => {
-    // @ts-ignore — runtime fallback for dev (same package source)
-    return import("../../src/index.ts")
-  })
-  return mod
+/** Return live source in a checkout, otherwise the built distribution module. */
+export function resolveBrowsersModuleUrl(): string {
+  return existsSync(fileURLToPath(sourceModuleUrl)) ? sourceModuleUrl.href : distributionModuleUrl.href
+}
+
+/** Load and cache the browser library selected for the current package layout. */
+function loadBrowsers(): Promise<typeof BrowsersPackage> {
+  browsersModulePromise ??= import(resolveBrowsersModuleUrl()) as Promise<typeof BrowsersPackage>
+  return browsersModulePromise
 }
 
 /**

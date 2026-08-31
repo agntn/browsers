@@ -27,8 +27,8 @@ Expose the existing browser tools through OMP and MCP without duplicating provid
 
 ## Current step
 
-The integrations are verified and ready for their local semantic commit.
+Pull request #24 is open from `feat/omp-mcp-integrations` and closes issue #21 when merged.
 
 ## Next action
 
-Commit the scoped files, push the branch after the approved dry-run, and open the contribution PR for issue #21.
+Monitor review and checks; no local implementation action is pending.

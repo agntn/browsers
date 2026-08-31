@@ -13,6 +13,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 - `src/providers/*.ts` — one file per provider, self-registers on import
 - `src/commands/*.ts` — CLI subcommands (citty)
 - `packages/pi/extensions/browsers.ts` — Pi agent tools
+- `oxlint.config.ts` / `oxfmt.config.ts` - repository-local consumers of the shared `@agntn/ox` policy
 
 ## Adding a provider
 
@@ -26,6 +27,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 ## Conventions
 
 - TypeScript, ESM, Node >= 22
+- Linting and formatting use oxlint + oxfmt through `@agntn/ox`; type-aware lint runs after `pnpm build`
 - ofetch for HTTP, citty for CLI, consola for logging
 - API keys from env: `PROVIDERNAME_API_KEY`
 - Self-registering providers (no central wiring)

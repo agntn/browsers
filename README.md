@@ -71,75 +71,75 @@ browsers providers --check
 ## Library
 
 ```typescript
-import { create, resolveProvider } from '@agntn/browsers'
+import { create, resolveProvider } from "@agntn/browsers";
 
 // Auto-detect provider from env vars
-const providerName = resolveProvider()
-const provider = create(providerName)
+const providerName = resolveProvider();
+const provider = create(providerName);
 
 // Check capabilities
-const caps = provider.capabilities()
-console.log(caps.statelessScrape, caps.cdp, caps.crawl)
+const caps = provider.capabilities();
+console.log(caps.statelessScrape, caps.cdp, caps.crawl);
 
 // Stateless scrape (no session needed for Steel, Cloudflare, Browserless, etc.)
-const result = await provider.scrape('https://example.com', {
-  waitFor: '#content',
-})
-console.log(result.markdown ?? result.text ?? result.html)
+const result = await provider.scrape("https://example.com", {
+  waitFor: "#content",
+});
+console.log(result.markdown ?? result.text ?? result.html);
 
 // Session-based workflow
 const session = await provider.createSession({
   stealth: true,
-  region: 'eu-west-1',
-})
-await provider.navigate('https://example.com', session)
-const screenshot = await provider.screenshot({ fullPage: true }, session)
-const evalResult = await provider.evaluate('document.title', session)
-await provider.releaseSession(session.id)
+  region: "eu-west-1",
+});
+await provider.navigate("https://example.com", session);
+const screenshot = await provider.screenshot({ fullPage: true }, session);
+const evalResult = await provider.evaluate("document.title", session);
+await provider.releaseSession(session.id);
 
 // Crawl (providers that support it)
 if (provider.crawl) {
-  const crawlResult = await provider.crawl('https://example.com', { maxPages: 10 })
+  const crawlResult = await provider.crawl("https://example.com", { maxPages: 10 });
 }
 
 // PDF generation
 if (provider.pdf) {
-  const pdf = await provider.pdf('https://example.com')
+  const pdf = await provider.pdf("https://example.com");
 }
 
 // Extract links
 if (provider.links) {
-  const links = await provider.links('https://example.com')
+  const links = await provider.links("https://example.com");
 }
 
 // AI-powered extraction
 if (provider.extract) {
-  const extracted = await provider.extract('https://example.com', {
-    prompt: 'Extract product name, price, and description',
-  })
+  const extracted = await provider.extract("https://example.com", {
+    prompt: "Extract product name, price, and description",
+  });
 }
 ```
 
 ## Providers
 
-| Provider | Env Key | Scrape | Screenshot | Navigate | Evaluate | Crawl | PDF | Links | Extract | Search | CDP |
-|----------|---------|--------|------------|----------|----------|-------|-----|-------|---------|--------|-----|
-| **Steel** | `STEEL_API_KEY` | ✓ stateless | ✓ session | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
-| **Browserbase** | `BROWSERBASE_API_KEY` | ✓ stateless | ✓ session | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
-| **Kernel** | `KERNEL_API_KEY` | ✓ session | ✓ session | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
-| **Browserless** | `BROWSERLESS_API_KEY` | ✓ stateless | ✓ stateless | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ |
-| **Hyperbrowser** | `HYPERBROWSER_API_KEY` | ✓ stateless | ✓ session | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ |
-| **Anchor** | `ANCHOR_API_KEY` | ✗ | ✓ session | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
-| **Cloudflare** | `CF_API_TOKEN` + `CF_ACCOUNT_ID` | ✓ stateless | ✓ stateless | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ |
-| **Playwright** | *(local)* | ✓ stateless | ✓ session | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Provider         | Env Key                          | Scrape      | Screenshot  | Navigate | Evaluate | Crawl | PDF | Links | Extract | Search | CDP |
+| ---------------- | -------------------------------- | ----------- | ----------- | -------- | -------- | ----- | --- | ----- | ------- | ------ | --- |
+| **Steel**        | `STEEL_API_KEY`                  | ✓ stateless | ✓ session   | ✗        | ✗        | ✗     | ✗   | ✗     | ✗       | ✗      | ✓   |
+| **Browserbase**  | `BROWSERBASE_API_KEY`            | ✓ stateless | ✓ session   | ✗        | ✗        | ✗     | ✗   | ✗     | ✗       | ✗      | ✓   |
+| **Kernel**       | `KERNEL_API_KEY`                 | ✓ session   | ✓ session   | ✓        | ✓        | ✗     | ✗   | ✗     | ✗       | ✗      | ✓   |
+| **Browserless**  | `BROWSERLESS_API_KEY`            | ✓ stateless | ✓ stateless | ✓        | ✓        | ✗     | ✓   | ✗     | ✗       | ✗      | ✓   |
+| **Hyperbrowser** | `HYPERBROWSER_API_KEY`           | ✓ stateless | ✓ session   | ✗        | ✗        | ✓     | ✗   | ✗     | ✓       | ✓      | ✓   |
+| **Anchor**       | `ANCHOR_API_KEY`                 | ✗           | ✓ session   | ✗        | ✗        | ✗     | ✗   | ✗     | ✗       | ✗      | ✓   |
+| **Cloudflare**   | `CF_API_TOKEN` + `CF_ACCOUNT_ID` | ✓ stateless | ✓ stateless | ✗        | ✗        | ✓     | ✓   | ✓     | ✓       | ✗      | ✓   |
+| **Playwright**   | _(local)_                        | ✓ stateless | ✓ session   | ✓        | ✓        | ✓     | ✓   | ✓     | ✗       | ✗      | ✗   |
 
 ### Capabilities at runtime
 
 ```typescript
-import { create } from '@agntn/browsers'
+import { create } from "@agntn/browsers";
 
-const provider = create('cloudflare')
-const caps = provider.capabilities()
+const provider = create("cloudflare");
+const caps = provider.capabilities();
 // {
 //   scrape: true, screenshot: true, navigate: false, evaluate: false,
 //   sessions: true, cdp: true, statelessScrape: true, statelessScreenshot: true,

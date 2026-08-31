@@ -65,13 +65,13 @@ export default function browsersExtension(pi: ExtensionAPI) {
         0, 0,
       )
     },
-    async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; content: string }>> {
+    async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; provider: string; contentLength: number }>> {
       const { name, provider } = await getProvider(params.provider)
       const result = await provider.scrape(params.url, { waitFor: params.waitFor })
       const content = result.text || result.markdown || result.html || "No content extracted"
       return {
         content: [{ type: "text", text: `[provider=${name}] ${params.url}\n\n${content}` }],
-        details: { url: params.url, provider: name, content },
+        details: { url: params.url, provider: name, contentLength: content.length },
       }
     },
   })

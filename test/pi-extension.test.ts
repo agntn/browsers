@@ -51,6 +51,39 @@ describe('browsers Pi extension', () => {
     )
   })
 
+  it('stores scraped page content only once in the tool result', async () => {
+    const sentinel = 'SENTINEL_PAGE_BODY'
+    const provider = {
+      scrape: vi.fn().mockResolvedValue({
+        url: 'https://example.test',
+        text: sentinel,
+      }),
+    }
+    browsersMock.resolveProvider.mockReturnValue('steel')
+    browsersMock.create.mockReturnValue(provider)
+
+    const result = await requireTool(registerTools(), 'browsers_scrape').execute(
+      'test',
+      { provider: 'steel', url: 'https://example.test' },
+      undefined,
+      undefined,
+      {} as ExtensionContext,
+    )
+
+    expect(result.content).toEqual([
+      {
+        type: 'text',
+        text: `[provider=steel] https://example.test\n\n${sentinel}`,
+      },
+    ])
+    expect(result.details).toEqual({
+      url: 'https://example.test',
+      provider: 'steel',
+      contentLength: sentinel.length,
+    })
+    expect(JSON.stringify(result).split(sentinel)).toHaveLength(2)
+  })
+
   it('keeps session connection credentials out of tool output', async () => {
     const secretUrl = 'wss://connect.example.test?token=secret&signingKey=jwt'
     const provider = {

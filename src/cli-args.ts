@@ -8,6 +8,7 @@ const passthroughFirstArgs = new Set([
   "extract",
   "session",
   "providers",
+  "mcp",
 ]);
 
 const helpOrVersionFlags = new Set(["-h", "--help", "-v", "--version"]);

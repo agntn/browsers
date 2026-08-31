@@ -68,6 +68,17 @@ browsers providers
 browsers providers --check
 ```
 
+## Agent integrations
+
+Pi and OMP discover their extensions from the package manifests. The same eleven tools are available through the MCP stdio server:
+
+```bash
+browsers mcp
+
+# Register the installed CLI with Claude Code
+claude mcp add browsers --scope user -- browsers mcp
+```
+
 ## Library
 
 ```typescript
@@ -153,13 +164,15 @@ Follows the same pattern as [@agntn/web](https://github.com/agntn/web), [apkx](h
 
 ```
 src/
-  core/       — types, registry, client, errors, resolve
-  providers/  — steel, browserbase, kernel, browserless, hyperbrowser, anchor, cloudflare, playwright
-  commands/   — CLI subcommands (scrape, screenshot, session, providers, crawl, pdf, links, search, extract)
+  core/             - types, registry, client, errors, resolve
+  providers/        - steel, browserbase, kernel, browserless, hyperbrowser, anchor, cloudflare, playwright
+  commands/         - CLI subcommands, including the MCP stdio server
+  tool-operations.ts - shared executors for every agent surface
 packages/
-  pi/extensions/ - Pi agent extension (11 tools: browsers_scrape, browsers_session, etc.)
+  pi/extensions/    - Pi extension with eleven browser tools
+  omp/extensions/   - OMP extension with the same eleven tools
 test/
-  registry.test.ts, errors.test.ts, resolve.test.ts, capabilities.test.ts, playwright.test.ts
+  provider, tool operation, Pi, OMP, and MCP coverage
 ```
 
 Providers self-register on import. Add a new provider by creating a file in `src/providers/` that calls `register()`.
@@ -170,7 +183,8 @@ Providers self-register on import. Add a new provider by creating a file in `src
 2. Implement `BrowserProvider` interface (including `capabilities()`)
 3. Call `register('yourprovider', 'https://...', factory)` at module level
 4. Add import to `src/providers/index.ts`
-5. Add to `builtinProviders` in `src/core/providers.ts`
+5. Add the key to `browserProviderNames` in `src/tool-contract.ts`
+6. Add any nonstandard environment key to `src/core/resolve.ts`
 
 ## License
 

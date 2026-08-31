@@ -366,6 +366,11 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       prompt: Type.String({
         description: "What to extract (e.g. 'Extract product name, price, and description')",
       }),
+      schema: Type.Optional(
+        Type.Record(Type.String(), Type.Unknown(), {
+          description: "JSON schema that constrains the extracted result",
+        }),
+      ),
     }),
     renderCall(args, theme) {
       return new Text(
@@ -380,7 +385,10 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     ): Promise<AgentToolResult<{ url: string; provider: string; data: unknown }>> {
       const { name, provider } = await getProvider(params.provider);
       if (!provider.extract) throw new Error(`Provider ${name} does not support extract.`);
-      const result = await provider.extract(params.url, { prompt: params.prompt });
+      const result = await provider.extract(params.url, {
+        prompt: params.prompt,
+        schema: params.schema,
+      });
       return {
         content: [
           {

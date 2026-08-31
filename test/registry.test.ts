@@ -1,40 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 // Import providers/index to register all providers
 import "../src/providers/index";
-import { register, create, providers, has } from "../src/core/registry";
+import { create, providers, has } from "../src/core/registry";
 import { resetDefaultClientForTests } from "../src/core/client";
-import type { BrowserProviderFactory, ProviderConfig, BrowserProvider } from "../src/core/types";
-
-function mockFactory(name: string): BrowserProviderFactory {
-  return (config: ProviderConfig): BrowserProvider => ({
-    name: () => name,
-    capabilities: () => ({
-      scrape: false,
-      screenshot: false,
-      navigate: false,
-      evaluate: false,
-      sessions: false,
-      cdp: false,
-      statelessScrape: false,
-      statelessScreenshot: false,
-      crawl: false,
-      pdf: false,
-      links: false,
-      search: false,
-      extract: false,
-    }),
-    createSession: async () => ({ id: "test", provider: name, createdAt: Date.now() }),
-    getSession: async () => null,
-    listSessions: async () => [],
-    releaseSession: async () => {},
-    scrape: async () => ({ url: "" }),
-    screenshot: async () => ({ data: "", mimeType: "image/png" }),
-    navigate: async () => {},
-    evaluate: async () => ({ value: null }),
-    getCdpUrl: () => undefined,
-    isAvailable: async () => true,
-  });
-}
 
 describe("registry", () => {
   beforeEach(() => {

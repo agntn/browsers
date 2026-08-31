@@ -26,6 +26,18 @@ interface AnchorSessionResponse {
   [key: string]: unknown;
 }
 
+function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (!options) return body;
+  if (options.region) body.region = options.region;
+  if (options.proxy) body.proxy = options.proxy;
+  if (options.stealth) body.stealth = true;
+  if (options.headless !== undefined) body.headless = options.headless;
+  if (options.viewport) body.viewport = options.viewport;
+  if (options.extra) Object.assign(body, options.extra);
+  return body;
+}
+
 class AnchorProvider implements BrowserProvider {
   private readonly client: Client;
   private readonly baseURL: string;
@@ -71,17 +83,9 @@ class AnchorProvider implements BrowserProvider {
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
-      const body: Record<string, unknown> = {};
-      if (options?.region) body.region = options.region;
-      if (options?.proxy) body.proxy = options.proxy;
-      if (options?.stealth) body.stealth = true;
-      if (options?.headless !== undefined) body.headless = options.headless;
-      if (options?.viewport) body.viewport = options.viewport;
-      if (options?.extra) Object.assign(body, options.extra);
-
       const res = await this.client.postJSON<AnchorSessionResponse>(
         `${this.baseURL}/v1/sessions`,
-        body,
+        createSessionBody(options),
         this.headers(),
       );
 

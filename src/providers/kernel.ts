@@ -15,7 +15,7 @@ import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, normalizeError } from "../core/errors";
 import { register } from "../core/registry";
-import { isNotFoundError, assertSessionId, notSupportedViaRest } from "../core/utils";
+import { isNotFoundError, assertSessionId } from "../core/utils";
 
 interface KernelSessionResponse {
   id: string;
@@ -24,6 +24,18 @@ interface KernelSessionResponse {
   status?: string;
   createdAt?: string;
   [key: string]: unknown;
+}
+
+function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (!options) return body;
+  if (options.region) body.region = options.region;
+  if (options.proxy) body.proxy = options.proxy;
+  if (options.stealth) body.stealth = true;
+  if (options.timeout) body.timeout_seconds = Math.floor(options.timeout / 1000);
+  if (options.viewport) body.viewport = options.viewport;
+  if (options.extra) Object.assign(body, options.extra);
+  return body;
 }
 
 class KernelProvider implements BrowserProvider {
@@ -71,17 +83,9 @@ class KernelProvider implements BrowserProvider {
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
-      const body: Record<string, unknown> = {};
-      if (options?.region) body.region = options.region;
-      if (options?.proxy) body.proxy = options.proxy;
-      if (options?.stealth) body.stealth = true;
-      if (options?.timeout) body.timeout_seconds = Math.floor(options.timeout / 1000);
-      if (options?.viewport) body.viewport = options.viewport;
-      if (options?.extra) Object.assign(body, options.extra);
-
       const res = await this.client.postJSON<KernelSessionResponse>(
         `${this.baseURL}/v1/browsers`,
-        body,
+        createSessionBody(options),
         this.headers(),
       );
 

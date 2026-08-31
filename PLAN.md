@@ -17,12 +17,13 @@ Make `@agntn/ox` the single lint and formatting policy source for this repositor
 
 - [x] Baseline build, typecheck, and 105 tests pass.
 - [x] Confirmed the published `@agntn/ox@0.1.0` peer contract and canonical `_template` integration.
-- [ ] Add shared config consumers, scripts, dependencies, and project documentation.
-- [ ] Run the formatter as a mechanical migration.
-- [ ] Fix lint findings without changing public behavior.
-- [ ] Verify effective config and all project gates.
-- [ ] Review final diff and preserve foreign WIP.
+- [x] Add shared config consumers, scripts, dependencies, and project documentation.
+- [x] Run the formatter as a mechanical migration.
+- [x] Fix 188 tracked lint errors without changing public behavior.
+- [x] Verify effective config, typecheck, 107 tests, and build.
+- [x] Review the diff adversarially and add discriminating regression controls.
+- [x] Verify `pnpm lint` from the isolated candidate tree and preserve foreign WIP.
 
 ## Current step
 
-Add the minimal integration surface, then run the new lint gate to measure the required code migration.
+The migration is verified and ready for its local semantic commit.

@@ -2,6 +2,7 @@ import { describe, it, expect, afterAll } from "vitest";
 // Import providers/index to register all providers
 import "../src/providers/index";
 import { create } from "../src/core/registry";
+import { SessionNotFoundError } from "../src/core/errors";
 import type { BrowserSession } from "../src/core/types";
 
 describe("playwright provider (local)", () => {
@@ -50,6 +51,13 @@ describe("playwright provider (local)", () => {
     expect(result.html).toContain("Hello");
     expect(result.title).toBe("Test");
     expect(result.text).toContain("Hello");
+  });
+
+  it("preserves a missing-session error while scraping", async () => {
+    const session = { id: "executable", provider: "playwright", createdAt: 0 };
+    await expect(
+      provider.scrape("data:text/html,unused", undefined, session),
+    ).rejects.toBeInstanceOf(SessionNotFoundError);
   });
 
   it("navigates and evaluates in a session", async () => {

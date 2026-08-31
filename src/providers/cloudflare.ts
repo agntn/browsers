@@ -8,7 +8,6 @@ import type {
   ScreenshotOptions,
   EvaluateResult,
   CrawlResult,
-  CrawlPage,
   CrawlOptions,
   PdfResult,
   PdfOptions,
@@ -26,30 +25,71 @@ import { register } from "../core/registry";
 import { assertUrlOrSession, notSupportedViaRest } from "../core/utils";
 
 interface CfEnvelope<T = unknown> {
-  success: boolean;
-  result: T;
-  errors?: Array<{ code: number; message: string }>;
-  messages?: string[];
+  readonly success: boolean;
+  readonly result: T;
+  readonly errors?: readonly { readonly code: number; readonly message: string }[];
+  readonly messages?: readonly string[];
 }
 
 interface CfSessionResult {
-  sessionId?: string;
-  sessionId2?: string;
-  closeReason?: string;
-  connectionStartTime?: number;
-  connectionEndTime?: number;
-  connectionId?: string;
-  [key: string]: unknown;
+  readonly sessionId?: string;
+  readonly sessionId2?: string;
+  readonly closeReason?: string;
+  readonly connectionStartTime?: number;
+  readonly connectionEndTime?: number;
+  readonly connectionId?: string;
+  readonly [key: string]: unknown;
 }
 
 interface CfContentResult {
-  content?: string;
-  [key: string]: unknown;
+  readonly content?: string;
+  readonly [key: string]: unknown;
 }
 
 interface CfScreenshotResult {
-  image?: string;
-  [key: string]: unknown;
+  readonly image?: string;
+  readonly [key: string]: unknown;
+}
+
+function createScrapeBody(url: string, options?: ScrapeOptions): Record<string, unknown> {
+  const body: Record<string, unknown> = { url };
+  if (!options) return body;
+  if (options.waitFor) body.waitForSelector = options.waitFor;
+  if (options.waitForNetworkIdle) body.waitUntil = "networkidle";
+  if (options.headers) body.headers = options.headers;
+  if (options.script) body.addScriptTag = { content: options.script };
+  return body;
+}
+
+function createScreenshotBody(
+  options: ScreenshotOptions,
+  session?: BrowserSession,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (options.url) body.url = options.url;
+  if (session?.id) body.sessionId = session.id;
+  if (options.selector) body.selector = options.selector;
+  if (options.fullPage !== undefined) body.fullPage = options.fullPage;
+  return body;
+}
+
+function createCrawlBody(url: string, options?: CrawlOptions): Record<string, unknown> {
+  const body: Record<string, unknown> = { url };
+  if (!options) return body;
+  if (options.maxDepth) body.depth = options.maxDepth;
+  if (options.maxPages) body.limit = options.maxPages;
+  if (options.formats) body.output_format = options.formats[0];
+  return body;
+}
+
+function createPdfBody(url: string, options?: PdfOptions): Record<string, unknown> {
+  const body: Record<string, unknown> = { url };
+  if (!options) return body;
+  if (options.format) body.format = options.format;
+  if (options.landscape !== undefined) body.landscape = options.landscape;
+  if (options.printBackground !== undefined) body.printBackground = options.printBackground;
+  if (options.css) body.css = options.css;
+  return body;
 }
 
 class CloudflareProvider implements BrowserProvider {
@@ -195,15 +235,9 @@ class CloudflareProvider implements BrowserProvider {
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
     try {
-      const body: Record<string, unknown> = { url };
-      if (options?.waitFor) body.waitForSelector = options.waitFor;
-      if (options?.waitForNetworkIdle) body.waitUntil = "networkidle";
-      if (options?.headers) body.headers = options.headers;
-      if (options?.script) body.addScriptTag = { content: options.script };
-
       const res = await this.client.postJSON<CfEnvelope<CfContentResult>>(
         `${this.base()}/content`,
-        body,
+        createScrapeBody(url, options),
         this.headers(),
       );
       const result = this.unwrap(res) as CfContentResult | string;
@@ -224,13 +258,11 @@ class CloudflareProvider implements BrowserProvider {
     try {
       assertUrlOrSession(options.url, session, "cloudflare", "screenshot");
 
-      const body: Record<string, unknown> = {};
-      if (options.url) body.url = options.url;
-      if (session?.id) body.sessionId = session.id;
-      if (options.selector) body.selector = options.selector;
-      if (options.fullPage !== undefined) body.fullPage = options.fullPage;
-
-      const res = await this.client.postResponse(`${this.base()}/screenshot`, body, this.headers());
+      const res = await this.client.postResponse(
+        `${this.base()}/screenshot`,
+        createScreenshotBody(options, session),
+        this.headers(),
+      );
 
       const contentType = res.headers.get("content-type") ?? "";
       if (contentType.includes("image")) {
@@ -271,14 +303,9 @@ class CloudflareProvider implements BrowserProvider {
     _session?: BrowserSession,
   ): Promise<CrawlResult> {
     try {
-      const body: Record<string, unknown> = { url };
-      if (options?.maxDepth) body.depth = options.maxDepth;
-      if (options?.maxPages) body.limit = options.maxPages;
-      if (options?.formats) body.output_format = options.formats[0];
-
       const res = await this.client.postJSON<CfEnvelope<string | Record<string, unknown>>>(
         `${this.base()}/crawl`,
-        body,
+        createCrawlBody(url, options),
         this.headers(),
       );
       const result = this.unwrap(res);
@@ -306,13 +333,11 @@ class CloudflareProvider implements BrowserProvider {
 
   async pdf(url: string, options?: PdfOptions, _session?: BrowserSession): Promise<PdfResult> {
     try {
-      const body: Record<string, unknown> = { url };
-      if (options?.format) body.format = options.format;
-      if (options?.landscape !== undefined) body.landscape = options.landscape;
-      if (options?.printBackground !== undefined) body.printBackground = options.printBackground;
-      if (options?.css) body.css = options.css;
-
-      const res = await this.client.postResponse(`${this.base()}/pdf`, body, this.headers());
+      const res = await this.client.postResponse(
+        `${this.base()}/pdf`,
+        createPdfBody(url, options),
+        this.headers(),
+      );
 
       const contentType = res.headers.get("content-type") ?? "";
       if (contentType.includes("pdf")) {

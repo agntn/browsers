@@ -21,19 +21,33 @@ let browsersModulePromise: Promise<typeof BrowsersPackage> | undefined;
 const DEFAULT_SCRAPE_MAX_CHARS = 20_000;
 const MAX_SCRAPE_MAX_CHARS = 200_000;
 
-/** Return live source in a checkout, otherwise the built distribution module. */
+/**
+ * Return live source in a checkout, otherwise the built distribution module.
+ *
+ * @returns {string} Module URL for the current package layout.
+ */
 export function resolveBrowsersModuleUrl(): string {
   return existsSync(fileURLToPath(sourceModuleUrl))
     ? sourceModuleUrl.href
     : distributionModuleUrl.href;
 }
 
-/** Load and cache the browser library selected for the current package layout. */
+/**
+ * Load and cache the browser library for the current package layout.
+ *
+ * @returns {Promise<typeof BrowsersPackage>} Browser library module.
+ */
 function loadBrowsers(): Promise<typeof BrowsersPackage> {
   browsersModulePromise ??= import(resolveBrowsersModuleUrl()) as Promise<typeof BrowsersPackage>;
   return browsersModulePromise;
 }
 
+/**
+ * Resolve and validate the scrape output limit.
+ *
+ * @param {number} [value] Requested character limit.
+ * @returns {number} Effective character limit.
+ */
 function resolveScrapeMaxChars(value?: number): number {
   const maxChars = value ?? DEFAULT_SCRAPE_MAX_CHARS;
   if (!Number.isInteger(maxChars) || maxChars < 1 || maxChars > MAX_SCRAPE_MAX_CHARS) {
@@ -43,16 +57,10 @@ function resolveScrapeMaxChars(value?: number): number {
 }
 
 /**
- * Resolve provider name: prefer explicit, fallback to first with API key.
- * Does NOT call create() — caller decides when to instantiate.
- */
-async function resolveProviderName(preferred?: string): Promise<string> {
-  const browsers = await loadBrowsers();
-  return browsers.resolveProvider(preferred);
-}
-
-/**
- * Resolve + create a provider instance in one call.
+ * Resolve and create a provider instance.
+ *
+ * @param {string} [preferred] Preferred provider name.
+ * @returns {Promise<{ name: string; provider: BrowsersPackage.BrowserProvider }>} Resolved provider.
  */
 async function getProvider(preferred?: string) {
   const browsers = await loadBrowsers();
@@ -62,7 +70,13 @@ async function getProvider(preferred?: string) {
 
 // ─── Tools ───────────────────────────────────────────────────────────────
 
-export default function browsersExtension(pi: ExtensionAPI) {
+/**
+ * Register browser tools with Pi.
+ *
+ * @param {ExtensionAPI} pi Pi extension API.
+ * @returns {void}
+ */
+export default function browsersExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "browsers_scrape",
     label: "Browser Scrape",

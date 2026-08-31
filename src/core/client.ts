@@ -32,7 +32,7 @@ export class Client {
 
   async getJSON<T>(
     url: string,
-    headers?: Record<string, string>,
+    headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<T> {
     try {
@@ -44,8 +44,8 @@ export class Client {
 
   async postJSON<T>(
     url: string,
-    body: Record<string, unknown>,
-    headers?: Record<string, string>,
+    body: Readonly<Record<string, unknown>>,
+    headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<T> {
     try {
@@ -57,8 +57,8 @@ export class Client {
 
   async postText(
     url: string,
-    body: Record<string, unknown>,
-    headers?: Record<string, string>,
+    body: Readonly<Record<string, unknown>>,
+    headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<string> {
     try {
@@ -76,8 +76,8 @@ export class Client {
 
   async postRaw(
     url: string,
-    body: Record<string, unknown>,
-    headers?: Record<string, string>,
+    body: Readonly<Record<string, unknown>>,
+    headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<ArrayBuffer> {
     try {
@@ -96,7 +96,7 @@ export class Client {
 
   async deleteJSON<T>(
     url: string,
-    headers?: Record<string, string>,
+    headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<T> {
     try {
@@ -107,14 +107,18 @@ export class Client {
   }
 
   /**
-   * POST that returns a Response-like object for content-type inspection.
-   * Use when the endpoint may return binary (image/pdf) or JSON depending
-   * on the request — the caller checks headers.get('content-type').
+   * POST that returns a response-like object for content type inspection.
+   *
+   * @param {string} url Target URL.
+   * @param {Readonly<Record<string, unknown>>} body Request body.
+   * @param {Readonly<Record<string, string>>} [headers] Request headers.
+   * @param {AbortSignal} [signal] Cancellation signal.
+   * @returns {Promise<{ headers: Headers; arrayBuffer(): Promise<ArrayBuffer>; json(): Promise<unknown> }>} Response readers and headers.
    */
   async postResponse(
     url: string,
-    body: Record<string, unknown>,
-    headers?: Record<string, string>,
+    body: Readonly<Record<string, unknown>>,
+    headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<{ headers: Headers; arrayBuffer(): Promise<ArrayBuffer>; json(): Promise<unknown> }> {
     try {
@@ -124,7 +128,7 @@ export class Client {
         headers,
         signal,
       });
-      const data = res._data;
+      const data: unknown = res._data;
       return {
         headers: res.headers as unknown as Headers,
         arrayBuffer: () =>
@@ -150,7 +154,6 @@ export class Client {
 }
 
 const SENSITIVE_PARAMS = ["api_key", "key", "token", "secret", "password", "apikey"];
-const SENSITIVE_PARAM_SET = new Set(SENSITIVE_PARAMS.map((p) => p.toLowerCase()));
 
 function sanitizeUrl(url: string): string {
   try {
@@ -169,7 +172,7 @@ function sanitizeUrl(url: string): string {
 let _defaultClient: Client | undefined;
 
 export function defaultClient(): Client {
-  if (!_defaultClient) _defaultClient = new Client();
+  _defaultClient ??= new Client();
   return _defaultClient;
 }
 

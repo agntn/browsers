@@ -17,7 +17,15 @@ import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, normalizeError } from "../core/errors";
 import { register } from "../core/registry";
-import { assertUrlOrSession, notSupportedViaRest } from "../core/utils";
+import { assertUrlOrSession } from "../core/utils";
+
+function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
+  const body: Record<string, unknown> = { timeout: options?.timeout ?? 300_000 };
+  if (options?.proxy) body.proxy = options.proxy.server;
+  if (options?.stealth) body.stealth = true;
+  if (options?.extra) Object.assign(body, options.extra);
+  return body;
+}
 
 class BrowserlessProvider implements BrowserProvider {
   private readonly client: Client;
@@ -64,14 +72,9 @@ class BrowserlessProvider implements BrowserProvider {
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
-      const body: Record<string, unknown> = { timeout: options?.timeout ?? 300_000 };
-      if (options?.proxy) body.proxy = options.proxy.server;
-      if (options?.stealth) body.stealth = true;
-      if (options?.extra) Object.assign(body, options.extra);
-
       const res = await this.client.postJSON<{ id?: string; browserWSEndpoint?: string }>(
         `${this.baseURL}/sessions?${this.tokenParam()}`,
-        body,
+        createSessionBody(options),
         { "Content-Type": "application/json" },
       );
 
@@ -129,7 +132,7 @@ class BrowserlessProvider implements BrowserProvider {
 
   async scrape(
     url: string,
-    options?: ScrapeOptions,
+    _options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
     try {
@@ -175,7 +178,7 @@ class BrowserlessProvider implements BrowserProvider {
     await this.evaluate(`await page.goto(${JSON.stringify(url)})`, session);
   }
 
-  async evaluate(script: string, session: BrowserSession): Promise<EvaluateResult> {
+  async evaluate(script: string, _session: BrowserSession): Promise<EvaluateResult> {
     try {
       const res = await this.client.postJSON<{ data?: unknown }>(
         `${this.baseURL}/function?${this.tokenParam()}`,

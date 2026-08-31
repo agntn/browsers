@@ -147,4 +147,10 @@ describe("normalizeError", () => {
     expect(result).toBeInstanceOf(BrowserError);
     expect(result.message).toBe("string error");
   });
+
+  it("preserves a message from an object with a non-numeric status", () => {
+    const result = normalizeError({ status: "500", message: "upstream boom" });
+    expect(result).toBeInstanceOf(BrowserError);
+    expect(result.message).toBe("upstream boom");
+  });
 });

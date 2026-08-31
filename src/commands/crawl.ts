@@ -1,6 +1,35 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import { resolveAndCreate } from "./_helpers";
+import type { CrawlPage, CrawlResult } from "../core/types";
+
+type PrintableCrawlPage = Readonly<Pick<CrawlPage, "url" | "markdown" | "text" | "html">>;
+
+type PrintableCrawlResult = Readonly<Pick<CrawlResult, "jobId" | "status">> & {
+  readonly pages: readonly PrintableCrawlPage[];
+};
+
+function pageContent(page: PrintableCrawlPage): string {
+  if (page.markdown) return page.markdown;
+  if (page.text) return page.text;
+  if (page.html) return page.html.slice(0, 500);
+  return "(no content)";
+}
+
+function printCrawlResult(result: PrintableCrawlResult): void {
+  if (result.jobId) consola.info(`Job ID: ${result.jobId} (status: ${result.status})`);
+  if (result.pages.length === 0) {
+    if (result.jobId) {
+      consola.info("Crawl is running asynchronously. Use the job ID to check status.");
+    }
+    return;
+  }
+
+  for (const page of result.pages) {
+    console.log(`\n--- ${page.url} ---`);
+    console.log(pageContent(page));
+  }
+}
 
 export default defineCommand({
   meta: {
@@ -39,15 +68,7 @@ export default defineCommand({
         maxPages: args.maxPages ? Number(args.maxPages) : 10,
         maxDepth: args.maxDepth ? Number(args.maxDepth) : 1,
       });
-      if (result.jobId) consola.info(`Job ID: ${result.jobId} (status: ${result.status})`);
-      if (result.pages.length > 0) {
-        for (const page of result.pages) {
-          console.log(`\n--- ${page.url} ---`);
-          console.log(page.markdown || page.text || page.html?.slice(0, 500) || "(no content)");
-        }
-      } else if (result.jobId) {
-        consola.info("Crawl is running asynchronously. Use the job ID to check status.");
-      }
+      printCrawlResult(result);
     } catch (error) {
       consola.error(error instanceof Error ? error.message : String(error));
       process.exit(1);

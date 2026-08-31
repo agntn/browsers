@@ -5,7 +5,13 @@ const specialEnvKeys: Record<string, string[]> = {
   cloudflare: ["CF_API_TOKEN", "CLOUDFLARE_API_TOKEN"],
 };
 
-/** @internal */
+/**
+ * Check whether a provider can run with the current environment.
+ *
+ * @param {string} provider Provider name.
+ * @returns {boolean} Whether credentials are available or unnecessary.
+ * @internal
+ */
 export function _hasKey(provider: string): boolean {
   if (provider === "playwright") return true;
   const specials = specialEnvKeys[provider];
@@ -14,8 +20,10 @@ export function _hasKey(provider: string): boolean {
 }
 
 /**
- * Resolve a browser provider name. Throws on missing/unknown provider
- * instead of calling process.exit — callers decide how to handle.
+ * Resolve a provider or reject a missing explicit choice.
+ *
+ * @param {string} [preferred] Preferred provider name.
+ * @returns {string} Resolved provider name.
  */
 export function resolveProvider(preferred?: string): string {
   const available = listProviders();
@@ -32,12 +40,14 @@ export function resolveProvider(preferred?: string): string {
   for (const name of available) {
     if (_hasKey(name)) return name;
   }
-  const allKeys = available.map((n) => specialEnvKeys[n]?.[0] ?? `${n.toUpperCase()}_API_KEY`);
   throw new NoProviderConfiguredError();
 }
 
 /**
- * Get the env key hint for a provider (for error messages).
+ * Get the environment key hint for a provider.
+ *
+ * @param {string} provider Provider name.
+ * @returns {string} Primary environment key.
  */
 export function providerEnvKey(provider: string): string {
   return specialEnvKeys[provider]?.[0] ?? `${provider.toUpperCase()}_API_KEY`;

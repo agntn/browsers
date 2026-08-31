@@ -32,6 +32,23 @@ interface HyperbrowserSessionResponse {
   [key: string]: unknown;
 }
 
+function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (options?.region) body.region = options.region;
+  if (options?.proxy) body.proxy = options.proxy;
+  if (options?.stealth) body.stealth = true;
+  if (options?.extra) Object.assign(body, options.extra);
+  return body;
+}
+
+function createCrawlBody(url: string, options?: CrawlOptions): Record<string, unknown> {
+  return {
+    url,
+    outputs: { formats: options?.formats ?? ["markdown"] },
+    crawlOptions: { maxPages: options?.maxPages ?? 10 },
+  };
+}
+
 class HyperbrowserProvider implements BrowserProvider {
   private readonly client: Client;
   private readonly baseURL: string;
@@ -80,15 +97,9 @@ class HyperbrowserProvider implements BrowserProvider {
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
-      const body: Record<string, unknown> = {};
-      if (options?.region) body.region = options.region;
-      if (options?.proxy) body.proxy = options.proxy;
-      if (options?.stealth) body.stealth = true;
-      if (options?.extra) Object.assign(body, options.extra);
-
       const res = await this.client.postJSON<HyperbrowserSessionResponse>(
         `${this.baseURL}/v1/session`,
-        body,
+        createSessionBody(options),
         this.headers(),
       );
 
@@ -151,7 +162,7 @@ class HyperbrowserProvider implements BrowserProvider {
 
   async scrape(
     url: string,
-    options?: ScrapeOptions,
+    _options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
     try {
@@ -225,15 +236,9 @@ class HyperbrowserProvider implements BrowserProvider {
     _session?: BrowserSession,
   ): Promise<CrawlResult> {
     try {
-      const body: Record<string, unknown> = {
-        url,
-        outputs: { formats: options?.formats ?? ["markdown"] },
-        crawlOptions: { maxPages: options?.maxPages ?? 10 },
-      };
-
       const res = await this.client.postJSON<Record<string, unknown>>(
         `${this.baseURL}/api/web/crawl`,
-        body,
+        createCrawlBody(url, options),
         this.headers(),
       );
 
@@ -257,7 +262,7 @@ class HyperbrowserProvider implements BrowserProvider {
     }
   }
 
-  async search(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]> {
+  async search(query: string, _options?: WebSearchOptions): Promise<WebSearchResult[]> {
     try {
       const body: Record<string, unknown> = { query };
 

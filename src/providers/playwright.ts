@@ -10,6 +10,7 @@ import type {
   ProviderConfig,
   BrowserProviderFactory,
   CrawlResult,
+  CrawlPage,
   CrawlOptions,
   PdfResult,
   PdfOptions,
@@ -47,6 +48,159 @@ function resolveSystemChromium(): string | undefined {
 interface PlaywrightSession {
   browser: Browser;
   page: Page;
+}
+
+interface PageLease {
+  readonly page: Page;
+  readonly browser?: Browser;
+}
+
+function normalizePlaywrightError(error: unknown): BrowserError {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("executable") || message.includes("browserType.launch")) {
+    return new BrowserError("Playwright browser not found. Run: npx playwright install chromium");
+  }
+  return normalizeError(error, "playwright");
+}
+
+function truncateText(text: string | undefined, maxChars: number | undefined): string | undefined {
+  if (!maxChars || !text || text.length <= maxChars) return text;
+  return text.slice(0, maxChars);
+}
+
+async function scrapePage(page: Page, url: string, options?: ScrapeOptions): Promise<ScrapeResult> {
+  await page.goto(url, {
+    waitUntil: options?.waitForNetworkIdle ? "networkidle" : "load",
+  });
+  if (options?.waitFor) {
+    await page.waitForSelector(options.waitFor, { timeout: options.timeout ?? 25000 });
+  }
+
+  const [title, html, text, links] = await Promise.all([
+    page.title(),
+    page.content(),
+    page.evaluate(() => document.body?.innerText || "").catch(() => undefined),
+    page
+      .evaluate(() =>
+        Array.from(document.querySelectorAll("a[href]")).map(
+          (anchor) => (anchor as HTMLAnchorElement).href,
+        ),
+      )
+      .catch(() => []),
+  ]);
+
+  return {
+    url,
+    title,
+    html,
+    text: truncateText(text, options?.maxChars),
+    links: [...new Set(links)],
+  };
+}
+
+async function renderPdf(
+  page: Page,
+  url: string,
+  options: PdfOptions | undefined,
+  hasSession: boolean,
+): Promise<PdfResult> {
+  if (!hasSession || url !== page.url()) {
+    await page.goto(url, { waitUntil: "networkidle" });
+  }
+  const buffer = await page.pdf({
+    format: options?.format ?? "A4",
+    landscape: options?.landscape ?? false,
+    printBackground: options?.printBackground ?? true,
+  });
+  return {
+    data: buffer.toString("base64"),
+    mimeType: "application/pdf",
+  };
+}
+
+async function readLinks(page: Page, url: string): Promise<LinksResult> {
+  await page.goto(url, { waitUntil: "load", timeout: 15000 });
+  const links = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("a[href]")).map((anchor) => {
+      const element = anchor as HTMLAnchorElement;
+      return {
+        href: element.href,
+        text: element.textContent?.trim() || undefined,
+        rel: element.rel || undefined,
+      };
+    }),
+  );
+  return { url, links };
+}
+
+async function readCrawlPage(page: Page, url: string, depth: number): Promise<CrawlPage> {
+  await page.goto(url, { waitUntil: "load", timeout: 15000 });
+  const [title, html, text, links] = await Promise.all([
+    page.title().catch(() => undefined),
+    page.content().catch(() => undefined),
+    page.evaluate(() => document.body?.innerText || "").catch(() => undefined),
+    page
+      .evaluate(() =>
+        Array.from(document.querySelectorAll("a[href]")).map(
+          (anchor) => (anchor as HTMLAnchorElement).href,
+        ),
+      )
+      .catch(() => []),
+  ]);
+  return { url, title, html, text, links, depth };
+}
+
+interface CrawlSettings {
+  readonly maxPages: number;
+  readonly maxDepth: number;
+  readonly sameDomain: boolean;
+}
+
+function resolveCrawlSettings(options?: CrawlOptions): CrawlSettings {
+  return {
+    maxPages: options?.maxPages ?? 10,
+    maxDepth: options?.maxDepth ?? 2,
+    sameDomain: options?.sameDomain ?? true,
+  };
+}
+
+async function crawlPage(
+  page: Page,
+  url: string,
+  baseHostname: string,
+  options?: CrawlOptions,
+): Promise<CrawlResult> {
+  const { maxPages, maxDepth, sameDomain } = resolveCrawlSettings(options);
+  const visited = new Set<string>();
+  const pages: CrawlPage[] = [];
+  const queue: Array<{ url: string; depth: number }> = [{ url, depth: 0 }];
+
+  function enqueueLinks(links: readonly string[], currentUrl: string, depth: number): void {
+    if (depth >= maxDepth) return;
+    for (const link of links) {
+      try {
+        const parsed = new URL(link, currentUrl);
+        const normalized = parsed.toString();
+        if (visited.has(normalized)) continue;
+        if (sameDomain && parsed.hostname !== baseHostname) continue;
+        queue.push({ url: normalized, depth: depth + 1 });
+      } catch {}
+    }
+  }
+
+  while (queue.length > 0 && visited.size < maxPages) {
+    const next = queue.shift();
+    if (!next) break;
+    if (visited.has(next.url) || next.depth > maxDepth) continue;
+    try {
+      const crawled = await readCrawlPage(page, next.url, next.depth);
+      visited.add(next.url);
+      pages.push(crawled);
+      enqueueLinks(crawled.links ?? [], next.url, next.depth);
+    } catch {}
+  }
+
+  return { pages, totalFound: visited.size };
 }
 
 class PlaywrightProvider implements BrowserProvider {
@@ -88,6 +242,32 @@ class PlaywrightProvider implements BrowserProvider {
     return this.getSessionData(session.id).page;
   }
 
+  private async acquirePage(session?: BrowserSession): Promise<PageLease> {
+    if (session) return { page: this.getPage(session) };
+    const { chromium } = await import("playwright");
+    const browser = await chromium.launch({
+      headless: true,
+      executablePath: resolveSystemChromium(),
+    });
+    return { browser, page: await browser.newPage() };
+  }
+
+  private async withPage<T>(
+    session: BrowserSession | undefined,
+    operation: (page: Page) => Promise<T>,
+  ): Promise<T> {
+    let lease: PageLease | undefined;
+    try {
+      lease = await this.acquirePage(session);
+      const result = await operation(lease.page);
+      if (lease.browser) await lease.browser.close();
+      return result;
+    } catch (error) {
+      if (lease?.browser) await lease.browser.close().catch(() => {});
+      throw normalizeError(error, "playwright");
+    }
+  }
+
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
       const { chromium } = await import("playwright");
@@ -108,13 +288,7 @@ class PlaywrightProvider implements BrowserProvider {
         metadata: { headless: options?.headless ?? true },
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes("executable") || message.includes("browserType.launch")) {
-        throw new BrowserError(
-          `Playwright browser not found. Run: npx playwright install chromium`,
-        );
-      }
-      throw normalizeError(error, "playwright");
+      throw normalizePlaywrightError(error);
     }
   }
 
@@ -150,66 +324,7 @@ class PlaywrightProvider implements BrowserProvider {
     options?: ScrapeOptions,
     session?: BrowserSession,
   ): Promise<ScrapeResult> {
-    let browser: Browser | undefined;
-    let page: Page;
-    let owns = false;
-
-    try {
-      if (session) {
-        page = this.getPage(session);
-      } else {
-        const { chromium } = await import("playwright");
-        browser = await chromium.launch({
-          headless: true,
-          executablePath: resolveSystemChromium(),
-        });
-        page = await browser.newPage();
-        owns = true;
-      }
-
-      await page.goto(url, {
-        waitUntil: options?.waitForNetworkIdle ? "networkidle" : "load",
-      });
-
-      if (options?.waitFor) {
-        await page.waitForSelector(options.waitFor, { timeout: options.timeout ?? 25000 });
-      }
-
-      const [title, html, text, links] = await Promise.all([
-        page.title(),
-        page.content(),
-        page.evaluate(() => document.body?.innerText || "").catch(() => undefined),
-        page
-          .evaluate(() =>
-            Array.from(document.querySelectorAll("a[href]")).map(
-              (a) => (a as HTMLAnchorElement).href,
-            ),
-          )
-          .catch(() => []),
-      ]);
-
-      if (owns && browser) {
-        await browser.close();
-      }
-
-      let resultText = text;
-      if (options?.maxChars && resultText && resultText.length > options.maxChars) {
-        resultText = resultText.slice(0, options.maxChars);
-      }
-
-      return {
-        url,
-        title,
-        html,
-        text: resultText,
-        links: [...new Set(links)],
-      };
-    } catch (error) {
-      if (owns && browser) {
-        await browser.close().catch(() => {});
-      }
-      throw normalizeError(error, "playwright");
-    }
+    return this.withPage(session, (page) => scrapePage(page, url, options));
   }
 
   async screenshot(
@@ -260,8 +375,9 @@ class PlaywrightProvider implements BrowserProvider {
   async evaluate(script: string, session: BrowserSession): Promise<EvaluateResult> {
     try {
       const page = this.getPage(session);
-      const value = await page.evaluate((s) => {
-        return (0, eval)(s);
+      const value: unknown = await page.evaluate((source): unknown => {
+        const result: unknown = globalThis.eval(source);
+        return result;
       }, script);
       return { value };
     } catch (error) {
@@ -270,189 +386,16 @@ class PlaywrightProvider implements BrowserProvider {
   }
 
   async pdf(url: string, options?: PdfOptions, session?: BrowserSession): Promise<PdfResult> {
-    let browser: Browser | undefined;
-    let page: Page;
-    let owns = false;
-
-    try {
-      if (session) {
-        page = this.getPage(session);
-      } else {
-        const { chromium } = await import("playwright");
-        browser = await chromium.launch({
-          headless: true,
-          executablePath: resolveSystemChromium(),
-        });
-        page = await browser.newPage();
-        owns = true;
-      }
-
-      if (!session || url !== page.url()) {
-        await page.goto(url, { waitUntil: "networkidle" });
-      }
-
-      const buffer = await page.pdf({
-        format: options?.format ?? "A4",
-        landscape: options?.landscape ?? false,
-        printBackground: options?.printBackground ?? true,
-      });
-
-      if (owns && browser) {
-        await browser.close();
-      }
-
-      return {
-        data: buffer.toString("base64"),
-        mimeType: "application/pdf",
-      };
-    } catch (error) {
-      if (owns && browser) {
-        await browser.close().catch(() => {});
-      }
-      throw normalizeError(error, "playwright");
-    }
+    return this.withPage(session, (page) => renderPdf(page, url, options, session !== undefined));
   }
 
   async links(url: string, session?: BrowserSession): Promise<LinksResult> {
-    let browser: Browser | undefined;
-    let page: Page;
-    let owns = false;
-
-    try {
-      if (session) {
-        page = this.getPage(session);
-      } else {
-        const { chromium } = await import("playwright");
-        browser = await chromium.launch({
-          headless: true,
-          executablePath: resolveSystemChromium(),
-        });
-        page = await browser.newPage();
-        owns = true;
-      }
-
-      await page.goto(url, { waitUntil: "load", timeout: 15000 });
-
-      const rawLinks = await page.evaluate(() =>
-        Array.from(document.querySelectorAll("a[href]")).map((a) => {
-          const el = a as HTMLAnchorElement;
-          return {
-            href: el.href,
-            text: el.textContent?.trim() || undefined,
-            rel: el.rel || undefined,
-          };
-        }),
-      );
-
-      if (owns && browser) await browser.close();
-
-      return {
-        url,
-        links: rawLinks,
-      };
-    } catch (error) {
-      if (owns && browser) await browser.close().catch(() => {});
-      throw normalizeError(error, "playwright");
-    }
+    return this.withPage(session, (page) => readLinks(page, url));
   }
 
   async crawl(url: string, options?: CrawlOptions, session?: BrowserSession): Promise<CrawlResult> {
-    const maxPages = options?.maxPages ?? 10;
-    const maxDepth = options?.maxDepth ?? 2;
-    const sameDomain = options?.sameDomain ?? true;
-    const visited = new Set<string>();
-    const pages: Array<{
-      url: string;
-      title?: string;
-      html?: string;
-      text?: string;
-      links?: string[];
-      depth?: number;
-    }> = [];
-
     const baseHostname = new URL(url).hostname;
-
-    let browser: Browser | undefined;
-    let page: Page;
-    let owns = false;
-
-    try {
-      if (session) {
-        page = this.getPage(session);
-      } else {
-        const { chromium } = await import("playwright");
-        browser = await chromium.launch({
-          headless: true,
-          executablePath: resolveSystemChromium(),
-        });
-        page = await browser.newPage();
-        owns = true;
-      }
-
-      const queue: Array<{ url: string; depth: number }> = [{ url, depth: 0 }];
-
-      while (queue.length > 0 && visited.size < maxPages) {
-        const { url: currentUrl, depth } = queue.shift()!;
-        if (visited.has(currentUrl)) continue;
-        if (depth > maxDepth) continue;
-
-        try {
-          await page.goto(currentUrl, { waitUntil: "load", timeout: 15000 });
-          const [title, html, text, links] = await Promise.all([
-            page.title().catch(() => undefined),
-            page.content().catch(() => undefined),
-            page.evaluate(() => document.body?.innerText || "").catch(() => undefined),
-            page
-              .evaluate(() =>
-                Array.from(document.querySelectorAll("a[href]")).map(
-                  (a) => (a as HTMLAnchorElement).href,
-                ),
-              )
-              .catch(() => []),
-          ]);
-
-          visited.add(currentUrl);
-          pages.push({ url: currentUrl, title, html, text, links, depth });
-
-          if (depth < maxDepth) {
-            for (const link of links) {
-              try {
-                const parsed = new URL(link, currentUrl);
-                const normalized = parsed.toString();
-                if (visited.has(normalized)) continue;
-                if (sameDomain && parsed.hostname !== baseHostname) continue;
-                queue.push({ url: normalized, depth: depth + 1 });
-              } catch {
-                // ignore malformed URLs
-              }
-            }
-          }
-        } catch {
-          // skip pages that fail to load
-        }
-      }
-
-      if (owns && browser) {
-        await browser.close();
-      }
-
-      return {
-        pages: pages.map((p) => ({
-          url: p.url,
-          title: p.title,
-          html: p.html,
-          text: p.text,
-          links: p.links,
-          depth: p.depth,
-        })),
-        totalFound: visited.size,
-      };
-    } catch (error) {
-      if (owns && browser) {
-        await browser.close().catch(() => {});
-      }
-      throw normalizeError(error, "playwright");
-    }
+    return this.withPage(session, (page) => crawlPage(page, url, baseHostname, options));
   }
 
   async isAvailable(): Promise<boolean> {

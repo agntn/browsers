@@ -18,26 +18,84 @@ import { register } from "../core/registry";
 import { isNotFoundError, assertSessionId, notSupportedViaRest } from "../core/utils";
 
 interface SteelSessionResponse {
-  id: string;
-  websocketUrl?: string;
-  status?: string;
-  createdAt?: string;
-  [key: string]: unknown;
+  readonly id: string;
+  readonly websocketUrl?: string;
+  readonly status?: string;
+  readonly createdAt?: string;
+  readonly [key: string]: unknown;
 }
 
 interface SteelScrapeResponse {
-  content?: {
-    html?: string;
-    markdown?: string;
-    cleaned_html?: string;
-    readability?: string;
+  readonly content?: {
+    readonly html?: string;
+    readonly markdown?: string;
+    readonly cleaned_html?: string;
+    readonly readability?: string;
   };
-  metadata?: {
-    status_code?: number;
-    title?: string;
+  readonly metadata?: {
+    readonly status_code?: number;
+    readonly title?: string;
   };
-  links?: string[];
-  [key: string]: unknown;
+  readonly links?: readonly string[];
+  readonly [key: string]: unknown;
+}
+
+function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (!options) return body;
+  if (options.region) body.proxy_region = options.region;
+  if (options.stealth) body.stealth = true;
+  if (options.timeout) body.timeout = options.timeout;
+  if (options.proxy) body.proxy = options.proxy;
+  if (options.profileId) body.profiles = [options.profileId];
+  if (options.captchaSolving) body.solve_captchas = true;
+  if (options.extra) Object.assign(body, options.extra);
+  return body;
+}
+
+function createScrapeBody(url: string, options?: ScrapeOptions): Record<string, unknown> {
+  const body: Record<string, unknown> = { url };
+  if (!options) return body;
+  if (options.waitFor) body.waitFor = options.waitFor;
+  if (options.headers) body.headers = options.headers;
+  return body;
+}
+
+function toScrapeResult(url: string, response: SteelScrapeResponse): ScrapeResult {
+  return {
+    url,
+    title: response.metadata?.title,
+    html: response.content?.html,
+    cleanedHtml: response.content?.cleaned_html,
+    markdown: response.content?.markdown,
+    text: response.content?.readability,
+    statusCode: response.metadata?.status_code,
+    links: response.links ? [...response.links] : undefined,
+  };
+}
+
+function createScreenshotBody(
+  options: ScreenshotOptions,
+  session?: BrowserSession,
+): Record<string, unknown> {
+  assertSessionId(session?.id, "steel", "screenshot");
+  const body: Record<string, unknown> = {
+    sessionId: session.id,
+    fullPage: options.fullPage ?? true,
+  };
+  if (options.url) body.url = options.url;
+  if (options.selector) body.selector = options.selector;
+  return body;
+}
+
+function toScreenshotResult(
+  response: Readonly<Record<string, unknown>>,
+  format: ScreenshotOptions["format"],
+): ScreenshotResult {
+  return {
+    data: (response.url ?? response.screenshot ?? response.data ?? "") as string,
+    mimeType: `image/${format ?? "png"}`,
+  };
 }
 
 class SteelProvider implements BrowserProvider {
@@ -85,18 +143,9 @@ class SteelProvider implements BrowserProvider {
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
-      const body: Record<string, unknown> = {};
-      if (options?.region) body.proxy_region = options.region;
-      if (options?.stealth) body.stealth = true;
-      if (options?.timeout) body.timeout = options.timeout;
-      if (options?.proxy) body.proxy = options.proxy;
-      if (options?.profileId) body.profiles = [options.profileId];
-      if (options?.captchaSolving) body.solve_captchas = true;
-      if (options?.extra) Object.assign(body, options.extra);
-
       const res = await this.client.postJSON<SteelSessionResponse>(
         `${this.baseURL}/v1/sessions`,
-        body,
+        createSessionBody(options),
         this.headers(),
       );
 
@@ -163,26 +212,12 @@ class SteelProvider implements BrowserProvider {
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
     try {
-      const body: Record<string, unknown> = { url };
-      if (options?.waitFor) body.waitFor = options.waitFor;
-      if (options?.headers) body.headers = options.headers;
-
       const res = await this.client.postJSON<SteelScrapeResponse>(
         `${this.baseURL}/v1/scrape`,
-        body,
+        createScrapeBody(url, options),
         this.headers(),
       );
-
-      return {
-        url,
-        title: res.metadata?.title,
-        html: res.content?.html,
-        cleanedHtml: res.content?.cleaned_html,
-        markdown: res.content?.markdown,
-        text: res.content?.readability,
-        statusCode: res.metadata?.status_code,
-        links: res.links,
-      };
+      return toScrapeResult(url, res);
     } catch (error) {
       throw normalizeError(error, "steel");
     }
@@ -193,26 +228,12 @@ class SteelProvider implements BrowserProvider {
     session?: BrowserSession,
   ): Promise<ScreenshotResult> {
     try {
-      assertSessionId(session?.id, "steel", "screenshot");
-
-      const body: Record<string, unknown> = {
-        sessionId: session.id,
-        fullPage: options.fullPage ?? true,
-      };
-      if (options.url) body.url = options.url;
-      if (options.selector) body.selector = options.selector;
-
       const res = await this.client.postJSON<Record<string, unknown>>(
         `${this.baseURL}/v1/screenshot`,
-        body,
+        createScreenshotBody(options, session),
         this.headers(),
       );
-
-      const data = (res.url ?? res.screenshot ?? res.data ?? "") as string;
-      return {
-        data,
-        mimeType: `image/${options.format ?? "png"}`,
-      };
+      return toScreenshotResult(res, options.format);
     } catch (error) {
       throw normalizeError(error, "steel");
     }

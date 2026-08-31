@@ -25,6 +25,15 @@ interface BrowserbaseSessionResponse {
   [key: string]: unknown;
 }
 
+function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (options?.region) body.region = options.region;
+  if (options?.proxy) body.proxy = options.proxy;
+  if (options?.stealth) body.stealth = options.stealth;
+  if (options?.extra) Object.assign(body, options.extra);
+  return body;
+}
+
 class BrowserbaseProvider implements BrowserProvider {
   private readonly client: Client;
   private readonly baseURL: string;
@@ -73,15 +82,9 @@ class BrowserbaseProvider implements BrowserProvider {
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
-      const body: Record<string, unknown> = {};
-      if (options?.region) body.region = options.region;
-      if (options?.proxy) body.proxy = options.proxy;
-      if (options?.stealth) body.stealth = options.stealth;
-      if (options?.extra) Object.assign(body, options.extra);
-
       const res = await this.client.postJSON<BrowserbaseSessionResponse>(
         `${this.baseURL}/v1/sessions`,
-        body,
+        createSessionBody(options),
         this.headers(),
       );
 
@@ -131,8 +134,9 @@ class BrowserbaseProvider implements BrowserProvider {
   }
 
   /**
-   * Browserbase has no DELETE route for sessions. The documented way to end
-   * one is POST /v1/sessions/{id} with status REQUEST_RELEASE.
+   * Release a session through Browserbase's status update endpoint.
+   *
+   * @param {string} sessionId Session identifier.
    */
   async releaseSession(sessionId: string): Promise<void> {
     try {
@@ -148,7 +152,7 @@ class BrowserbaseProvider implements BrowserProvider {
 
   async scrape(
     url: string,
-    options?: ScrapeOptions,
+    _options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
     try {

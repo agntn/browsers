@@ -144,44 +144,74 @@ export class PaymentError extends BrowserError {
 export const DEFAULT_RETRY_AFTER = 60;
 
 export function parseRetryAfter(header: string | null | undefined): number {
-  if (header == null) return DEFAULT_RETRY_AFTER;
+  if (header === null || header === undefined) return DEFAULT_RETRY_AFTER;
   const trimmed = header.trim();
   if (!/^\d+$/.test(trimmed)) return DEFAULT_RETRY_AFTER;
   const parsed = Number.parseInt(trimmed, 10);
   return parsed > 0 && parsed < 3600 ? parsed : DEFAULT_RETRY_AFTER;
 }
 
+interface StatusError {
+  readonly status: number;
+  readonly message: string;
+  readonly response?: {
+    readonly headers?: { readonly get: (key: string) => string | null };
+  };
+}
+
+function isStatusError(error: unknown): error is StatusError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    typeof error.status === "number" &&
+    "message" in error &&
+    typeof error.message === "string"
+  );
+}
+
+function objectErrorMessage(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("message" in error)) return undefined;
+  return typeof error.message === "string" ? error.message : undefined;
+}
+
+function effectiveProvider(provider: string | undefined): string {
+  return provider || "unknown";
+}
+
+function messageOrDefault(message: string, fallback: string): string {
+  return message || fallback;
+}
+
+function normalizeStatusError(error: StatusError, provider?: string): BrowserError {
+  const message = messageOrDefault(error.message, `HTTP ${error.status}`);
+  switch (error.status) {
+    case 401:
+      return new AuthError(`Authentication failed: ${message}`, effectiveProvider(provider));
+    case 402:
+    case 403:
+      return new PaymentError(
+        `Payment required: ${message}`,
+        error.status,
+        effectiveProvider(provider),
+      );
+    case 429:
+      return new RateLimitError(parseRetryAfter(error.response?.headers?.get("Retry-After")));
+    default:
+      return error.status >= 500
+        ? new HTTPError(error.status, "", message)
+        : new BrowserError(message);
+  }
+}
+
 export function normalizeError(error: unknown, provider?: string): BrowserError {
   if (error instanceof HTTPError && error.statusCode === 401) {
-    return new AuthError(
-      `Authentication failed: ${error.body || "Invalid or missing API key"}`,
-      provider || "unknown",
-    );
+    const message = messageOrDefault(error.body, "Invalid or missing API key");
+    return new AuthError(`Authentication failed: ${message}`, effectiveProvider(provider));
   }
   if (error instanceof BrowserError) return error;
-  if (error && typeof error === "object" && "status" in error && "message" in error) {
-    const fetchError = error as {
-      status: number;
-      message: string;
-      response?: { headers?: { get: (key: string) => string | null } };
-    };
-    const status = fetchError.status;
-    const message = fetchError.message || `HTTP ${status}`;
-    switch (status) {
-      case 401:
-        return new AuthError(`Authentication failed: ${message}`, provider || "unknown");
-      case 402:
-      case 403:
-        return new PaymentError(`Payment required: ${message}`, status, provider || "unknown");
-      case 429: {
-        const retryAfter = parseRetryAfter(fetchError.response?.headers?.get("Retry-After"));
-        return new RateLimitError(retryAfter);
-      }
-      default:
-        if (status >= 500) return new HTTPError(status, "", message);
-        return new BrowserError(message);
-    }
-  }
+  if (isStatusError(error)) return normalizeStatusError(error, provider);
   if (error instanceof Error) return new BrowserError(error.message);
-  return new BrowserError(String(error));
+  const message = objectErrorMessage(error);
+  return new BrowserError(message ?? String(error));
 }

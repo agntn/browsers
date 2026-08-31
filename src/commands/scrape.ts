@@ -1,6 +1,23 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import { resolveAndCreate } from "./_helpers";
+import type { ScrapeResult } from "../core/types";
+
+function printScrapeResult(
+  format: string,
+  result: Readonly<Pick<ScrapeResult, "html" | "text" | "markdown">>,
+): void {
+  switch (format) {
+    case "html":
+      console.log(result.html ?? "");
+      return;
+    case "text":
+      console.log(result.text ?? "");
+      return;
+    default:
+      console.log(result.markdown ?? result.text ?? result.html ?? "");
+  }
+}
 
 export default defineCommand({
   meta: {
@@ -42,17 +59,7 @@ export default defineCommand({
         waitFor: args.waitFor,
         maxChars: args.maxChars ? Number(args.maxChars) : undefined,
       });
-
-      switch (args.format) {
-        case "html":
-          console.log(result.html ?? "");
-          break;
-        case "text":
-          console.log(result.text ?? "");
-          break;
-        default:
-          console.log(result.markdown ?? result.text ?? result.html ?? "");
-      }
+      printScrapeResult(args.format, result);
     } catch (error) {
       consola.error(error instanceof Error ? error.message : String(error));
       process.exit(1);

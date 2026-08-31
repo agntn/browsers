@@ -4,8 +4,10 @@ import { create } from "../core/registry";
 import type { BrowserProvider } from "../core/types";
 
 /**
- * CLI helper: resolve provider name + create instance.
- * Prints user-friendly error and exits on failure.
+ * Resolve and create a provider, or terminate with a readable error.
+ *
+ * @param {string} [preferred] Preferred provider name.
+ * @returns {{ name: string; provider: BrowserProvider }} Resolved name and provider.
  */
 export function resolveAndCreate(preferred?: string): { name: string; provider: BrowserProvider } {
   try {

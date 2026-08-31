@@ -12,9 +12,9 @@ const passthroughFirstArgs = new Set([
 
 const helpOrVersionFlags = new Set(["-h", "--help", "-v", "--version"]);
 
-export function normalizeMainArgs(rawArgs: string[]): string[] {
+export function normalizeMainArgs(rawArgs: readonly string[]): string[] {
   const [firstArg] = rawArgs;
-  if (!firstArg) return rawArgs;
-  if (passthroughFirstArgs.has(firstArg) || helpOrVersionFlags.has(firstArg)) return rawArgs;
+  if (!firstArg) return [...rawArgs];
+  if (passthroughFirstArgs.has(firstArg) || helpOrVersionFlags.has(firstArg)) return [...rawArgs];
   return ["scrape", ...rawArgs];
 }

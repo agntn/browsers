@@ -1,12 +1,5 @@
-export const builtinProviders = [
-  "steel",
-  "browserbase",
-  "kernel",
-  "browserless",
-  "hyperbrowser",
-  "anchor",
-  "cloudflare",
-  "playwright",
-] as const;
+import { browserProviderNames } from "../tool-contract";
 
-export type BrowserProviderName = (typeof builtinProviders)[number];
+export { browserProviderNames as builtinProviders };
+
+export type BrowserProviderName = (typeof browserProviderNames)[number];

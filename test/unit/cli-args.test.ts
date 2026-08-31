@@ -24,6 +24,7 @@ describe("normalizeMainArgs", () => {
     expect(normalizeMainArgs(["extract"])).toEqual(["extract"]);
     expect(normalizeMainArgs(["session"])).toEqual(["session"]);
     expect(normalizeMainArgs(["providers"])).toEqual(["providers"]);
+    expect(normalizeMainArgs(["mcp"])).toEqual(["mcp"]);
   });
   it("preserves --help and --version", () => {
     expect(normalizeMainArgs(["--help"])).toEqual(["--help"]);

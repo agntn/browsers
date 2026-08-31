@@ -21,6 +21,7 @@ const main = defineCommand({
     extract: () => import("./commands/extract").then((m) => m.default),
     session: () => import("./commands/session").then((m) => m.default),
     providers: () => import("./commands/providers").then((m) => m.default),
+    mcp: () => import("./commands/mcp").then((m) => m.default),
   },
 });
 

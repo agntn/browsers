@@ -72,7 +72,7 @@ export default function browsersExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "browsers_session",
     label: "Browser Session",
-    description: "Create a new cloud browser session. Returns session ID and CDP WebSocket URL for Puppeteer/Playwright connection.",
+    description: "Create a new cloud browser session. Returns an opaque session ID for later operations.",
     promptSnippet: "Create a cloud browser session for full browser automation.",
     promptGuidelines: [
       "Use browsers_session when you need full browser control (navigate, click, type, evaluate JS).",
@@ -89,14 +89,12 @@ export default function browsersExtension(pi: ExtensionAPI) {
         0, 0,
       )
     },
-    async execute(_toolCallId, params): Promise<AgentToolResult<{ session: Record<string, unknown> }>> {
+    async execute(_toolCallId, params): Promise<AgentToolResult<{ session: { id: string; provider: string; createdAt: number } }>> {
       const { name, provider } = await getProvider(params.provider)
       const session = await provider.createSession({ region: params.region })
-      const lines = [`[provider=${name}] Session created: ${session.id}`]
-      if (session.cdpUrl) lines.push(`CDP URL: ${session.cdpUrl}`)
       return {
-        content: [{ type: "text", text: lines.join("\n") }],
-        details: { session: { id: session.id, provider: session.provider, cdpUrl: session.cdpUrl, createdAt: session.createdAt } },
+        content: [{ type: "text", text: `[provider=${name}] Session created: ${session.id}` }],
+        details: { session: { id: session.id, provider: session.provider, createdAt: session.createdAt } },
       }
     },
   })

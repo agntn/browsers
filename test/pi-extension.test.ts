@@ -173,6 +173,51 @@ describe("browsers Pi extension", () => {
     expect(provider.scrape).not.toHaveBeenCalled();
   });
 
+  it("registers and forwards extraction schemas", async () => {
+    const schema = {
+      type: "object",
+      properties: { title: { type: "string" } },
+      required: ["title"],
+    };
+    const tools = registerTools();
+
+    expect(tools.get("browsers_extract")?.parameters).toMatchObject({
+      properties: {
+        schema: {
+          type: "object",
+          patternProperties: { "^.*$": {} },
+        },
+      },
+    });
+
+    for (const providerName of ["cloudflare", "hyperbrowser"] as const) {
+      const extract = vi.fn().mockResolvedValue({
+        url: "https://example.test",
+        data: { title: "Example" },
+      });
+      browsersMock.resolveProvider.mockReturnValue(providerName);
+      browsersMock.create.mockReturnValue({ extract });
+
+      await requireTool(tools, "browsers_extract").execute(
+        "test",
+        {
+          provider: providerName,
+          url: "https://example.test",
+          prompt: "Extract the title",
+          schema,
+        },
+        undefined,
+        undefined,
+        {} as ExtensionContext,
+      );
+
+      expect(extract).toHaveBeenCalledWith("https://example.test", {
+        prompt: "Extract the title",
+        schema,
+      });
+    }
+  });
+
   it("keeps session connection credentials out of tool output", async () => {
     const secretUrl = "wss://connect.example.test?token=secret&signingKey=jwt";
     const provider = {

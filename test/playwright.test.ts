@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+import type { ServerResponse } from "node:http";
 import { describe, it, expect, afterAll } from "vitest";
 // Import providers/index to register all providers
 import "../src/providers/index";
@@ -51,6 +53,43 @@ describe("playwright provider (local)", () => {
     expect(result.html).toContain("Hello");
     expect(result.title).toBe("Test");
     expect(result.text).toContain("Hello");
+  });
+
+  it("returns the DOM before a slow image finishes", async () => {
+    let imageFinished = false;
+    let delayedResponse: ServerResponse | undefined;
+    let delay: NodeJS.Timeout | undefined;
+    const server = createServer((request, response) => {
+      if (request.url === "/slow.png") {
+        delayedResponse = response;
+        delay = setTimeout(() => {
+          imageFinished = true;
+          response.setHeader("Content-Type", "image/png");
+          response.end();
+        }, 1_000);
+        return;
+      }
+      response.setHeader("Content-Type", "text/html");
+      response.end("<html><body>Ready<img src=/slow.png></body></html>");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (typeof address !== "object" || !address) throw new Error("Missing test server address");
+
+    try {
+      const result = await provider.scrape(`http://127.0.0.1:${address.port}`);
+
+      expect(result.text).toContain("Ready");
+      expect(delayedResponse).toBeDefined();
+      expect(imageFinished).toBe(false);
+    } finally {
+      if (delay) clearTimeout(delay);
+      delayedResponse?.destroy();
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
   });
 
   it("preserves a missing-session error while scraping", async () => {

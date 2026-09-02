@@ -3,6 +3,7 @@ import type { BrowserProvider } from "../src/core/types";
 import { register } from "../src/core/registry";
 import {
   browserCapabilities,
+  browserLinks,
   browserScrape,
   browserSession,
   browserScreenshot,
@@ -14,6 +15,7 @@ const previousApiKey = process.env.TOOLTEST_API_KEY;
 const releaseSession = vi.fn<(sessionId: string) => Promise<void>>();
 const scrape = vi.fn<BrowserProvider["scrape"]>();
 const screenshot = vi.fn<BrowserProvider["screenshot"]>();
+const links = vi.fn<NonNullable<BrowserProvider["links"]>>();
 
 function toolTestProvider(): BrowserProvider {
   return {
@@ -29,7 +31,7 @@ function toolTestProvider(): BrowserProvider {
       statelessScreenshot: true,
       crawl: false,
       pdf: false,
-      links: false,
+      links: true,
       search: false,
       extract: false,
     }),
@@ -47,6 +49,7 @@ function toolTestProvider(): BrowserProvider {
     screenshot,
     navigate: vi.fn().mockResolvedValue(undefined),
     evaluate: vi.fn().mockResolvedValue({ value: undefined }),
+    links,
   };
 }
 
@@ -122,6 +125,31 @@ describe("browser tool operations", () => {
 
     expect(releaseSession).toHaveBeenCalledWith("session-1");
     expect(result.details).toEqual({ released: true });
+  });
+
+  it("deduplicates links in order of first appearance across visible and structured output", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    links.mockResolvedValue({
+      url: "https://example.test",
+      links: [
+        { href: "https://example.test/first" },
+        { href: "https://example.test/second" },
+        { href: "https://example.test/first" },
+      ],
+    });
+
+    const result = await browserLinks({ provider: "tooltest", url: "https://example.test" });
+
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: "[provider=tooltest] 2 links:\nhttps://example.test/first\nhttps://example.test/second",
+      },
+    ]);
+    expect(result.details.links).toEqual([
+      "https://example.test/first",
+      "https://example.test/second",
+    ]);
   });
 
   it("returns stateless screenshots without exposing the image twice", async () => {

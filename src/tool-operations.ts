@@ -349,11 +349,9 @@ export async function browserLinks(
   const { name, provider } = getProvider(params.provider);
   if (!provider.links) throw new Error(`Provider ${name} does not support link extraction.`);
   const result = await provider.links(params.url);
-  const links = result.links.map((link) => link.href);
+  const links = [...new Set(result.links.map((link) => sanitizeField(link.href)))];
   return {
-    content: content(
-      `[provider=${name}] ${links.length} links:\n${links.map(sanitizeField).join("\n")}`,
-    ),
+    content: content(`[provider=${name}] ${links.length} links:\n${links.join("\n")}`),
     details: { url: params.url, links },
   };
 }

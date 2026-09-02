@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { resolveAndCreate } from "./_helpers";
+import { browserLinks } from "../tool-operations";
 
 export default defineCommand({
   meta: {
@@ -20,15 +20,10 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = resolveAndCreate(args.provider);
-    if (!provider.links) {
-      consola.error(`Provider ${providerName} does not support link extraction.`);
-      process.exit(1);
-    }
     try {
-      const result = await provider.links(args.url);
-      for (const link of result.links) {
-        console.log(link.href);
+      const result = await browserLinks({ url: args.url, provider: args.provider });
+      for (const link of result.details.links) {
+        console.log(link);
       }
     } catch (error) {
       consola.error(error instanceof Error ? error.message : String(error));

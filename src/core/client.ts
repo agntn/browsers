@@ -74,10 +74,12 @@ export class Client {
     signal?: AbortSignal,
   ): Promise<string> {
     try {
+      const requestHeaders = new Headers(headers);
+      if (!requestHeaders.has("Accept")) requestHeaders.set("Accept", "*/*");
       const res = await this.fetch.raw(url, {
         method: "POST",
         body,
-        headers,
+        headers: requestHeaders,
         signal,
       });
       return typeof res._data === "string" ? res._data : String(res._data);

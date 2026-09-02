@@ -18,24 +18,33 @@ import { register } from "../core/registry";
 import { isNotFoundError, assertSessionId } from "../core/utils";
 
 interface KernelSessionResponse {
-  id: string;
-  cdpUrl?: string;
-  websocketUrl?: string;
-  status?: string;
-  createdAt?: string;
-  [key: string]: unknown;
+  readonly session_id: string;
+  readonly cdp_ws_url?: string;
+  readonly created_at?: string;
+  readonly [key: string]: unknown;
 }
 
 function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
-  const body: Record<string, unknown> = {};
-  if (!options) return body;
-  if (options.region) body.region = options.region;
-  if (options.proxy) body.proxy = options.proxy;
-  if (options.stealth) body.stealth = true;
-  if (options.timeout) body.timeout_seconds = Math.floor(options.timeout / 1000);
-  if (options.viewport) body.viewport = options.viewport;
-  if (options.extra) Object.assign(body, options.extra);
-  return body;
+  if (!options) return {};
+  return {
+    region: options.region,
+    headless: options.headless,
+    profile: options.profileId ? { id: options.profileId } : undefined,
+    proxy: options.proxy,
+    stealth: options.stealth,
+    timeout_seconds: options.timeout === undefined ? undefined : Math.floor(options.timeout / 1000),
+    viewport: options.viewport,
+    ...options.extra,
+  };
+}
+
+function mapSession(response: KernelSessionResponse): BrowserSession {
+  return {
+    id: response.session_id,
+    cdpUrl: response.cdp_ws_url,
+    provider: "kernel",
+    createdAt: response.created_at ? new Date(response.created_at).getTime() : Date.now(),
+  };
 }
 
 class KernelProvider implements BrowserProvider {
@@ -48,7 +57,7 @@ class KernelProvider implements BrowserProvider {
       throw new AuthError("Missing API key for Kernel. Set KERNEL_API_KEY", "kernel");
     }
     this.client = defaultClient();
-    this.baseURL = (config.baseURL ?? "https://api.kernel.sh").replace(/\/+$/, "");
+    this.baseURL = (config.baseURL ?? "https://api.onkernel.com").replace(/\/+$/, "");
     this.apiKey = config.apiKey;
   }
 
@@ -84,18 +93,12 @@ class KernelProvider implements BrowserProvider {
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
       const res = await this.client.postJSON<KernelSessionResponse>(
-        `${this.baseURL}/v1/browsers`,
+        `${this.baseURL}/browsers`,
         createSessionBody(options),
         this.headers(),
       );
 
-      return {
-        id: res.id,
-        cdpUrl: res.cdpUrl ?? res.websocketUrl,
-        provider: "kernel",
-        createdAt: Date.now(),
-        metadata: { status: res.status },
-      };
+      return mapSession(res);
     } catch (error) {
       throw normalizeError(error, "kernel");
     }
@@ -104,16 +107,10 @@ class KernelProvider implements BrowserProvider {
   async getSession(sessionId: string): Promise<BrowserSession | null> {
     try {
       const res = await this.client.getJSON<KernelSessionResponse>(
-        `${this.baseURL}/v1/browsers/${sessionId}`,
+        `${this.baseURL}/browsers/${sessionId}`,
         this.headers(),
       );
-      return {
-        id: res.id,
-        cdpUrl: res.cdpUrl ?? res.websocketUrl,
-        provider: "kernel",
-        createdAt: res.createdAt ? new Date(res.createdAt).getTime() : Date.now(),
-        metadata: { status: res.status },
-      };
+      return mapSession(res);
     } catch (error: unknown) {
       if (isNotFoundError(error)) return null;
       throw normalizeError(error, "kernel");
@@ -122,21 +119,18 @@ class KernelProvider implements BrowserProvider {
 
   async listSessions(): Promise<BrowserSession[]> {
     const res = await this.client.getJSON<KernelSessionResponse[]>(
-      `${this.baseURL}/v1/browsers`,
+      `${this.baseURL}/browsers`,
       this.headers(),
     );
-    return res.map((s) => ({
-      id: s.id,
-      cdpUrl: s.cdpUrl ?? s.websocketUrl,
-      provider: "kernel",
-      createdAt: s.createdAt ? new Date(s.createdAt).getTime() : Date.now(),
-      metadata: { status: s.status },
-    }));
+    return res.map(mapSession);
   }
 
   async releaseSession(sessionId: string): Promise<void> {
     try {
-      await this.client.deleteJSON(`${this.baseURL}/v1/browsers/${sessionId}`, this.headers());
+      await this.client.deleteJSON(`${this.baseURL}/browsers/${sessionId}`, {
+        ...this.headers(),
+        Accept: "*/*",
+      });
     } catch (error) {
       throw normalizeError(error, "kernel");
     }
@@ -167,25 +161,20 @@ class KernelProvider implements BrowserProvider {
   }
 
   async screenshot(
-    options: ScreenshotOptions,
+    _options: ScreenshotOptions,
     session?: BrowserSession,
   ): Promise<ScreenshotResult> {
     try {
       assertSessionId(session?.id, "kernel", "screenshot");
-      const body: Record<string, unknown> = {
-        fullPage: options.fullPage ?? true,
-      };
-      if (options.selector) body.selector = options.selector;
-
-      const res = await this.client.postJSON<{ data?: string; screenshot?: string }>(
-        `${this.baseURL}/v1/browsers/${session.id}/screenshot`,
-        body,
-        this.headers(),
+      const png = await this.client.postRaw(
+        `${this.baseURL}/browsers/${session.id}/computer/screenshot`,
+        {},
+        { ...this.headers(), Accept: "image/png" },
       );
 
       return {
-        data: res.data ?? res.screenshot ?? "",
-        mimeType: `image/${options.format ?? "png"}`,
+        data: `data:image/png;base64,${Buffer.from(png).toString("base64")}`,
+        mimeType: "image/png",
       };
     } catch (error) {
       throw normalizeError(error, "kernel");
@@ -199,14 +188,19 @@ class KernelProvider implements BrowserProvider {
   async evaluate(script: string, session: BrowserSession): Promise<EvaluateResult> {
     try {
       const res = await this.client.postJSON<{
-        result?: { value?: unknown };
-        value?: unknown;
-        logs?: string[];
-      }>(`${this.baseURL}/v1/browsers/${session.id}/playwright`, { code: script }, this.headers());
-      return {
-        value: res.result?.value ?? res.value,
-        logs: res.logs,
-      };
+        success: boolean;
+        result?: unknown;
+        error?: string;
+        stdout?: string;
+        stderr?: string;
+      }>(
+        `${this.baseURL}/browsers/${session.id}/playwright/execute`,
+        { code: script },
+        this.headers(),
+      );
+      if (!res.success) throw new Error(res.error ?? "Kernel Playwright execution failed");
+      const logs = [res.stdout, res.stderr].filter((line): line is string => Boolean(line));
+      return logs.length > 0 ? { value: res.result, logs } : { value: res.result };
     } catch (error) {
       throw normalizeError(error, "kernel");
     }
@@ -218,7 +212,10 @@ class KernelProvider implements BrowserProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
-      await this.client.getJSON<{ status?: string }>(`${this.baseURL}/v1/health`, this.headers());
+      await this.client.getJSON<KernelSessionResponse[]>(
+        `${this.baseURL}/browsers?limit=1`,
+        this.headers(),
+      );
       return true;
     } catch {
       return false;
@@ -227,4 +224,4 @@ class KernelProvider implements BrowserProvider {
 }
 
 const factory: BrowserProviderFactory = (config) => new KernelProvider(config);
-register("kernel", "https://api.kernel.sh", factory);
+register("kernel", "https://api.onkernel.com", factory);

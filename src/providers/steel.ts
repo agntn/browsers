@@ -13,7 +13,7 @@ import type {
 } from "../core/types";
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
-import { AuthError, normalizeError } from "../core/errors";
+import { AuthError, BrowserError, normalizeError } from "../core/errors";
 import { register } from "../core/registry";
 import { isNotFoundError, assertSessionId, notSupportedViaRest } from "../core/utils";
 
@@ -61,7 +61,17 @@ function createScrapeBody(url: string, options?: ScrapeOptions): Record<string, 
   return body;
 }
 
+function isCloudflareChallenge(response: SteelScrapeResponse): boolean {
+  return (
+    response.metadata?.title?.trim().toLowerCase() === "just a moment..." &&
+    response.content?.html?.includes("challenges.cloudflare.com") === true
+  );
+}
+
 function toScrapeResult(url: string, response: SteelScrapeResponse): ScrapeResult {
+  if (isCloudflareChallenge(response)) {
+    throw new BrowserError("Steel returned a Cloudflare challenge instead of page content");
+  }
   return {
     url,
     title: response.metadata?.title,

@@ -59,7 +59,7 @@ browsers search "browser automation agents"
 browsers extract https://example.com --prompt "Extract all product prices"
 
 # Manage sessions
-browsers session create --provider kernel --region us-east-1
+browsers session create --provider kernel
 browsers session list --provider browserbase
 browsers session release <session-id> --provider steel
 

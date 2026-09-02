@@ -1,33 +1,34 @@
-# OMP and MCP integrations
+# Deduplicate browser links
 
 ## Goal
 
-Expose the existing browser tools through OMP and MCP without duplicating provider behavior.
+Make `browsers_links` return each href once while preserving its order of first appearance.
 
 ## Success criteria
 
-- Pi, OMP, and MCP call one shared executor per operation.
-- OMP registers the eleven existing browser tools through an exact package manifest entry.
-- MCP lists and executes the same eleven tools over stdio.
-- Session credentials stay out of public tool output.
-- Package exports, tarball contents, CLI routing, and host-facing metadata include the new surfaces.
-- Focused tests, typecheck, lint, full tests, build, packed import smoke, MCP stdio smoke, and installed OMP validation pass.
+- Repeated hrefs collapse to one row in order of first appearance.
+- Text shown to the model and `details.links` contain the same sequence.
+- The CLI prints the sequence produced by the shared link executor.
+- An offline regression covers repeated hrefs.
+- Focused tests, typecheck, lint, full tests, and build pass.
 - Foreign `probe_*.mjs` files remain untouched.
 
 ## Progress
 
-- [x] Read issue #21, open issues, open PRs, merged PRs, repository instructions, and sibling integrations.
-- [x] Confirm no open PR overlaps issue #21 and the default branch has no recorded CI runs.
-- [x] Select `aeitwoen`, set the local noreply commit identity, and branch from `origin/main`.
-- [x] Add red contract tests for shared operations, OMP registration, and MCP registration/execution.
-- [x] Extract shared operations and migrate Pi.
-- [x] Add OMP and MCP surfaces plus package/build/CLI metadata.
-- [x] Run focused and repository-wide verification, packed install smoke, and live host registration.
-- [x] Perform adversarial self-review and an independent read-only review.
+- [x] Read issue #25, every open issue, open and recent merged PRs, repository instructions, and link call sites.
+- [x] Confirm issue #25 is unassigned and no open or closed PR duplicates it.
+- [x] Reproduce the implementation path from provider rows through `browserLinks()` and the CLI.
+- [x] Select `oritwoen`, set the local noreply commit identity, and branch from `origin/main`.
+- [x] Add a failing regression for repeated hrefs.
+- [x] Deduplicate at the shared link executor and route the CLI through it.
+- [x] Run focused and whole repository verification.
+- [x] Perform an adversarial review and prepare the exact staged patch for Ori.
+- [x] Create and push the reviewed local commit.
+- [x] Open pull request #26 as `oritwoen` with the required assignee.
 
 ## Current step
 
-Pull request #24 is open from `feat/omp-mcp-integrations` and closes issue #21 when merged.
+Pull request #26 is open from `fix/deduplicate-browser-links` and closes issue #25 when merged.
 
 ## Next action
 

@@ -24,21 +24,45 @@ import { register } from "../core/registry";
 import { isNotFoundError, assertSessionId, notSupportedViaRest } from "../core/utils";
 
 interface HyperbrowserSessionResponse {
-  id: string;
-  cdpUrl?: string;
-  wsEndpoint?: string;
-  status?: string;
-  createdAt?: string;
-  [key: string]: unknown;
+  readonly id: string;
+  readonly wsEndpoint?: string;
+  readonly status?: string;
+  readonly createdAt?: string;
+  readonly [key: string]: unknown;
+}
+
+interface HyperbrowserSessionListResponse {
+  readonly sessions: readonly HyperbrowserSessionResponse[];
 }
 
 function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
-  const body: Record<string, unknown> = {};
-  if (options?.region) body.region = options.region;
-  if (options?.proxy) body.proxy = options.proxy;
-  if (options?.stealth) body.stealth = true;
-  if (options?.extra) Object.assign(body, options.extra);
+  if (!options) return {};
+  const body: Record<string, unknown> = {
+    region: options.region,
+    useStealth: options.stealth,
+    solveCaptchas: options.captchaSolving,
+    profile: options.profileId ? { id: options.profileId } : undefined,
+    timeoutMinutes: options.timeout === undefined ? undefined : Math.ceil(options.timeout / 60_000),
+    screen: options.viewport,
+  };
+  if (options.proxy) {
+    body.useProxy = true;
+    body.proxyServer = options.proxy.server;
+    body.proxyServerUsername = options.proxy.username;
+    body.proxyServerPassword = options.proxy.password;
+  }
+  if (options.extra) Object.assign(body, options.extra);
   return body;
+}
+
+function mapSession(response: HyperbrowserSessionResponse): BrowserSession {
+  return {
+    id: response.id,
+    cdpUrl: response.wsEndpoint,
+    provider: "hyperbrowser",
+    createdAt: response.createdAt ? new Date(response.createdAt).getTime() : Date.now(),
+    metadata: response.status ? { status: response.status } : undefined,
+  };
 }
 
 function createCrawlBody(url: string, options?: CrawlOptions): Record<string, unknown> {
@@ -98,18 +122,12 @@ class HyperbrowserProvider implements BrowserProvider {
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
       const res = await this.client.postJSON<HyperbrowserSessionResponse>(
-        `${this.baseURL}/v1/session`,
+        `${this.baseURL}/api/session`,
         createSessionBody(options),
         this.headers(),
       );
 
-      return {
-        id: res.id,
-        cdpUrl: res.cdpUrl ?? res.wsEndpoint,
-        provider: "hyperbrowser",
-        createdAt: Date.now(),
-        metadata: { status: res.status },
-      };
+      return mapSession(res);
     } catch (error) {
       throw normalizeError(error, "hyperbrowser");
     }
@@ -118,16 +136,10 @@ class HyperbrowserProvider implements BrowserProvider {
   async getSession(sessionId: string): Promise<BrowserSession | null> {
     try {
       const res = await this.client.getJSON<HyperbrowserSessionResponse>(
-        `${this.baseURL}/v1/session/${sessionId}`,
+        `${this.baseURL}/api/session/${sessionId}`,
         this.headers(),
       );
-      return {
-        id: res.id,
-        cdpUrl: res.cdpUrl ?? res.wsEndpoint,
-        provider: "hyperbrowser",
-        createdAt: res.createdAt ? new Date(res.createdAt).getTime() : Date.now(),
-        metadata: { status: res.status },
-      };
+      return mapSession(res);
     } catch (error: unknown) {
       if (isNotFoundError(error)) return null;
       throw normalizeError(error, "hyperbrowser");
@@ -136,17 +148,11 @@ class HyperbrowserProvider implements BrowserProvider {
 
   async listSessions(): Promise<BrowserSession[]> {
     try {
-      const res = await this.client.getJSON<HyperbrowserSessionResponse[]>(
-        `${this.baseURL}/v1/sessions`,
+      const res = await this.client.getJSON<HyperbrowserSessionListResponse>(
+        `${this.baseURL}/api/sessions`,
         this.headers(),
       );
-      return res.map((s) => ({
-        id: s.id,
-        cdpUrl: s.cdpUrl ?? s.wsEndpoint,
-        provider: "hyperbrowser",
-        createdAt: s.createdAt ? new Date(s.createdAt).getTime() : Date.now(),
-        metadata: { status: s.status },
-      }));
+      return res.sessions.map(mapSession);
     } catch {
       return [];
     }
@@ -154,7 +160,7 @@ class HyperbrowserProvider implements BrowserProvider {
 
   async releaseSession(sessionId: string): Promise<void> {
     try {
-      await this.client.deleteJSON(`${this.baseURL}/v1/session/${sessionId}`, this.headers());
+      await this.client.putJSON(`${this.baseURL}/api/session/${sessionId}/stop`, this.headers());
     } catch (error) {
       throw normalizeError(error, "hyperbrowser");
     }
@@ -312,7 +318,10 @@ class HyperbrowserProvider implements BrowserProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
-      await this.client.getJSON<{ status?: string }>(`${this.baseURL}/v1/health`, this.headers());
+      await this.client.getJSON<HyperbrowserSessionListResponse>(
+        `${this.baseURL}/api/sessions`,
+        this.headers(),
+      );
       return true;
     } catch {
       return false;

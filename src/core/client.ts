@@ -55,6 +55,18 @@ export class Client {
     }
   }
 
+  async putJSON<T>(
+    url: string,
+    headers?: Readonly<Record<string, string>>,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    try {
+      return await this.fetch<T>(url, { method: "PUT", headers, signal });
+    } catch (error) {
+      throw this.mapError(error, url);
+    }
+  }
+
   async postText(
     url: string,
     body: Readonly<Record<string, unknown>>,

@@ -15,12 +15,25 @@ import type {
 } from "../core/types";
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
-import { AuthError, normalizeError } from "../core/errors";
+import { AuthError, normalizeError, SessionNotFoundError } from "../core/errors";
 import { register } from "../core/registry";
 import { assertUrlOrSession } from "../core/utils";
 
+interface BrowserlessSessionResponse {
+  readonly id?: string;
+  readonly connect?: string;
+  readonly stop?: string;
+}
+
+interface BrowserlessSessionRecord {
+  readonly session: BrowserSession;
+  readonly stopUrl: string;
+}
+
+const browserlessSessionStores = new Map<string, Map<string, BrowserlessSessionRecord>>();
+
 function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
-  const body: Record<string, unknown> = { timeout: options?.timeout ?? 300_000 };
+  const body: Record<string, unknown> = { ttl: options?.timeout ?? 300_000 };
   if (options?.proxy) body.proxy = options.proxy.server;
   if (options?.stealth) body.stealth = true;
   if (options?.extra) Object.assign(body, options.extra);
@@ -31,6 +44,7 @@ class BrowserlessProvider implements BrowserProvider {
   private readonly client: Client;
   private readonly baseURL: string;
   private readonly apiKey: string;
+  private readonly sessionStoreKey: string;
 
   constructor(config: ProviderConfig) {
     if (!config.apiKey) {
@@ -42,6 +56,7 @@ class BrowserlessProvider implements BrowserProvider {
     this.client = defaultClient();
     this.baseURL = (config.baseURL ?? "https://chrome.browserless.io").replace(/\/+$/, "");
     this.apiKey = config.apiKey;
+    this.sessionStoreKey = `${this.baseURL}\0${this.apiKey}`;
   }
 
   name(): string {
@@ -72,59 +87,52 @@ class BrowserlessProvider implements BrowserProvider {
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
-      const res = await this.client.postJSON<{ id?: string; browserWSEndpoint?: string }>(
-        `${this.baseURL}/sessions?${this.tokenParam()}`,
+      const res = await this.client.postJSON<BrowserlessSessionResponse>(
+        `${this.baseURL}/session?${this.tokenParam()}`,
         createSessionBody(options),
         { "Content-Type": "application/json" },
       );
+      if (!res.id || !res.connect || !res.stop) {
+        throw new Error("Browserless session response is missing lifecycle URLs");
+      }
 
-      return {
-        id: res.id ?? "",
-        cdpUrl: res.browserWSEndpoint,
+      const session: BrowserSession = {
+        id: res.id,
+        cdpUrl: res.connect,
         provider: "browserless",
         createdAt: Date.now(),
       };
+      const sessionStore =
+        browserlessSessionStores.get(this.sessionStoreKey) ??
+        new Map<string, BrowserlessSessionRecord>();
+      sessionStore.set(res.id, { session, stopUrl: res.stop });
+      browserlessSessionStores.set(this.sessionStoreKey, sessionStore);
+      return { ...session };
     } catch (error) {
       throw normalizeError(error, "browserless");
     }
   }
 
   async getSession(sessionId: string): Promise<BrowserSession | null> {
-    try {
-      const res = await this.client.getJSON<{ id?: string; browserWSEndpoint?: string }>(
-        `${this.baseURL}/sessions/${sessionId}?${this.tokenParam()}`,
-      );
-      if (!res.id) return null;
-      return {
-        id: res.id,
-        cdpUrl: res.browserWSEndpoint,
-        provider: "browserless",
-        createdAt: Date.now(),
-      };
-    } catch {
-      return null;
-    }
+    const record = browserlessSessionStores.get(this.sessionStoreKey)?.get(sessionId);
+    return record ? { ...record.session } : null;
   }
 
   async listSessions(): Promise<BrowserSession[]> {
-    try {
-      const res = await this.client.getJSON<Array<{ id?: string; browserWSEndpoint?: string }>>(
-        `${this.baseURL}/sessions?${this.tokenParam()}`,
-      );
-      return res.map((s) => ({
-        id: s.id ?? "",
-        cdpUrl: s.browserWSEndpoint,
-        provider: "browserless",
-        createdAt: Date.now(),
-      }));
-    } catch {
-      return [];
-    }
+    const sessionStore = browserlessSessionStores.get(this.sessionStoreKey);
+    return sessionStore ? Array.from(sessionStore.values(), ({ session }) => ({ ...session })) : [];
   }
 
   async releaseSession(sessionId: string): Promise<void> {
+    const sessionStore = browserlessSessionStores.get(this.sessionStoreKey);
+    if (!sessionStore) throw new SessionNotFoundError(sessionId, "browserless");
+    const record = sessionStore.get(sessionId);
+    if (!record) throw new SessionNotFoundError(sessionId, "browserless");
+
     try {
-      await this.client.deleteJSON(`${this.baseURL}/sessions/${sessionId}?${this.tokenParam()}`);
+      await this.client.deleteJSON(record.stopUrl);
+      sessionStore.delete(sessionId);
+      if (sessionStore.size === 0) browserlessSessionStores.delete(this.sessionStoreKey);
     } catch (error) {
       throw normalizeError(error, "browserless");
     }

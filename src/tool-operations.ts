@@ -2,7 +2,7 @@ import "./providers/index";
 import { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS } from "./tool-contract";
 import { create, providers } from "./core/registry";
 import { resolveProvider } from "./core/resolve";
-import type { BrowserProvider, ProviderCapabilities } from "./core/types";
+import type { BrowserProvider, ProviderCapabilities, ScrapeResult } from "./core/types";
 
 export type { ProviderCapabilities } from "./core/types";
 
@@ -133,6 +133,24 @@ function resolveScrapeMaxChars(value?: number): number {
   return maxChars;
 }
 
+async function scrapeWithSessionWhenNeeded(
+  provider: Readonly<BrowserProvider>,
+  url: string,
+  options: Readonly<{ waitFor?: string; maxChars: number }>,
+): Promise<ScrapeResult> {
+  const capabilities = provider.capabilities();
+  if (!capabilities.scrape || capabilities.statelessScrape) {
+    return provider.scrape(url, options);
+  }
+
+  const session = await provider.createSession();
+  try {
+    return await provider.scrape(url, options, session);
+  } finally {
+    await provider.releaseSession(session.id).catch(() => undefined);
+  }
+}
+
 /**
  * Scrapes one URL and bounds the normalized text returned to the model.
  *
@@ -144,7 +162,10 @@ export async function browserScrape(
 ): Promise<ToolResult<BrowserScrapeDetails>> {
   const maxChars = resolveScrapeMaxChars(params.maxChars);
   const { name, provider } = getProvider(params.provider);
-  const result = await provider.scrape(params.url, { waitFor: params.waitFor, maxChars });
+  const result = await scrapeWithSessionWhenNeeded(provider, params.url, {
+    waitFor: params.waitFor,
+    maxChars,
+  });
   const rawContent = result.text || result.markdown || result.html || "No content extracted";
   const body = rawContent.slice(0, maxChars);
   const truncation =

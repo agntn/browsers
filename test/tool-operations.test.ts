@@ -12,7 +12,15 @@ import {
 } from "../src/tool-operations";
 
 const previousApiKey = process.env.TOOLTEST_API_KEY;
-const releaseSession = vi.fn<(sessionId: string) => Promise<void>>();
+let statelessScrape = true;
+const createSession = vi.fn<BrowserProvider["createSession"]>().mockResolvedValue({
+  id: "session-1",
+  provider: "tooltest",
+  createdAt: 1_000,
+  cdpUrl: "wss://example.test?token=secret",
+  metadata: { token: "secret" },
+});
+const releaseSession = vi.fn<(sessionId: string) => Promise<void>>().mockResolvedValue(undefined);
 const scrape = vi.fn<BrowserProvider["scrape"]>();
 const screenshot = vi.fn<BrowserProvider["screenshot"]>();
 const links = vi.fn<NonNullable<BrowserProvider["links"]>>();
@@ -27,7 +35,7 @@ function toolTestProvider(): BrowserProvider {
       evaluate: false,
       sessions: true,
       cdp: true,
-      statelessScrape: true,
+      statelessScrape,
       statelessScreenshot: true,
       crawl: false,
       pdf: false,
@@ -35,13 +43,7 @@ function toolTestProvider(): BrowserProvider {
       search: false,
       extract: false,
     }),
-    createSession: vi.fn().mockResolvedValue({
-      id: "session-1",
-      provider: "tooltest",
-      createdAt: 1_000,
-      cdpUrl: "wss://example.test?token=secret",
-      metadata: { token: "secret" },
-    }),
+    createSession,
     getSession: vi.fn().mockResolvedValue(null),
     listSessions: vi.fn().mockResolvedValue([]),
     releaseSession,
@@ -59,6 +61,8 @@ beforeAll(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  releaseSession.mockReset().mockResolvedValue(undefined);
+  statelessScrape = true;
   if (previousApiKey === undefined) delete process.env.TOOLTEST_API_KEY;
   else process.env.TOOLTEST_API_KEY = previousApiKey;
 });
@@ -66,7 +70,7 @@ afterEach(() => {
 describe("browser tool operations", () => {
   it("bounds normalized scrape content once", async () => {
     process.env.TOOLTEST_API_KEY = "test";
-    scrape.mockResolvedValue({ url: "https://example.test", text: "abcdefgh" });
+    scrape.mockResolvedValueOnce({ url: "https://example.test", text: "abcdefgh" });
 
     const result = await browserScrape({
       provider: "tooltest",
@@ -86,6 +90,36 @@ describe("browser tool operations", () => {
       contentLength: 8,
     });
     expect(JSON.stringify(result).split("abcde")).toHaveLength(2);
+    expect(createSession).not.toHaveBeenCalled();
+    expect(releaseSession).not.toHaveBeenCalled();
+  });
+
+  it("gives scrapers that need a session a temporary session", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    statelessScrape = false;
+    scrape.mockResolvedValueOnce({ url: "https://example.test", text: "content" });
+
+    await browserScrape({ provider: "tooltest", url: "https://example.test" });
+
+    expect(createSession).toHaveBeenCalledOnce();
+    expect(scrape).toHaveBeenCalledWith(
+      "https://example.test",
+      { waitFor: undefined, maxChars: 20_000 },
+      expect.objectContaining({ id: "session-1" }),
+    );
+    expect(releaseSession).toHaveBeenCalledWith("session-1");
+  });
+
+  it("releases temporary scrape sessions without replacing the scrape error", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    statelessScrape = false;
+    scrape.mockRejectedValueOnce(new Error("scrape failed"));
+    releaseSession.mockRejectedValueOnce(new Error("release failed"));
+
+    await expect(
+      browserScrape({ provider: "tooltest", url: "https://example.test" }),
+    ).rejects.toThrow("scrape failed");
+    expect(releaseSession).toHaveBeenCalledWith("session-1");
   });
 
   it("rejects an invalid scrape limit before provider I/O", async () => {

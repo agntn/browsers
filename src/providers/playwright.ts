@@ -70,7 +70,7 @@ function truncateText(text: string | undefined, maxChars: number | undefined): s
 
 async function scrapePage(page: Page, url: string, options?: ScrapeOptions): Promise<ScrapeResult> {
   await page.goto(url, {
-    waitUntil: options?.waitForNetworkIdle ? "networkidle" : "load",
+    waitUntil: options?.waitForNetworkIdle ? "networkidle" : "domcontentloaded",
   });
   if (options?.waitFor) {
     await page.waitForSelector(options.waitFor, { timeout: options.timeout ?? 25000 });

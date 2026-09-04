@@ -205,9 +205,18 @@ function normalizeStatusError(error: StatusError, provider?: string): BrowserErr
 }
 
 export function normalizeError(error: unknown, provider?: string): BrowserError {
-  if (error instanceof HTTPError && error.statusCode === 401) {
-    const message = messageOrDefault(error.body, "Invalid or missing API key");
-    return new AuthError(`Authentication failed: ${message}`, effectiveProvider(provider));
+  if (error instanceof HTTPError) {
+    if (error.statusCode === 401) {
+      const message = messageOrDefault(error.body, "Invalid or missing API key");
+      return new AuthError(`Authentication failed: ${message}`, effectiveProvider(provider));
+    }
+    if (error.statusCode === 402 || error.statusCode === 403) {
+      return new PaymentError(
+        `Payment required: ${error.message}`,
+        error.statusCode,
+        effectiveProvider(provider),
+      );
+    }
   }
   if (error instanceof BrowserError) return error;
   if (isStatusError(error)) return normalizeStatusError(error, provider);

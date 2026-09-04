@@ -3,6 +3,7 @@ import {
   BrowserError,
   HTTPError,
   AuthError,
+  PaymentError,
   RateLimitError,
   UnknownProviderError,
   SessionError,
@@ -152,5 +153,17 @@ describe("normalizeError", () => {
     const result = normalizeError({ status: "500", message: "upstream boom" });
     expect(result).toBeInstanceOf(BrowserError);
     expect(result.message).toBe("upstream boom");
+  });
+
+  it.each([402, 403])("maps HTTP %i to a payment error", (statusCode) => {
+    const result = normalizeError(
+      new HTTPError(statusCode, "https://api.example.com", "quota exhausted"),
+      "steel",
+    );
+
+    expect(result).toBeInstanceOf(PaymentError);
+    expect(result).toMatchObject({ statusCode, provider: "steel" });
+    expect(result.message).toBe(`Payment required: HTTP ${statusCode}: https://api.example.com`);
+    expect(result.message).not.toContain("quota exhausted");
   });
 });

@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { providers as listProviders, create } from "../core/registry";
-import { _hasKey, providerEnvKey } from "../core/resolve";
+import { _hasKey, providerEnvHint } from "../core/resolve";
 import type { ProviderCapabilities } from "../core/types";
 
 const simpleCapabilityLabels = [
@@ -48,7 +48,7 @@ async function printAvailability(name: string): Promise<void> {
 
 function printCapabilities(name: string): void {
   const hasKey = _hasKey(name);
-  const envKey = providerEnvKey(name);
+  const envHint = providerEnvHint(name);
 
   let tags = "";
   try {
@@ -58,7 +58,7 @@ function printCapabilities(name: string): void {
   }
 
   console.log(
-    `${hasKey ? "●" : "○"} ${name.padEnd(14)} ${hasKey ? "" : `(${envKey})`.padEnd(27)} ${tags}`,
+    `${hasKey ? "●" : "○"} ${name.padEnd(14)} ${hasKey ? "" : `(${envHint})`.padEnd(35)} ${tags}`,
   );
 }
 

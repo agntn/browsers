@@ -187,6 +187,7 @@ export interface BrowserProvider {
 
 export interface ProviderConfig {
   apiKey?: string;
+  accountID?: string;
   baseURL?: string;
 }
 

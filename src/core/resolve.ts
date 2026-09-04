@@ -1,8 +1,13 @@
 import { providers as listProviders } from "./registry";
 import { UnknownProviderError, NoProviderConfiguredError, AuthError } from "./errors";
 
-const specialEnvKeys: Record<string, string[]> = {
-  cloudflare: ["CF_API_TOKEN", "CLOUDFLARE_API_TOKEN"],
+type ProviderEnvRequirements = readonly (readonly [string, ...string[]])[];
+
+const specialEnvRequirements: Readonly<Record<string, ProviderEnvRequirements>> = {
+  cloudflare: [
+    ["CF_API_TOKEN", "CLOUDFLARE_API_TOKEN"],
+    ["CF_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID"],
+  ],
 };
 
 /**
@@ -14,9 +19,11 @@ const specialEnvKeys: Record<string, string[]> = {
  */
 export function _hasKey(provider: string): boolean {
   if (provider === "playwright") return true;
-  const specials = specialEnvKeys[provider];
-  if (specials) return specials.some((k) => !!process.env[k]);
-  return !!process.env[`${provider.toUpperCase()}_API_KEY`];
+  const requirements = specialEnvRequirements[provider];
+  if (requirements) {
+    return requirements.every((group) => group.some((key) => Boolean(process.env[key])));
+  }
+  return Boolean(process.env[`${provider.toUpperCase()}_API_KEY`]);
 }
 
 /**
@@ -32,8 +39,11 @@ export function resolveProvider(preferred?: string): string {
       throw new UnknownProviderError(preferred);
     }
     if (!_hasKey(preferred)) {
-      const envHint = specialEnvKeys[preferred]?.[0] ?? `${preferred.toUpperCase()}_API_KEY`;
-      throw new AuthError(`Missing API key for ${preferred}. Set ${envHint}`, preferred);
+      const requirements = specialEnvRequirements[preferred];
+      const message = requirements
+        ? `Missing configuration for ${preferred}. Set ${providerEnvHint(preferred)}`
+        : `Missing API key for ${preferred}. Set ${providerEnvKey(preferred)}`;
+      throw new AuthError(message, preferred);
     }
     return preferred;
   }
@@ -50,5 +60,18 @@ export function resolveProvider(preferred?: string): string {
  * @returns {string} Primary environment key.
  */
 export function providerEnvKey(provider: string): string {
-  return specialEnvKeys[provider]?.[0] ?? `${provider.toUpperCase()}_API_KEY`;
+  return specialEnvRequirements[provider]?.[0]?.[0] ?? `${provider.toUpperCase()}_API_KEY`;
+}
+
+/**
+ * Describe the environment values required by a provider.
+ *
+ * @param {string} provider Provider name.
+ * @returns {string} Readable environment requirement.
+ */
+export function providerEnvHint(provider: string): string {
+  const requirements = specialEnvRequirements[provider];
+  return requirements
+    ? requirements.map(([primary]) => primary).join(" and ")
+    : providerEnvKey(provider);
 }

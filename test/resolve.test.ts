@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 // Import providers/index first to ensure all providers are registered
 import "../src/providers/index";
-import { resolveProvider, _hasKey, providerEnvKey } from "../src/core/resolve";
+import { resolveProvider, _hasKey, providerEnvKey, providerEnvHint } from "../src/core/resolve";
 
 describe("_hasKey", () => {
   const saved: Record<string, string | undefined> = {};
@@ -18,6 +18,7 @@ describe("_hasKey", () => {
       "CF_API_TOKEN",
       "CLOUDFLARE_API_TOKEN",
       "CF_ACCOUNT_ID",
+      "CLOUDFLARE_ACCOUNT_ID",
     ]) {
       saved[key] = process.env[key];
       delete process.env[key];
@@ -44,12 +45,23 @@ describe("_hasKey", () => {
     expect(_hasKey("steel")).toBe(true);
   });
 
-  it("cloudflare checks multiple env vars", () => {
+  it("cloudflare requires a token and account ID", () => {
     expect(_hasKey("cloudflare")).toBe(false);
+
+    process.env.CF_ACCOUNT_ID = "account";
+    expect(_hasKey("cloudflare")).toBe(false);
+    delete process.env.CF_ACCOUNT_ID;
+
     process.env.CF_API_TOKEN = "test";
+    expect(_hasKey("cloudflare")).toBe(false);
+
+    process.env.CF_ACCOUNT_ID = "account";
     expect(_hasKey("cloudflare")).toBe(true);
+
     delete process.env.CF_API_TOKEN;
+    delete process.env.CF_ACCOUNT_ID;
     process.env.CLOUDFLARE_API_TOKEN = "test";
+    process.env.CLOUDFLARE_ACCOUNT_ID = "account";
     expect(_hasKey("cloudflare")).toBe(true);
   });
 });
@@ -62,6 +74,10 @@ describe("providerEnvKey", () => {
 
   it("returns special env key for cloudflare", () => {
     expect(providerEnvKey("cloudflare")).toBe("CF_API_TOKEN");
+  });
+
+  it("describes every required Cloudflare value", () => {
+    expect(providerEnvHint("cloudflare")).toBe("CF_API_TOKEN and CF_ACCOUNT_ID");
   });
 });
 
@@ -79,6 +95,7 @@ describe("resolveProvider", () => {
       "CF_API_TOKEN",
       "CLOUDFLARE_API_TOKEN",
       "CF_ACCOUNT_ID",
+      "CLOUDFLARE_ACCOUNT_ID",
     ]) {
       saved[key] = process.env[key];
       delete process.env[key];
@@ -109,6 +126,13 @@ describe("resolveProvider", () => {
     process.env.KERNEL_API_KEY = "test";
     const result = resolveProvider();
     expect(result).toBe("kernel");
+  });
+
+  it("skips incomplete Cloudflare configuration", () => {
+    process.env.CF_API_TOKEN = "test";
+
+    expect(resolveProvider()).toBe("playwright");
+    expect(() => resolveProvider("cloudflare")).toThrow("Set CF_API_TOKEN and CF_ACCOUNT_ID");
   });
 
   it("playwright resolves without env", () => {

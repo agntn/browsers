@@ -46,6 +46,7 @@ const RESULT_BODY_LIMIT = 16_000;
 const TERMINAL_UNSAFE = /[\p{Cc}\p{Zl}\p{Zp}]/gu;
 const FORMAT_CHARACTER = /\p{Cf}/gu;
 const SAFE_FORMAT_CHARACTERS = new Set(["\u200C", "\u200D"]);
+const TAB = String.fromCodePoint(0x09);
 const MALFORMED_SURROGATE = /\p{Cs}/gu;
 const GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
@@ -303,7 +304,7 @@ function firstLine(text: string): string {
 
 function cleanBodyLine(line: string): string {
   return cleanFormatCharacters(stripAnsi(line.replaceAll(MALFORMED_SURROGATE, "�")))
-    .replaceAll(TERMINAL_UNSAFE, " ")
+    .replaceAll(TERMINAL_UNSAFE, (character) => (character === TAB ? character : " "))
     .trimEnd();
 }
 

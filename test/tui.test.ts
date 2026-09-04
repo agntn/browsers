@@ -137,23 +137,31 @@ describe("shared browser tool TUI", () => {
     expect(capabilities).toBe("✓ playwright · 2/3 supported (expand to view)");
   });
 
-  it("shows terminal safe output on demand and preserves indentation", () => {
-    const escape = controlCharacter(0x1b);
-    const result = {
-      content: [{ type: "text", text: `first${escape}[31m line\n  second line` }],
-      details: { links: ["https://a.test", "https://b.test"] },
-    };
+  it("sanitizes hostile multiline output without losing meaningful layout", () => {
+    const tab = controlCharacter(0x09);
+    const c1Csi = controlCharacter(0x9b);
+    const zwnj = controlCharacter(0x200c);
+    const lineSeparator = controlCharacter(0x2028);
+    const bidiOverride = controlCharacter(0x202e);
+    const text = `row\r\n${tab}indented 👨‍👩‍👧‍👦 فارسی${zwnj}text\n${c1Csi}31mred${c1Csi}0m\n${bidiOverride}safe${lineSeparator}next`;
 
     const expanded = renderToolResult(
       "browsers_links",
-      result,
+      {
+        content: [{ type: "text", text }],
+        details: { links: ["https://a.test", "https://b.test"] },
+      },
       false,
       { expanded: true },
       plainTheme,
     );
 
-    expect(expanded).toBe("✓ 2 links\n  first line\n    second line");
-    expect(expanded).not.toContain(escape);
+    expect(expanded).toBe(
+      `✓ 2 links\n  row\n  ${tab}indented 👨‍👩‍👧‍👦 فارسی${zwnj}text\n  red\n   safe next`,
+    );
+    expect(expanded).not.toContain(c1Csi);
+    expect(expanded).not.toContain(lineSeparator);
+    expect(expanded).not.toContain(bidiOverride);
   });
 
   it("bounds expanded output and repairs malformed surrogates", () => {

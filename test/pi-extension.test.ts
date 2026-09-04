@@ -51,6 +51,33 @@ function requireTool(tools: Readonly<Map<string, ToolDefinition>>, name: string)
   return tool as ExecutableTool;
 }
 
+interface Renderable {
+  render(...args: readonly unknown[]): unknown;
+}
+
+function isRenderable(value: unknown): value is Renderable {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "render" in value &&
+    typeof value.render === "function"
+  );
+}
+
+function renderComponent(component: unknown): string {
+  if (!isRenderable(component)) throw new Error("Renderer did not return a component");
+  const lines = component.render(160);
+  if (!Array.isArray(lines) || lines.some((line) => typeof line !== "string")) {
+    throw new Error("Component returned invalid lines");
+  }
+  return lines.join("\n").trimEnd();
+}
+
+const plainTheme = {
+  fg: (_color: string, text: string) => text,
+  bold: (text: string) => text,
+};
+
 async function executeTool(
   tools: Readonly<Map<string, ToolDefinition>>,
   name: string,
@@ -90,6 +117,33 @@ describe("browsers Pi extension", () => {
       "browsers_search",
       "browsers_capabilities",
     ]);
+  });
+
+  it("registers custom call and result renderers for every tool", () => {
+    for (const tool of registerTools().values()) {
+      expect(typeof tool.renderCall).toBe("function");
+      expect(typeof tool.renderResult).toBe("function");
+    }
+  });
+
+  it("adapts Pi call state and error context to the shared renderer", () => {
+    const tool = registerTools().get("browsers_links");
+    if (!tool?.renderCall || !tool.renderResult) throw new Error("Missing browser link renderers");
+
+    const call: unknown = Reflect.apply(tool.renderCall, tool, [
+      { url: "https://example.test" },
+      plainTheme,
+      { executionStarted: true, isPartial: true },
+    ]);
+    const result: unknown = Reflect.apply(tool.renderResult, tool, [
+      { content: [{ type: "text", text: "Link extraction failed" }] },
+      { expanded: false, isPartial: false },
+      plainTheme,
+      { isError: true },
+    ]);
+
+    expect(renderComponent(call)).toBe("◌ 🔗 Browser Links https://example.test");
+    expect(renderComponent(result)).toBe("✗ Link extraction failed (failed)");
   });
 
   it("delegates scraping to the shared executor without duplicating content", async () => {

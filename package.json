@@ -38,6 +38,7 @@
     "dist",
     "packages/omp/extensions",
     "packages/pi/extensions",
+    "packages/shared",
     "src/tool-contract.ts",
     "src/tool-schemas.ts"
   ],
@@ -75,6 +76,8 @@
     "consola": "latest",
     "ofetch": "^1.5.1",
     "playwright": "^1.52.0",
+    "string-width": "^7.2.0",
+    "strip-ansi": "^7.2.0",
     "typebox": "1.3.14"
   },
   "devDependencies": {

@@ -23,6 +23,12 @@ importers:
       playwright:
         specifier: ^1.52.0
         version: 1.60.0
+      string-width:
+        specifier: ^7.2.0
+        version: 7.2.0
+      strip-ansi:
+        specifier: ^7.2.0
+        version: 7.2.0
       typebox:
         specifier: 1.3.14
         version: 1.3.14

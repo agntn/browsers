@@ -16,6 +16,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 - `src/commands/*.ts` - CLI subcommands (citty)
 - `packages/pi/extensions/browsers.ts` - Pi agent tools
 - `packages/omp/extensions/browsers.ts` - OMP agent tools
+- `packages/shared/tui.ts` - terminal rendering shared by Pi and OMP
 - `oxlint.config.ts` / `oxfmt.config.ts` - repository-local consumers of the shared `@agntn/ox` policy
 
 ## Adding a provider

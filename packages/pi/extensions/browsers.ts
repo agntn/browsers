@@ -2,9 +2,20 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { browserToolDescriptions, browserToolLabels } from "../../../src/tool-contract.ts";
+import {
+  type BrowserToolName,
+  browserToolDescriptions,
+  browserToolLabels,
+} from "../../../src/tool-contract.ts";
 import { browserToolSchemas } from "../../../src/tool-schemas.ts";
 import type * as BrowserTools from "../../../dist/tool-operations.d.mts";
+import {
+  type RenderedToolResult,
+  type RenderOptions,
+  renderToolCall,
+  renderToolResult,
+  type StatusTheme,
+} from "../../shared/tui.ts";
 
 const sourceModuleUrl = new URL("../../../src/tool-operations.ts", import.meta.url);
 const distributionModuleUrl = new URL("../../../dist/tool-operations.mjs", import.meta.url);
@@ -31,6 +42,26 @@ function loadToolOperations(): Promise<typeof BrowserTools> {
   return toolOperationsPromise;
 }
 
+function statusRenderers(tool: BrowserToolName) {
+  return {
+    renderCall(args: unknown, theme: Readonly<StatusTheme>, context: Readonly<RenderOptions>) {
+      return new Text(renderToolCall(tool, args, context, theme), 0, 0);
+    },
+    renderResult(
+      result: Readonly<RenderedToolResult>,
+      options: Readonly<RenderOptions>,
+      theme: Readonly<StatusTheme>,
+      context?: Readonly<{ isError?: boolean }>,
+    ) {
+      return new Text(
+        renderToolResult(tool, result, context?.isError === true, options, theme),
+        0,
+        0,
+      );
+    },
+  };
+}
+
 /**
  * Registers browser tools with Pi.
  *
@@ -50,13 +81,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       "Pass waitFor to wait for a CSS selector before extraction.",
     ],
     parameters: browserToolSchemas.browsers_scrape,
-    renderCall(args, theme) {
-      return new Text(
-        `${theme.fg("toolTitle", theme.bold("browsers_scrape"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`,
-        0,
-        0,
-      );
-    },
+    ...statusRenderers("browsers_scrape"),
     async execute(
       _toolCallId,
       params,
@@ -76,13 +101,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       "Always release sessions when done with browsers_release.",
     ],
     parameters: browserToolSchemas.browsers_session,
-    renderCall(args, theme) {
-      return new Text(
-        `${theme.fg("toolTitle", theme.bold("browsers_session"))} ${theme.fg("muted", `provider=${args.provider ?? "auto"} region=${args.region ?? "default"}`)}`,
-        0,
-        0,
-      );
-    },
+    ...statusRenderers("browsers_session"),
     async execute(
       _toolCallId,
       params,
@@ -101,13 +120,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       "Use the same provider that created the session.",
     ],
     parameters: browserToolSchemas.browsers_release,
-    renderCall(args, theme) {
-      return new Text(
-        `${theme.fg("toolTitle", theme.bold("browsers_release"))} ${theme.fg("dim", args.sessionId)}`,
-        0,
-        0,
-      );
-    },
+    ...statusRenderers("browsers_release"),
     async execute(_toolCallId, params): Promise<AgentToolResult<{ released: boolean }>> {
       return (await loadToolOperations()).releaseBrowserSession(params);
     },
@@ -122,9 +135,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       "Use browsers_providers to check which browser providers have API keys configured.",
     ],
     parameters: browserToolSchemas.browsers_providers,
-    renderCall(_args, theme) {
-      return new Text(theme.fg("toolTitle", theme.bold("browsers_providers")), 0, 0);
-    },
+    ...statusRenderers("browsers_providers"),
     async execute(): Promise<AgentToolResult<{ providers: BrowserTools.BrowserProviderStatus[] }>> {
       return (await loadToolOperations()).listBrowserProviders();
     },
@@ -141,13 +152,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       "Other providers create a temporary session, navigate, screenshot, and release.",
     ],
     parameters: browserToolSchemas.browsers_screenshot,
-    renderCall(args, theme) {
-      return new Text(
-        `${theme.fg("toolTitle", theme.bold("browsers_screenshot"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`,
-        0,
-        0,
-      );
-    },
+    ...statusRenderers("browsers_screenshot"),
     async execute(
       _toolCallId,
       params,
@@ -167,13 +172,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       "Pass a prompt describing what to extract.",
     ],
     parameters: browserToolSchemas.browsers_extract,
-    renderCall(args, theme) {
-      return new Text(
-        `${theme.fg("toolTitle", theme.bold("browsers_extract"))} ${theme.fg("dim", args.url)} ${theme.fg("muted", `provider=${args.provider ?? "auto"}`)}`,
-        0,
-        0,
-      );
-    },
+    ...statusRenderers("browsers_extract"),
     async execute(
       _toolCallId,
       params,
@@ -193,13 +192,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       "Pass maxPages to limit the crawl scope.",
     ],
     parameters: browserToolSchemas.browsers_crawl,
-    renderCall(args, theme) {
-      return new Text(
-        `${theme.fg("toolTitle", theme.bold("browsers_crawl"))} ${theme.fg("dim", args.url)}`,
-        0,
-        0,
-      );
-    },
+    ...statusRenderers("browsers_crawl"),
     async execute(
       _toolCallId,
       params,
@@ -218,13 +211,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       "Cloudflare and Browserless work statelessly (no session needed).",
     ],
     parameters: browserToolSchemas.browsers_pdf,
-    renderCall(args, theme) {
-      return new Text(
-        `${theme.fg("toolTitle", theme.bold("browsers_pdf"))} ${theme.fg("dim", args.url)}`,
-        0,
-        0,
-      );
-    },
+    ...statusRenderers("browsers_pdf"),
     async execute(
       _toolCallId,
       params,
@@ -243,13 +230,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       "Cloudflare and Playwright support this currently.",
     ],
     parameters: browserToolSchemas.browsers_links,
-    renderCall(args, theme) {
-      return new Text(
-        `${theme.fg("toolTitle", theme.bold("browsers_links"))} ${theme.fg("dim", args.url)}`,
-        0,
-        0,
-      );
-    },
+    ...statusRenderers("browsers_links"),
     async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; links: string[] }>> {
       return (await loadToolOperations()).browserLinks(params);
     },
@@ -265,13 +246,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       "Hyperbrowser supports native web search.",
     ],
     parameters: browserToolSchemas.browsers_search,
-    renderCall(args, theme) {
-      return new Text(
-        `${theme.fg("toolTitle", theme.bold("browsers_search"))} ${theme.fg("dim", args.query)}`,
-        0,
-        0,
-      );
-    },
+    ...statusRenderers("browsers_search"),
     async execute(
       _toolCallId,
       params,
@@ -295,13 +270,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       "Some providers only support CDP (no REST navigate/evaluate): browserbase, hyperbrowser, anchor.",
     ],
     parameters: browserToolSchemas.browsers_capabilities,
-    renderCall(args, theme) {
-      return new Text(
-        `${theme.fg("toolTitle", theme.bold("browsers_capabilities"))} ${theme.fg("dim", args.provider)}`,
-        0,
-        0,
-      );
-    },
+    ...statusRenderers("browsers_capabilities"),
     async execute(
       _toolCallId,
       params,

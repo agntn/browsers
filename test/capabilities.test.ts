@@ -1,19 +1,24 @@
 import { describe, it, expect } from "vitest";
 import "../src/providers/index";
 import { create, providers } from "../src/core/registry";
+import type { ProviderConfig } from "../src/core/types";
 
 const all = providers();
+const testConfig = {
+  apiKey: "test-key",
+  accountID: "test-account",
+} satisfies ProviderConfig;
 
 describe("provider capabilities", () => {
   for (const name of all) {
     describe(name, () => {
-      it("creates with explicit API key", () => {
-        const provider = create(name, { apiKey: "test-key" });
+      it("creates with explicit provider configuration", () => {
+        const provider = create(name, testConfig);
         expect(provider.name()).toBe(name);
       });
 
       it("returns capabilities", () => {
-        const provider = create(name, { apiKey: "test-key" });
+        const provider = create(name, testConfig);
         const caps = provider.capabilities();
         expect(typeof caps).toBe("object");
         expect(typeof caps.scrape).toBe("boolean");
@@ -30,7 +35,7 @@ describe("provider capabilities", () => {
       });
 
       it("implements all core methods", () => {
-        const provider = create(name, { apiKey: "test-key" });
+        const provider = create(name, testConfig);
         expect(typeof provider.createSession).toBe("function");
         expect(typeof provider.getSession).toBe("function");
         expect(typeof provider.listSessions).toBe("function");
@@ -47,7 +52,7 @@ describe("provider capabilities", () => {
 describe("capability-specific optional methods", () => {
   it("crawl providers have crawl()", () => {
     for (const name of all) {
-      const provider = create(name, { apiKey: "test-key" });
+      const provider = create(name, testConfig);
       const caps = provider.capabilities();
       if (caps.crawl) {
         expect(typeof provider.crawl).toBe("function");
@@ -57,7 +62,7 @@ describe("capability-specific optional methods", () => {
 
   it("pdf providers have pdf()", () => {
     for (const name of all) {
-      const provider = create(name, { apiKey: "test-key" });
+      const provider = create(name, testConfig);
       const caps = provider.capabilities();
       if (caps.pdf) {
         expect(typeof provider.pdf).toBe("function");
@@ -67,7 +72,7 @@ describe("capability-specific optional methods", () => {
 
   it("search providers have search()", () => {
     for (const name of all) {
-      const provider = create(name, { apiKey: "test-key" });
+      const provider = create(name, testConfig);
       const caps = provider.capabilities();
       if (caps.search) {
         expect(typeof provider.search).toBe("function");
@@ -77,7 +82,7 @@ describe("capability-specific optional methods", () => {
 
   it("extract providers have extract()", () => {
     for (const name of all) {
-      const provider = create(name, { apiKey: "test-key" });
+      const provider = create(name, testConfig);
       const caps = provider.capabilities();
       if (caps.extract) {
         expect(typeof provider.extract).toBe("function");
@@ -87,7 +92,7 @@ describe("capability-specific optional methods", () => {
 
   it("links providers have links()", () => {
     for (const name of all) {
-      const provider = create(name, { apiKey: "test-key" });
+      const provider = create(name, testConfig);
       const caps = provider.capabilities();
       if (caps.links) {
         expect(typeof provider.links).toBe("function");

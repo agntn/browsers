@@ -97,7 +97,7 @@ class CloudflareProvider implements BrowserProvider {
   private readonly accountID: string;
   private readonly apiToken: string;
 
-  constructor(config: ProviderConfig & { accountID?: string }) {
+  constructor(config: ProviderConfig) {
     const apiToken = config.apiKey || process.env.CF_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN;
     const accountID =
       config.accountID || process.env.CF_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID;

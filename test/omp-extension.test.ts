@@ -15,6 +15,33 @@ class TestText {
   }
 }
 
+interface Renderable {
+  render(...args: readonly unknown[]): unknown;
+}
+
+function isRenderable(value: unknown): value is Renderable {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "render" in value &&
+    typeof value.render === "function"
+  );
+}
+
+function renderComponent(component: unknown): string {
+  if (!isRenderable(component)) throw new Error("Renderer did not return a component");
+  const lines = component.render();
+  if (!Array.isArray(lines) || lines.some((line) => typeof line !== "string")) {
+    throw new Error("Component returned invalid lines");
+  }
+  return lines.join("\n");
+}
+
+const plainTheme = {
+  fg: (_color: string, text: string) => text,
+  bold: (text: string) => text,
+};
+
 interface RegisteredExtension {
   label: string | undefined;
   tools: Map<string, ToolDefinition>;
@@ -105,6 +132,32 @@ describe("browsers OMP extension", () => {
     )) {
       expect(requireTool(tools, name).approval).toBe("read");
     }
+  });
+
+  it("registers custom call and result renderers for every tool", () => {
+    for (const tool of registerExtension().tools.values()) {
+      expect(typeof tool.renderCall).toBe("function");
+      expect(typeof tool.renderResult).toBe("function");
+    }
+  });
+
+  it("adapts OMP spinner and result error state to the shared renderer", () => {
+    const tool = requireTool(registerExtension().tools, "browsers_links");
+    if (!tool.renderCall || !tool.renderResult) throw new Error("Missing browser link renderers");
+
+    const call: unknown = Reflect.apply(tool.renderCall, tool, [
+      { url: "https://example.test" },
+      { isPartial: true, spinnerFrame: 2 },
+      plainTheme,
+    ]);
+    const result: unknown = Reflect.apply(tool.renderResult, tool, [
+      { content: [{ type: "text", text: "Link extraction failed" }], isError: true },
+      { expanded: false, isPartial: false },
+      plainTheme,
+    ]);
+
+    expect(renderComponent(call)).toBe("⠹ 🔗 Browser Links https://example.test");
+    expect(renderComponent(result)).toBe("✗ Link extraction failed (failed)");
   });
 
   it("keeps every OMP parameter schema aligned with Pi and MCP", () => {

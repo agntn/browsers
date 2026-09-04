@@ -70,7 +70,7 @@ browsers providers --check
 
 ## Agent integrations
 
-Pi and OMP discover their extensions from the package manifests. The same eleven tools are available through the MCP stdio server:
+Pi and OMP discover their extensions from the package manifests. Both keep browser calls compact in the terminal, with result details available in the expanded view. The same eleven tools are available through the MCP stdio server:
 
 ```bash
 browsers mcp
@@ -171,6 +171,7 @@ src/
 packages/
   pi/extensions/    - Pi extension with eleven browser tools
   omp/extensions/   - OMP extension with the same eleven tools
+  shared/tui.ts     - compact rendering shared by both extensions
 test/
   provider, tool operation, Pi, OMP, and MCP coverage
 ```

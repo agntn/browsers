@@ -4,12 +4,20 @@ import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import type { Static } from "@oh-my-pi/omptype/typebox";
 import {
   browserProviderNames,
+  type BrowserToolName,
   browserToolDescriptions,
   browserToolLabels,
   DEFAULT_SCRAPE_MAX_CHARS,
   MAX_SCRAPE_MAX_CHARS,
 } from "../../../src/tool-contract.ts";
 import type * as BrowserTools from "../../../dist/tool-operations.d.mts";
+import {
+  type RenderedToolResult,
+  type RenderOptions,
+  renderToolCall,
+  renderToolResult,
+  type StatusTheme,
+} from "../../shared/tui.ts";
 
 const sourceModulePath = fileURLToPath(new URL("../../../src/tool-operations.ts", import.meta.url));
 let toolOperationsPromise: Promise<typeof BrowserTools> | undefined;
@@ -166,6 +174,22 @@ type CapabilitiesParams = Static<ParameterSchemas["capabilities"]>;
 export default function browsersOmpExtension(pi: ExtensionAPI): void {
   const { Text } = pi.pi;
   const schemas = buildParameterSchemas(pi);
+  const statusRenderers = (tool: BrowserToolName) => ({
+    renderCall(args: unknown, options: Readonly<RenderOptions>, theme: Readonly<StatusTheme>) {
+      return new Text(renderToolCall(tool, args, options, theme), 0, 0);
+    },
+    renderResult(
+      result: Readonly<RenderedToolResult>,
+      options: Readonly<RenderOptions>,
+      theme: Readonly<StatusTheme>,
+    ) {
+      return new Text(
+        renderToolResult(tool, result, result.isError === true, options, theme),
+        0,
+        0,
+      );
+    },
+  });
   pi.setLabel("Browsers");
 
   pi.registerTool<typeof schemas.scrape, BrowserTools.BrowserScrapeDetails>({
@@ -174,12 +198,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     description: browserToolDescriptions.browsers_scrape,
     approval: "read",
     parameters: schemas.scrape,
-    renderCall: (args, _options, theme) =>
-      new Text(
-        `${theme.fg("toolTitle", theme.bold("browsers_scrape"))} ${theme.fg("dim", sanitizeTerminalText(args.url))}`,
-        0,
-        0,
-      ),
+    ...statusRenderers("browsers_scrape"),
     async execute(_toolCallId, params: ScrapeParams) {
       return (await loadToolOperations()).browserScrape(params);
     },
@@ -191,6 +210,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     description: browserToolDescriptions.browsers_session,
     approval: "write",
     parameters: schemas.session,
+    ...statusRenderers("browsers_session"),
     async execute(_toolCallId, params: SessionParams) {
       return (await loadToolOperations()).browserSession(params);
     },
@@ -202,6 +222,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     description: browserToolDescriptions.browsers_release,
     approval: "write",
     parameters: schemas.release,
+    ...statusRenderers("browsers_release"),
     async execute(_toolCallId, params: ReleaseParams) {
       return (await loadToolOperations()).releaseBrowserSession(params);
     },
@@ -213,6 +234,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     description: browserToolDescriptions.browsers_providers,
     approval: "read",
     parameters: schemas.providers,
+    ...statusRenderers("browsers_providers"),
     async execute(_toolCallId: string, _params: ProvidersParams) {
       return (await loadToolOperations()).listBrowserProviders();
     },
@@ -224,6 +246,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     description: browserToolDescriptions.browsers_screenshot,
     approval: "read",
     parameters: schemas.screenshot,
+    ...statusRenderers("browsers_screenshot"),
     async execute(_toolCallId, params: ScreenshotParams) {
       return (await loadToolOperations()).browserScreenshot(params);
     },
@@ -235,6 +258,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     description: browserToolDescriptions.browsers_extract,
     approval: "read",
     parameters: schemas.extract,
+    ...statusRenderers("browsers_extract"),
     async execute(
       _toolCallId,
       params: Readonly<Omit<ExtractParams, "schema">> & {
@@ -251,6 +275,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     description: browserToolDescriptions.browsers_crawl,
     approval: "read",
     parameters: schemas.crawl,
+    ...statusRenderers("browsers_crawl"),
     async execute(_toolCallId, params: CrawlParams) {
       return (await loadToolOperations()).browserCrawl(params);
     },
@@ -262,6 +287,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     description: browserToolDescriptions.browsers_pdf,
     approval: "read",
     parameters: schemas.pdf,
+    ...statusRenderers("browsers_pdf"),
     async execute(_toolCallId, params: PdfParams) {
       return (await loadToolOperations()).browserPdf(params);
     },
@@ -273,6 +299,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     description: browserToolDescriptions.browsers_links,
     approval: "read",
     parameters: schemas.links,
+    ...statusRenderers("browsers_links"),
     async execute(_toolCallId, params: LinksParams) {
       return (await loadToolOperations()).browserLinks(params);
     },
@@ -287,6 +314,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     description: browserToolDescriptions.browsers_search,
     approval: "read",
     parameters: schemas.search,
+    ...statusRenderers("browsers_search"),
     async execute(_toolCallId, params: SearchParams) {
       return (await loadToolOperations()).browserSearch(params);
     },
@@ -301,24 +329,9 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     description: browserToolDescriptions.browsers_capabilities,
     approval: "read",
     parameters: schemas.capabilities,
+    ...statusRenderers("browsers_capabilities"),
     async execute(_toolCallId, params: CapabilitiesParams) {
       return (await loadToolOperations()).browserCapabilities(params);
     },
   });
-}
-
-/**
- * Removes terminal control bytes from OMP call previews.
- *
- * @param value - Untrusted preview value.
- * @returns {string} Terminal safe single-line text.
- */
-function sanitizeTerminalText(value: unknown): string {
-  return (
-    String(value)
-      /* oxlint-disable-next-line no-control-regex */
-      .replaceAll(/[\u0000-\u001F\u007F-\u009F]/gu, " ")
-      .replaceAll(/ +/g, " ")
-      .trim()
-  );
 }

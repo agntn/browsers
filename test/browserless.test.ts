@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import type { Server } from "node:http";
+import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import "../src/providers/index";
 import { create } from "../src/core/registry";
@@ -8,6 +8,31 @@ interface CapturedRequest {
   method?: string;
   url?: string;
   body: string;
+}
+
+const PNG_BYTES = Buffer.from([137, 80, 78, 71]);
+const PDF_BYTES = Buffer.from("%PDF-1.4");
+
+/**
+ * Answers the stateless capture routes the way Browserless does: bytes for
+ * any client that accepts them, 404 for one that asks for JSON.
+ *
+ * @param {IncomingMessage} req Incoming request.
+ * @param {ServerResponse} res Response to write.
+ * @returns {boolean} Whether the request was a capture route.
+ */
+function serveCapture(req: IncomingMessage, res: ServerResponse): boolean {
+  if (req.method !== "POST") return false;
+  if (req.url !== "/screenshot?token=test" && req.url !== "/pdf?token=test") return false;
+  if (req.headers.accept?.includes("application/json")) {
+    res.statusCode = 404;
+    res.end("Not Found: check that your Content-Type header is supported");
+    return true;
+  }
+  const pdf = req.url.startsWith("/pdf");
+  res.setHeader("Content-Type", pdf ? "application/pdf" : "image/png");
+  res.end(pdf ? PDF_BYTES : PNG_BYTES);
+  return true;
 }
 
 describe("browserless current session API", () => {
@@ -43,6 +68,7 @@ describe("browserless current session API", () => {
           res.end();
           return;
         }
+        if (serveCapture(req, res)) return;
         res.statusCode = 404;
         res.end("not found");
       });
@@ -95,6 +121,26 @@ describe("browserless current session API", () => {
         url: "/session/opaque-stop?token=test&signature=keep",
         body: "",
       },
+    ]);
+  });
+
+  it("captures screenshots and PDFs from endpoints that refuse JSON clients", async () => {
+    const provider = create("browserless", { apiKey: "test", baseURL });
+
+    const screenshot = await provider.screenshot({ url: "https://example.com" });
+    const pdf = await provider.pdf?.("https://example.com");
+
+    expect(screenshot).toEqual({
+      data: `data:image/png;base64,${PNG_BYTES.toString("base64")}`,
+      mimeType: "image/png",
+    });
+    expect(pdf).toEqual({
+      data: `data:application/pdf;base64,${PDF_BYTES.toString("base64")}`,
+      mimeType: "application/pdf",
+    });
+    expect(requests.map((request) => request.url)).toEqual([
+      "/screenshot?token=test",
+      "/pdf?token=test",
     ]);
   });
 });

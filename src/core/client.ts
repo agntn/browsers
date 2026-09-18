@@ -9,6 +9,19 @@ const DEFAULT_BASE_DELAY = 100;
 const DEFAULT_TIMEOUT = 30_000;
 const DEFAULT_USER_AGENT = `browsers/${version}`;
 
+/**
+ * Headers for a POST whose response is text or bytes: ofetch asks for JSON
+ * whenever the body is an object, and Browserless answers that with a 404.
+ *
+ * @param {Readonly<Record<string, string>>} [headers] Caller headers, kept as given.
+ * @returns {Headers} Headers that accept any content type unless the caller chose one.
+ */
+function acceptAnyType(headers?: Readonly<Record<string, string>>): Headers {
+  const requestHeaders = new Headers(headers);
+  if (!requestHeaders.has("Accept")) requestHeaders.set("Accept", "*/*");
+  return requestHeaders;
+}
+
 export class Client {
   readonly maxRetries: number;
   readonly baseDelay: number;
@@ -74,12 +87,10 @@ export class Client {
     signal?: AbortSignal,
   ): Promise<string> {
     try {
-      const requestHeaders = new Headers(headers);
-      if (!requestHeaders.has("Accept")) requestHeaders.set("Accept", "*/*");
       const res = await this.fetch.raw(url, {
         method: "POST",
         body,
-        headers: requestHeaders,
+        headers: acceptAnyType(headers),
         signal,
       });
       return typeof res._data === "string" ? res._data : String(res._data);
@@ -98,7 +109,7 @@ export class Client {
       const res = await this.fetch.raw(url, {
         method: "POST",
         body,
-        headers,
+        headers: acceptAnyType(headers),
         signal,
         responseType: "arrayBuffer",
       });
@@ -139,7 +150,7 @@ export class Client {
       const res = await this.fetch.raw(url, {
         method: "POST",
         body,
-        headers,
+        headers: acceptAnyType(headers),
         signal,
       });
       const data: unknown = res._data;

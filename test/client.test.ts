@@ -47,6 +47,32 @@ describe("Client request Accept headers", () => {
 
     expect(accepts.at(-1)).toBe("*/*");
   });
+
+  it("does not advertise JSON for binary responses", async () => {
+    const client = new Client({ maxRetries: 0 });
+
+    const data = await client.postRaw(`${baseURL}/screenshot`, { url: "https://example.com" });
+
+    expect(new TextDecoder().decode(data)).toBe("<html>ok</html>");
+    expect(accepts.at(-1)).toBe("*/*");
+  });
+
+  it("does not advertise JSON when the caller inspects the content type", async () => {
+    const client = new Client({ maxRetries: 0 });
+
+    const response = await client.postResponse(`${baseURL}/pdf`, { url: "https://example.com" });
+
+    expect(response.headers.get("content-type")).toBe("text/html");
+    expect(accepts.at(-1)).toBe("*/*");
+  });
+
+  it("keeps an explicit Accept on binary posts", async () => {
+    const client = new Client({ maxRetries: 0 });
+
+    await client.postRaw(`${baseURL}/screenshot`, {}, { Accept: "image/png" });
+
+    expect(accepts.at(-1)).toBe("image/png");
+  });
 });
 
 describe("Client.postResponse", () => {

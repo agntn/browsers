@@ -119,6 +119,17 @@ describe("browsers Pi extension", () => {
     ]);
   });
 
+  it("does not tell the model to drive a session it cannot use", () => {
+    const session = registerTools().get("browsers_session");
+    const capabilities = registerTools().get("browsers_capabilities");
+    const sessionCopy = [session?.promptSnippet, ...(session?.promptGuidelines ?? [])].join(" ");
+    const capabilitiesCopy = (capabilities?.promptGuidelines ?? []).join(" ");
+
+    expect(sessionCopy).not.toMatch(/full browser automation/);
+    expect(sessionCopy).not.toMatch(/navigate, click, type, evaluate JS/);
+    expect(capabilitiesCopy).not.toMatch(/no REST navigate\/evaluate/);
+  });
+
   it("registers custom call and result renderers for every tool", () => {
     for (const tool of registerTools().values()) {
       expect(typeof tool.renderCall).toBe("function");

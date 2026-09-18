@@ -51,15 +51,15 @@ export const browserToolLabels: Readonly<Record<BrowserToolName, string>> = {
 /** Model-facing descriptions shared by Pi, OMP, and MCP. */
 export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> = {
   browsers_scrape:
-    "Read-only/open-world network fetch: scrape content from a URL using a cloud browser provider. Returns rendered HTML/markdown/text after JavaScript execution. Use when a URL needs a real browser to render (JS-heavy SPAs, sites with bot protection, dynamic content). Capabilities per provider: steel (stateless scrape, CDP navigate/evaluate), browserbase (stateless scrape, CDP only), kernel (session-based Playwright), browserless (stateless scrape+screenshot, CDP), hyperbrowser (stateless scrape, CDP only), anchor (stateless scrape, CDP only), cloudflare (stateless scrape+screenshot, CDP).",
+    "Read-only/open-world network fetch: scrape content from a URL using a cloud browser provider. Returns rendered HTML/markdown/text after JavaScript execution. Use when a URL needs a real browser to render (JS-heavy SPAs, sites with bot protection, dynamic content). This tool does not accept a session ID. Providers that need a session open and release one internally.",
   browsers_session:
-    "Create a new cloud browser session. Returns an opaque session ID for later operations.",
+    "Create a cloud browser session. Returns an opaque session ID. Only browsers_release accepts this ID; no other tool can drive the session.",
   browsers_release:
     "Release/destroy a cloud browser session. Always release sessions when done to avoid billing.",
   browsers_providers:
     "Read-only/idempotent local/env status: list browser-as-a-service providers and which ones are currently configured via environment variables.",
   browsers_screenshot:
-    "Take a screenshot of a URL using a cloud browser provider. Stateless mode (no session needed): cloudflare, browserless. Session-based: steel, browserbase, kernel, hyperbrowser, anchor. For providers without navigate support (browserbase, hyperbrowser, anchor, cloudflare), the screenshot captures the URL directly.",
+    "Take a screenshot of a URL using a cloud browser provider. Cloudflare and Browserless capture without passing a session. Other providers open a temporary session inside this tool. This tool does not accept a session ID.",
   browsers_extract:
     "Extract structured data from a URL using AI. Cloudflare returns synchronous results. Hyperbrowser returns an async job ID.",
   browsers_crawl:
@@ -70,5 +70,5 @@ export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> 
     "Extract all links from a webpage. Cloudflare and Playwright support stateless link extraction.",
   browsers_search: "Web search via browser provider. Hyperbrowser supports native web search.",
   browsers_capabilities:
-    "Read-only: check what operations a specific browser provider supports (scrape, screenshot, navigate, evaluate, sessions, CDP, stateless modes).",
+    "Read-only: report which library operations a browser provider supports, including scrape, screenshot, navigate, evaluate, sessions, CDP, and stateless modes. Navigate and evaluate flags describe the provider API, not extra tools.",
 };

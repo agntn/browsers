@@ -77,7 +77,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     promptGuidelines: [
       "Use browsers_scrape when a URL needs a real browser to render (SPA, bot-protected, dynamic).",
       "For simple HTML pages prefer web_read (cheaper, faster).",
-      "Steel and Cloudflare have stateless scrape (no session needed). Kernel requires a session.",
+      "Do not call browsers_session first. Providers that need a session open one inside this tool.",
       "Pass waitFor to wait for a CSS selector before extraction.",
     ],
     parameters: browserToolSchemas.browsers_scrape,
@@ -94,11 +94,11 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     name: "browsers_session",
     label: browserToolLabels.browsers_session,
     description: browserToolDescriptions.browsers_session,
-    promptSnippet: "Create a cloud browser session for full browser automation.",
+    promptSnippet: "Create a cloud browser session. Only browsers_release can use the returned ID.",
     promptGuidelines: [
-      "Use browsers_session when you need full browser control (navigate, click, type, evaluate JS).",
-      "For simple scrape/screenshot, use browsers_scrape instead (no session needed).",
-      "Always release sessions when done with browsers_release.",
+      "Agent tools cannot navigate, click, type, or evaluate in a session you created.",
+      "Use browsers_scrape or browsers_screenshot instead; they open a temporary session when needed.",
+      "Pass the returned ID only to browsers_release.",
     ],
     parameters: browserToolSchemas.browsers_session,
     ...statusRenderers("browsers_session"),
@@ -149,7 +149,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     promptGuidelines: [
       "Use browsers_screenshot when the user needs a visual capture of a webpage.",
       "Cloudflare and Browserless work statelessly (no session needed).",
-      "Other providers create a temporary session, navigate, screenshot, and release.",
+      "Other providers open a temporary session inside this tool, capture, and release it.",
     ],
     parameters: browserToolSchemas.browsers_screenshot,
     ...statusRenderers("browsers_screenshot"),
@@ -267,7 +267,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     promptGuidelines: [
       "Use browsers_capabilities before browsers_scrape/browsers_screenshot to check if the provider supports the operation.",
       "Some providers support stateless operations (no session needed): cloudflare, browserless for both scrape and screenshot.",
-      "Some providers only support CDP (no REST navigate/evaluate): browserbase, hyperbrowser, anchor.",
+      "Navigate and evaluate flags describe the library API. No tool accepts a session ID except browsers_release.",
     ],
     parameters: browserToolSchemas.browsers_capabilities,
     ...statusRenderers("browsers_capabilities"),

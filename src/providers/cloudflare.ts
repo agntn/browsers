@@ -17,12 +17,13 @@ import type {
   ProviderConfig,
   BrowserProviderFactory,
   ProviderCapabilities,
+  CloudflareBrowser,
 } from "../core/types";
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, normalizeError } from "../core/errors";
 import { register } from "../core/registry";
-import { assertUrlOrSession, notSupportedViaRest } from "../core/utils";
+import { assertUrlOrSession, notSupportedViaRest, resolveCloudflareBrowser } from "../core/utils";
 
 interface CfEnvelope<T = unknown> {
   readonly success: boolean;
@@ -38,6 +39,7 @@ interface CfSessionResult {
   readonly connectionStartTime?: number;
   readonly connectionEndTime?: number;
   readonly connectionId?: string;
+  readonly webSocketDebuggerUrl?: string;
   readonly [key: string]: unknown;
 }
 
@@ -96,6 +98,7 @@ class CloudflareProvider implements BrowserProvider {
   private readonly client: Client;
   private readonly accountID: string;
   private readonly apiToken: string;
+  private readonly browser?: CloudflareBrowser;
 
   constructor(config: ProviderConfig) {
     const apiToken = config.apiKey || process.env.CF_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN;
@@ -118,6 +121,7 @@ class CloudflareProvider implements BrowserProvider {
     this.client = defaultClient();
     this.apiToken = apiToken;
     this.accountID = accountID;
+    this.browser = resolveCloudflareBrowser("cloudflare", config.browser);
   }
 
   name(): string {
@@ -143,7 +147,14 @@ class CloudflareProvider implements BrowserProvider {
   }
 
   private base(): string {
-    return `https://api.cloudflare.com/client/v4/accounts/${this.accountID}/browser-rendering`;
+    const product = this.browser ? "browser-run" : "browser-rendering";
+    return `https://api.cloudflare.com/client/v4/accounts/${this.accountID}/${product}`;
+  }
+
+  private browserEndpoint(path: string, params = new URLSearchParams()): string {
+    if (this.browser) params.set("browser", this.browser);
+    const query = params.toString();
+    return `${this.base()}${path}${query ? `?${query}` : ""}`;
   }
 
   private headers(): Record<string, string> {
@@ -153,7 +164,16 @@ class CloudflareProvider implements BrowserProvider {
     };
   }
 
-  private unwrap<T>(envelope: CfEnvelope<T>): T {
+  private unwrap<T>(response: CfEnvelope<T> | T): T {
+    if (
+      typeof response !== "object" ||
+      response === null ||
+      !("success" in response) ||
+      !("result" in response)
+    ) {
+      return response as T;
+    }
+    const envelope = response as CfEnvelope<T>;
     if (!envelope.success) {
       const msg = envelope.errors?.map((e) => e.message).join("; ") ?? "Unknown Cloudflare error";
       throw new Error(msg);
@@ -165,10 +185,8 @@ class CloudflareProvider implements BrowserProvider {
     try {
       const params = new URLSearchParams();
       if (options?.timeout) params.set("keep_alive", String(options.timeout));
-      const qs = params.toString() ? `?${params}` : "";
-
-      const res = await this.client.postJSON<CfEnvelope<CfSessionResult>>(
-        `${this.base()}/devtools/browser${qs}`,
+      const res = await this.client.postJSON<CfEnvelope<CfSessionResult> | CfSessionResult>(
+        this.browserEndpoint("/devtools/browser", params),
         {},
         this.headers(),
       );
@@ -178,6 +196,7 @@ class CloudflareProvider implements BrowserProvider {
         id: result.sessionId ?? "",
         provider: "cloudflare",
         createdAt: Date.now(),
+        ...(result.webSocketDebuggerUrl ? { cdpUrl: result.webSocketDebuggerUrl } : {}),
         metadata: { connectionId: result.connectionId },
       };
     } catch (error) {
@@ -187,16 +206,17 @@ class CloudflareProvider implements BrowserProvider {
 
   async getSession(sessionId: string): Promise<BrowserSession | null> {
     try {
-      const res = await this.client.getJSON<CfEnvelope<CfSessionResult>>(
-        `${this.base()}/devtools/browser/${sessionId}`,
+      const res = await this.client.getJSON<CfEnvelope<CfSessionResult> | CfSessionResult>(
+        this.browserEndpoint(`/devtools/browser/${sessionId}`),
         this.headers(),
       );
-      if (!res.success) return null;
+      const result = this.unwrap(res);
       return {
         id: sessionId,
         provider: "cloudflare",
-        createdAt: res.result.connectionStartTime ?? Date.now(),
-        metadata: res.result,
+        createdAt: result.connectionStartTime ?? Date.now(),
+        ...(result.webSocketDebuggerUrl ? { cdpUrl: result.webSocketDebuggerUrl } : {}),
+        metadata: result,
       };
     } catch {
       return null;
@@ -205,8 +225,8 @@ class CloudflareProvider implements BrowserProvider {
 
   async listSessions(): Promise<BrowserSession[]> {
     try {
-      const res = await this.client.getJSON<CfEnvelope<CfSessionResult[]>>(
-        `${this.base()}/devtools/session`,
+      const res = await this.client.getJSON<CfEnvelope<CfSessionResult[]> | CfSessionResult[]>(
+        this.browserEndpoint("/devtools/session"),
         this.headers(),
       );
       const sessions = this.unwrap(res);
@@ -214,6 +234,7 @@ class CloudflareProvider implements BrowserProvider {
         id: s.sessionId ?? "",
         provider: "cloudflare",
         createdAt: s.connectionStartTime ?? Date.now(),
+        ...(s.webSocketDebuggerUrl ? { cdpUrl: s.webSocketDebuggerUrl } : {}),
         metadata: s,
       }));
     } catch {
@@ -223,7 +244,10 @@ class CloudflareProvider implements BrowserProvider {
 
   async releaseSession(sessionId: string): Promise<void> {
     try {
-      await this.client.deleteJSON(`${this.base()}/devtools/browser/${sessionId}`, this.headers());
+      await this.client.deleteJSON(
+        this.browserEndpoint(`/devtools/browser/${sessionId}`),
+        this.headers(),
+      );
     } catch (error) {
       throw normalizeError(error, "cloudflare");
     }
@@ -236,7 +260,7 @@ class CloudflareProvider implements BrowserProvider {
   ): Promise<ScrapeResult> {
     try {
       const res = await this.client.postJSON<CfEnvelope<CfContentResult>>(
-        `${this.base()}/content`,
+        this.browserEndpoint("/content"),
         createScrapeBody(url, options),
         this.headers(),
       );
@@ -259,7 +283,7 @@ class CloudflareProvider implements BrowserProvider {
       assertUrlOrSession(options.url, session, "cloudflare", "screenshot");
 
       const res = await this.client.postResponse(
-        `${this.base()}/screenshot`,
+        this.browserEndpoint("/screenshot"),
         createScreenshotBody(options, session),
         this.headers(),
       );
@@ -304,7 +328,7 @@ class CloudflareProvider implements BrowserProvider {
   ): Promise<CrawlResult> {
     try {
       const res = await this.client.postJSON<CfEnvelope<string | Record<string, unknown>>>(
-        `${this.base()}/crawl`,
+        this.browserEndpoint("/crawl"),
         createCrawlBody(url, options),
         this.headers(),
       );
@@ -334,7 +358,7 @@ class CloudflareProvider implements BrowserProvider {
   async pdf(url: string, options?: PdfOptions, _session?: BrowserSession): Promise<PdfResult> {
     try {
       const res = await this.client.postResponse(
-        `${this.base()}/pdf`,
+        this.browserEndpoint("/pdf"),
         createPdfBody(url, options),
         this.headers(),
       );
@@ -358,7 +382,7 @@ class CloudflareProvider implements BrowserProvider {
   async links(url: string, _session?: BrowserSession): Promise<LinksResult> {
     try {
       const res = await this.client.postJSON<CfEnvelope<string[]>>(
-        `${this.base()}/links`,
+        this.browserEndpoint("/links"),
         { url },
         this.headers(),
       );
@@ -385,7 +409,7 @@ class CloudflareProvider implements BrowserProvider {
         body.response_format = { type: "json_schema", json_schema: options.schema };
 
       const res = await this.client.postJSON<CfEnvelope<Record<string, unknown>>>(
-        `${this.base()}/json`,
+        this.browserEndpoint("/json"),
         body,
         this.headers(),
       );

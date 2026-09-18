@@ -44,7 +44,8 @@ describe("shared browser tool TUI", () => {
       "browsers_scrape",
       {
         url: "https://example.test/products",
-        provider: "steel",
+        provider: "cloudflare",
+        browser: "kitesurf",
         waitFor: "#catalog",
         maxChars: 50_000,
       },
@@ -53,7 +54,7 @@ describe("shared browser tool TUI", () => {
     );
 
     expect(line).toBe(
-      "◌ 🌐 Browser Scrape https://example.test/products steel · wait #catalog · 50,000 chars",
+      "◌ 🌐 Browser Scrape https://example.test/products cloudflare · kitesurf · wait #catalog · 50,000 chars",
     );
   });
 

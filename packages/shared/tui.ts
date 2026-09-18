@@ -165,28 +165,32 @@ function urlCall(
 const CALL_DESCRIPTIONS: Readonly<Record<BrowserToolName, CallDescriber>> = {
   browsers_scrape: (record) =>
     urlCall(record, [
+      scalar(record, "browser"),
       prefixedField(record, "waitFor", "wait"),
       countedField(record, "maxChars", "char"),
     ]),
   browsers_session: (record) => ({
     subject: provider(record),
-    meta: compact([prefixedField(record, "region", "region")]),
+    meta: compact([scalar(record, "browser"), prefixedField(record, "region", "region")]),
   }),
   browsers_release: (record) => ({
     subject: scalar(record, "sessionId"),
-    meta: compact([provider(record)]),
+    meta: compact([provider(record), scalar(record, "browser")]),
   }),
   browsers_providers: () => ({ meta: [] }),
   browsers_screenshot: (record) =>
     urlCall(record, [
+      scalar(record, "browser"),
       scalar(record, "format"),
       record.fullPage === true ? "full page" : undefined,
       record.fullPage === false ? "viewport" : undefined,
     ]),
-  browsers_extract: (record) => urlCall(record, [prefixedField(record, "prompt", "prompt")]),
-  browsers_crawl: (record) => urlCall(record, [countedField(record, "maxPages", "page")]),
-  browsers_pdf: (record) => urlCall(record),
-  browsers_links: (record) => urlCall(record),
+  browsers_extract: (record) =>
+    urlCall(record, [scalar(record, "browser"), prefixedField(record, "prompt", "prompt")]),
+  browsers_crawl: (record) =>
+    urlCall(record, [scalar(record, "browser"), countedField(record, "maxPages", "page")]),
+  browsers_pdf: (record) => urlCall(record, [scalar(record, "browser")]),
+  browsers_links: (record) => urlCall(record, [scalar(record, "browser")]),
   browsers_search: (record) => ({ subject: scalar(record, "query"), meta: [] }),
   browsers_capabilities: (record) => ({ subject: provider(record), meta: [] }),
 };

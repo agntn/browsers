@@ -65,10 +65,10 @@ browsers providers
 
 ```
 ● steel           scrape screenshot(sess) sessions cdp
-● browserbase     scrape screenshot(sess) sessions cdp
+● browserbase     scrape sessions cdp
 ● kernel          scrape(sess) screenshot(sess) navigate evaluate sessions cdp
 ● browserless     scrape screenshot navigate evaluate sessions cdp pdf
-● hyperbrowser    scrape screenshot(sess) sessions cdp crawl search extract
+● hyperbrowser    scrape screenshot sessions cdp crawl search extract
 ● anchor          screenshot(sess) sessions cdp
 ● cloudflare      scrape screenshot sessions cdp crawl pdf links extract
 ● playwright      scrape screenshot(sess) navigate evaluate sessions crawl pdf links
@@ -125,10 +125,10 @@ That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resol
 | Provider         | Auth                             | Capabilities                                                                  |
 | ---------------- | -------------------------------- | ----------------------------------------------------------------------------- |
 | **steel**        | `STEEL_API_KEY`                  | scrape, screenshot (session), sessions, CDP                                   |
-| **browserbase**  | `BROWSERBASE_API_KEY`            | scrape, screenshot (session), sessions, CDP                                   |
+| **browserbase**  | `BROWSERBASE_API_KEY`            | scrape, sessions, CDP                                                         |
 | **kernel**       | `KERNEL_API_KEY`                 | scrape (session), screenshot (session), navigate, evaluate, sessions, CDP     |
 | **browserless**  | `BROWSERLESS_API_KEY`            | scrape, screenshot, navigate, evaluate, sessions, CDP, PDF                    |
-| **hyperbrowser** | `HYPERBROWSER_API_KEY`           | scrape, screenshot (session), sessions, CDP, crawl, search, extract           |
+| **hyperbrowser** | `HYPERBROWSER_API_KEY`           | scrape, screenshot, sessions, CDP, crawl, search, extract                     |
 | **anchor**       | `ANCHOR_API_KEY`                 | screenshot (session), sessions, CDP                                           |
 | **cloudflare**   | `CF_API_TOKEN` + `CF_ACCOUNT_ID` | scrape, screenshot, sessions, CDP, crawl, PDF, links, extract                 |
 | **playwright**   | none, local                      | scrape, screenshot (session), navigate, evaluate, sessions, crawl, PDF, links |

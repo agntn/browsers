@@ -8,7 +8,10 @@ interface CapturedRequest {
   method?: string;
   url?: string;
   body: string;
+  apiKey?: string;
 }
+
+const PNG_BYTES = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
 
 const sessionDetail = {
   id: "session-1",
@@ -36,11 +39,39 @@ describe("hyperbrowser current session API", () => {
         method: request.method,
         url: request.url,
         body: await readBody(request),
+        apiKey: request.headers["x-api-key"] as string | undefined,
       };
       requests.push(captured);
 
+      if (`${request.method} ${request.url}` === "GET /screenshots/shot-1.png") {
+        response.setHeader("Content-Type", "image/png");
+        response.end(PNG_BYTES);
+        return;
+      }
+
       response.setHeader("Content-Type", "application/json");
       switch (`${request.method} ${request.url}`) {
+        case "POST /api/web/fetch": {
+          const { url } = JSON.parse(captured.body) as { url: string };
+          response.end(
+            url === "https://down.example/"
+              ? JSON.stringify({
+                  jobId: "job-2",
+                  status: "failed",
+                  data: {},
+                  error: "net::ERR_TUNNEL_CONNECTION_FAILED at https://down.example",
+                })
+              : JSON.stringify({
+                  jobId: "job-1",
+                  status: "completed",
+                  data: {
+                    metadata: { title: "Example Domain" },
+                    screenshot: `${baseURL}/screenshots/shot-1.png`,
+                  },
+                }),
+          );
+          return;
+        }
         case "POST /api/session":
         case "GET /api/session/session-1":
           response.end(JSON.stringify(sessionDetail));
@@ -140,5 +171,51 @@ describe("hyperbrowser current session API", () => {
       "GET /api/sessions",
       "PUT /api/session/session-1/stop",
     ]);
+  });
+
+  it("screenshots through the fetch route without a session", async () => {
+    const provider = create("hyperbrowser", { apiKey: "test", baseURL });
+    requests.length = 0;
+
+    expect(provider.capabilities().statelessScreenshot).toBe(true);
+    const result = await provider.screenshot({
+      url: "https://example.com",
+      fullPage: false,
+      format: "png",
+    });
+
+    expect(result).toEqual({
+      data: `data:image/png;base64,${PNG_BYTES.toString("base64")}`,
+      mimeType: "image/png",
+    });
+    expect(requests.map(({ method, url }) => `${method} ${url}`)).toEqual([
+      "POST /api/web/fetch",
+      "GET /screenshots/shot-1.png",
+    ]);
+    expect(JSON.parse(requests[0]?.body ?? "")).toEqual({
+      url: "https://example.com",
+      outputs: { formats: [{ type: "screenshot", fullPage: false, format: "png" }] },
+    });
+    expect(requests[0]?.apiKey).toBe("test");
+    expect(requests[1]?.apiKey).toBeUndefined();
+
+    await provider.screenshot({
+      url: "https://example.com",
+      viewport: { width: 800, height: 600 },
+    });
+    expect(JSON.parse(requests[2]?.body ?? "")).toEqual({
+      url: "https://example.com",
+      browser: { screen: { width: 800, height: 600 } },
+      outputs: { formats: [{ type: "screenshot", fullPage: true, format: "png" }] },
+    });
+  });
+
+  it("reports a failed fetch instead of an empty screenshot", async () => {
+    const provider = create("hyperbrowser", { apiKey: "test", baseURL });
+
+    await expect(provider.screenshot({ url: "https://down.example/" })).rejects.toThrow(
+      "Hyperbrowser returned no screenshot: net::ERR_TUNNEL_CONNECTION_FAILED at https://down.example",
+    );
+    await expect(provider.screenshot({})).rejects.toThrow("hyperbrowser screenshot requires a URL");
   });
 });

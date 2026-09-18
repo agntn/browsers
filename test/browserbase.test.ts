@@ -3,6 +3,7 @@ import type { Server } from "node:http";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import "../src/providers/index";
 import { create } from "../src/core/registry";
+import { UnsupportedOperationError } from "../src/core/errors";
 
 interface CapturedRequest {
   method?: string;
@@ -46,5 +47,21 @@ describe("browserbase releaseSession", () => {
     expect(captured.method).toBe("POST");
     expect(captured.url).toBe("/v1/sessions/s1");
     expect(JSON.parse(captured.body)).toEqual({ status: "REQUEST_RELEASE" });
+  });
+
+  it("does not advertise or request screenshots", async () => {
+    const provider = create("browserbase", { apiKey: "test", baseURL });
+    captured.method = undefined;
+    captured.url = undefined;
+
+    expect(provider.capabilities().screenshot).toBe(false);
+    await expect(
+      provider.screenshot(
+        { url: "https://example.com" },
+        { id: "s1", provider: "browserbase", createdAt: 0 },
+      ),
+    ).rejects.toBeInstanceOf(UnsupportedOperationError);
+    expect(captured.method).toBeUndefined();
+    expect(captured.url).toBeUndefined();
   });
 });

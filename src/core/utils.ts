@@ -1,6 +1,14 @@
 import type { HTTPError } from "./errors";
 import { InvalidInputError, UnsupportedOperationError } from "./errors";
-import type { BrowserProvider, CloudflareBrowser, ScrapeOptions, ScrapeResult } from "./types";
+import type {
+  BrowserProvider,
+  CloudflareBrowser,
+  CreateSessionOptions,
+  ScrapeOptions,
+  ScrapeResult,
+  ScreenshotOptions,
+  ScreenshotResult,
+} from "./types";
 
 /**
  * Check whether an error is an HTTP 404 from the provider API.
@@ -73,6 +81,35 @@ export async function scrapeWithSessionWhenNeeded(
   const session = await provider.createSession();
   try {
     return await provider.scrape(url, options, session);
+  } finally {
+    await provider.releaseSession(session.id).catch(() => undefined);
+  }
+}
+
+/**
+ * Screenshot one URL, opening a temporary session when the provider cannot screenshot statelessly.
+ *
+ * @param {BrowserProvider} provider Resolved provider.
+ * @param {ScreenshotOptions} options Screenshot options, including the page URL.
+ * @param {CreateSessionOptions} [sessionOptions] Options for the temporary session.
+ * @returns {Promise<ScreenshotResult>} Screenshot result.
+ */
+export async function screenshotWithSessionWhenNeeded(
+  provider: Readonly<BrowserProvider>,
+  options: ScreenshotOptions,
+  sessionOptions?: CreateSessionOptions,
+): Promise<ScreenshotResult> {
+  const capabilities = provider.capabilities();
+  if (!capabilities.screenshot || capabilities.statelessScreenshot) {
+    return provider.screenshot(options);
+  }
+
+  const session = await provider.createSession(sessionOptions);
+  try {
+    if (capabilities.navigate && options.url) {
+      await provider.navigate(options.url, session).catch(() => undefined);
+    }
+    return await provider.screenshot(options, session);
   } finally {
     await provider.releaseSession(session.id).catch(() => undefined);
   }

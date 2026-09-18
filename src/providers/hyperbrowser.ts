@@ -19,9 +19,9 @@ import type {
 } from "../core/types";
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
-import { AuthError, normalizeError } from "../core/errors";
+import { AuthError, BrowserError, InvalidInputError, normalizeError } from "../core/errors";
 import { register } from "../core/registry";
-import { isNotFoundError, assertSessionId, notSupportedViaRest } from "../core/utils";
+import { isNotFoundError, notSupportedViaRest } from "../core/utils";
 
 interface HyperbrowserSessionResponse {
   readonly id: string;
@@ -33,6 +33,37 @@ interface HyperbrowserSessionResponse {
 
 interface HyperbrowserSessionListResponse {
   readonly sessions: readonly HyperbrowserSessionResponse[];
+}
+
+interface HyperbrowserFetchResponse {
+  readonly status?: string;
+  readonly error?: string;
+  readonly data?: {
+    readonly screenshot?: string;
+    readonly [key: string]: unknown;
+  };
+}
+
+/**
+ * Hyperbrowser has no screenshot route: fetch renders the page and stores the image at a URL.
+ *
+ * @param {ScreenshotOptions} options Screenshot options.
+ * @returns {Record<string, unknown>} Fetch request body asking for one screenshot.
+ */
+function createScreenshotBody(options: ScreenshotOptions): Record<string, unknown> {
+  if (!options.url) {
+    throw new InvalidInputError("hyperbrowser screenshot requires a URL");
+  }
+  const body: Record<string, unknown> = {
+    url: options.url,
+    outputs: {
+      formats: [
+        { type: "screenshot", fullPage: options.fullPage ?? true, format: options.format ?? "png" },
+      ],
+    },
+  };
+  if (options.viewport) body.browser = { screen: options.viewport };
+  return body;
 }
 
 function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
@@ -103,7 +134,7 @@ class HyperbrowserProvider implements BrowserProvider {
       sessions: true,
       cdp: true,
       statelessScrape: true,
-      statelessScreenshot: false,
+      statelessScreenshot: true,
       crawl: true,
       pdf: false,
       links: false,
@@ -198,26 +229,26 @@ class HyperbrowserProvider implements BrowserProvider {
 
   async screenshot(
     options: ScreenshotOptions,
-    session?: BrowserSession,
+    _session?: BrowserSession,
   ): Promise<ScreenshotResult> {
     try {
-      assertSessionId(session?.id, "hyperbrowser", "screenshot");
-      const body: Record<string, unknown> = {
-        sessionId: session.id,
-        fullPage: options.fullPage ?? true,
-        format: options.format ?? "png",
-      };
-      if (options.selector) body.selector = options.selector;
-
-      const res = await this.client.postJSON<{ data?: string; screenshot?: string }>(
-        `${this.baseURL}/v1/screenshot`,
-        body,
+      const res = await this.client.postJSON<HyperbrowserFetchResponse>(
+        `${this.baseURL}/api/web/fetch`,
+        createScreenshotBody(options),
         this.headers(),
       );
+      const location = res.data?.screenshot;
+      if (!location) {
+        throw new BrowserError(
+          `Hyperbrowser returned no screenshot${res.error ? `: ${res.error}` : ""}`,
+        );
+      }
 
+      const image = Buffer.from(await this.client.getRaw(location));
+      const mimeType = `image/${options.format ?? "png"}`;
       return {
-        data: res.data ?? res.screenshot ?? "",
-        mimeType: `image/${options.format ?? "png"}`,
+        data: `data:${mimeType};base64,${image.toString("base64")}`,
+        mimeType,
       };
     } catch (error) {
       throw normalizeError(error, "hyperbrowser");

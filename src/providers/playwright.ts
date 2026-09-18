@@ -45,10 +45,18 @@ function resolveSystemChromium(): string | undefined {
   return undefined;
 }
 
-interface PlaywrightSession {
-  browser: Browser;
-  page: Page;
+interface PlaywrightSessionRecord {
+  readonly session: BrowserSession;
+  readonly browser: Browser;
+  readonly page: Page;
 }
+
+/**
+ * Live Chromium sessions keyed by session ID, shared by every provider
+ * instance the way the Browserless store is: agent tools build a new provider
+ * per call, so an instance field stranded the browser process on release.
+ */
+const playwrightSessions = new Map<string, PlaywrightSessionRecord>();
 
 interface PageLease {
   readonly page: Page;
@@ -204,8 +212,6 @@ async function crawlPage(
 }
 
 class PlaywrightProvider implements BrowserProvider {
-  private readonly sessions = new Map<string, PlaywrightSession>();
-
   constructor(_config: ProviderConfig) {
     // Playwright is local; no API key required.
   }
@@ -232,10 +238,10 @@ class PlaywrightProvider implements BrowserProvider {
     };
   }
 
-  private getSessionData(sessionId: string): PlaywrightSession {
-    const data = this.sessions.get(sessionId);
-    if (!data) throw new SessionNotFoundError(sessionId, "playwright");
-    return data;
+  private getSessionData(sessionId: string): PlaywrightSessionRecord {
+    const record = playwrightSessions.get(sessionId);
+    if (!record) throw new SessionNotFoundError(sessionId, "playwright");
+    return record;
   }
 
   private getPage(session: BrowserSession): Page {
@@ -279,44 +285,32 @@ class PlaywrightProvider implements BrowserProvider {
         viewport: options?.viewport ?? { width: 1280, height: 720 },
       });
       const page = await context.newPage();
-      const id = randomUUID();
-      this.sessions.set(id, { browser, page });
-      return {
-        id,
+      const session: BrowserSession = {
+        id: randomUUID(),
         provider: "playwright",
         createdAt: Date.now(),
         metadata: { headless: options?.headless ?? true },
       };
+      playwrightSessions.set(session.id, { session, browser, page });
+      return { ...session };
     } catch (error) {
       throw normalizePlaywrightError(error);
     }
   }
 
   async getSession(sessionId: string): Promise<BrowserSession | null> {
-    const data = this.sessions.get(sessionId);
-    if (!data) return null;
-    return {
-      id: sessionId,
-      provider: "playwright",
-      createdAt: Date.now(),
-      metadata: {},
-    };
+    const record = playwrightSessions.get(sessionId);
+    return record ? { ...record.session } : null;
   }
 
   async listSessions(): Promise<BrowserSession[]> {
-    return Array.from(this.sessions.keys()).map((id) => ({
-      id,
-      provider: "playwright",
-      createdAt: Date.now(),
-      metadata: {},
-    }));
+    return Array.from(playwrightSessions.values(), ({ session }) => ({ ...session }));
   }
 
   async releaseSession(sessionId: string): Promise<void> {
-    const data = this.sessions.get(sessionId);
-    if (!data) throw new SessionNotFoundError(sessionId, "playwright");
-    this.sessions.delete(sessionId);
-    await data.browser.close().catch(() => {});
+    const record = this.getSessionData(sessionId);
+    playwrightSessions.delete(sessionId);
+    await record.browser.close().catch(() => {});
   }
 
   async scrape(

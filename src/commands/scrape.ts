@@ -2,6 +2,7 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import { resolveAndCreate } from "./_helpers";
 import type { ScrapeResult } from "../core/types";
+import { scrapeWithSessionWhenNeeded } from "../core/utils";
 
 function printScrapeResult(
   format: string,
@@ -59,7 +60,7 @@ export default defineCommand({
     consola.info(`Scraping via ${providerName}...`);
 
     try {
-      const result = await provider.scrape(args.url, {
+      const result = await scrapeWithSessionWhenNeeded(provider, args.url, {
         waitFor: args.waitFor,
         maxChars: args.maxChars ? Number(args.maxChars) : undefined,
       });

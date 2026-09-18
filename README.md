@@ -118,7 +118,7 @@ const caps = provider.capabilities();
 console.log(caps.statelessScrape, caps.pdf, caps.cdp);
 ```
 
-That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resolveProvider()` picks the first one that does. Want Kitesurf on Cloudflare? Use `create("cloudflare", { browser: "kitesurf" })`. Without that option it stays on Chromium. Kernel scrape wants a session object. The agent tools open one and close it. The CLI `scrape` command does not.
+That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resolveProvider()` picks the first one that does. Want Kitesurf on Cloudflare? Use `create("cloudflare", { browser: "kitesurf" })`. Without that option it stays on Chromium. Kernel scrape wants a session object. The agent tools and the CLI `scrape` command open one and close it.
 
 ## 🗺️ Providers
 

@@ -1,6 +1,6 @@
 import type { HTTPError } from "./errors";
 import { InvalidInputError, UnsupportedOperationError } from "./errors";
-import type { CloudflareBrowser } from "./types";
+import type { BrowserProvider, CloudflareBrowser, ScrapeOptions, ScrapeResult } from "./types";
 
 /**
  * Check whether an error is an HTTP 404 from the provider API.
@@ -49,6 +49,32 @@ export function assertUrlOrSession(
 ): void {
   if (!url && !session?.id) {
     throw new InvalidInputError(`${provider} ${operation} requires either a URL or a session`);
+  }
+}
+
+/**
+ * Scrape one URL, opening a temporary session when the provider cannot scrape statelessly.
+ *
+ * @param {BrowserProvider} provider Resolved provider.
+ * @param {string} url Page to scrape.
+ * @param {ScrapeOptions} [options] Scrape options.
+ * @returns {Promise<ScrapeResult>} Scrape result.
+ */
+export async function scrapeWithSessionWhenNeeded(
+  provider: Readonly<BrowserProvider>,
+  url: string,
+  options?: ScrapeOptions,
+): Promise<ScrapeResult> {
+  const capabilities = provider.capabilities();
+  if (!capabilities.scrape || capabilities.statelessScrape) {
+    return provider.scrape(url, options);
+  }
+
+  const session = await provider.createSession();
+  try {
+    return await provider.scrape(url, options, session);
+  } finally {
+    await provider.releaseSession(session.id).catch(() => undefined);
   }
 }
 

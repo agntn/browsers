@@ -1,6 +1,6 @@
 {
   "name": "@agntn/browsers",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Unified browser-as-a-service provider for AI agents and CLI.",
   "keywords": [
     "agent",

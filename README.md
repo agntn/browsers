@@ -1,192 +1,180 @@
 # @agntn/browsers
 
-Unified browser-as-a-service provider for AI agents and CLI.
+[![npm version](https://npmx.dev/api/registry/badge/version/@agntn/browsers)](https://npmx.dev/package/@agntn/browsers)
+[![npm downloads](https://npmx.dev/api/registry/badge/downloads/@agntn/browsers)](https://npmx.dev/package/@agntn/browsers)
+[![license](https://npmx.dev/api/registry/badge/license/@agntn/browsers)](https://npmx.dev/package/@agntn/browsers)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/agntn/browsers)
 
-One API, eight providers: **Steel**, **Browserbase**, **Kernel**, **Browserless**, **Hyperbrowser**, **Anchor**, **Cloudflare**, **Playwright**.
+🌐 Eight vendors. One scrape call. JavaScript already ran.
 
-## Install
+## Why?
+
+Steel scrapes in one HTTP call. Kernel wants a live session first. Browserbase hands you CDP. A model will mix those three up, so this is one `scrape()` over eight backends.
+
+## ✨ Features
+
+- 🧩 **Eight backends, one contract.** Steel, Browserbase, Kernel, Browserless, Hyperbrowser, Anchor, Cloudflare and Playwright. Same objects on your side. Anchor still has no scrape.
+- 🖥️ **Playwright is local.** No key. Chromium on the machine you already have.
+- ⚡ **Stateless where the vendor is.** Steel, Browserbase, Browserless, Hyperbrowser, Cloudflare and Playwright scrape without you opening a session. Kernel will not.
+- 📸 **The extras follow the backend.** PDFs, crawls, links, AI extract, search. Anchor will not scrape. Hyperbrowser will search.
+- 🏷️ **`capabilities()` is the list.** Navigate is true on Kernel, Browserless and Playwright. False on Steel. Read the flag.
+- 🤖 **Five surfaces, eleven tools.** CLI, library, MCP, Pi, OMP. They share the executors.
+- 📏 **Agent scrape has a ceiling.** 20 000 characters unless you pass `maxChars`, 200 000 at most.
+- 🔐 **Keys in a URL get scrubbed.** Query params named `token` or `api_key` land in errors as `[REDACTED]`.
+
+## 📦 Install
 
 ```bash
 pnpm add @agntn/browsers
-# or globally
-pnpm add -g @agntn/browsers
 ```
 
-## API Keys
+Node.js 22 or newer.
 
-Set environment variables for the providers you want to use:
+## 🚀 First call
 
 ```bash
-export STEEL_API_KEY=sk-...
-export BROWSERBASE_API_KEY=bb-...
-export KERNEL_API_KEY=k-...
-export BROWSERLESS_API_KEY=bl-...
-export HYPERBROWSER_API_KEY=hb-...
-export ANCHOR_API_KEY=ab-...
-export CF_API_TOKEN=...          # Cloudflare
-export CF_ACCOUNT_ID=...         # Cloudflare (required)
-# Playwright is local — no API key needed
+npx @agntn/browsers scrape https://example.com --provider playwright
 ```
 
-## CLI
+```
+ℹ Scraping via playwright...
+Example Domain
+
+This domain is for use in documentation examples without needing permission. Avoid use in operations.
+
+Learn more
+```
+
+No key, no account. Playwright runs Chromium here. After `pnpm add`, that command is `pnpm exec browsers`, or install it once with `pnpm add -g @agntn/browsers`. Skip `--provider` and the first configured backend wins. Steel if that key is set. Playwright if nothing else is.
+
+The scrape said "Learn more" and dropped the href. This did not:
 
 ```bash
-# Scrape a URL (defaults to first configured provider)
-browsers scrape https://example.com
+browsers links https://example.com --provider playwright
+```
 
-# Scrape with specific provider and format
-browsers scrape https://example.com --provider steel --format html
+```
+https://iana.org/domains/example
+```
 
-# Wait for a CSS selector before extraction
-browsers scrape https://example.com --waitFor '#content'
+Same page, different door. Who is even configured?
 
-# Take a screenshot
-browsers screenshot https://example.com -o page.png
-
-# Generate PDF
-browsers pdf https://example.com -o page.pdf
-
-# Crawl a site
-browsers crawl https://example.com --maxPages 20
-
-# Extract links
-browsers links https://example.com
-
-# Web search (via Hyperbrowser)
-browsers search "browser automation agents"
-
-# AI-powered extraction
-browsers extract https://example.com --prompt "Extract all product prices"
-
-# Manage sessions
-browsers session create --provider kernel
-browsers session list --provider browserbase
-browsers session release <session-id> --provider steel
-
-# Check configured providers and capabilities
+```bash
 browsers providers
-browsers providers --check
 ```
 
-## Agent integrations
+```
+● steel           scrape screenshot(sess) sessions cdp
+● browserbase     scrape screenshot(sess) sessions cdp
+● kernel          scrape(sess) screenshot(sess) navigate evaluate sessions cdp
+● browserless     scrape screenshot navigate evaluate sessions cdp pdf
+● hyperbrowser    scrape screenshot(sess) sessions cdp crawl search extract
+● anchor          screenshot(sess) sessions cdp
+● cloudflare      scrape screenshot sessions cdp crawl pdf links extract
+● playwright      scrape screenshot(sess) navigate evaluate sessions crawl pdf links
+```
 
-Pi and OMP discover their extensions from the package manifests. Both keep browser calls compact in the terminal, with result details available in the expanded view. The same eleven tools are available through the MCP stdio server:
+Filled dot means that key was in the env on this run. Playwright is always filled. A few more:
 
 ```bash
-browsers mcp
-
-# Register the installed CLI with Claude Code
-claude mcp add browsers --scope user -- browsers mcp
+browsers scrape https://example.com --provider playwright --format html
+browsers scrape https://example.com --provider playwright --waitFor h1
+browsers screenshot https://example.com -o page.png
+browsers pdf https://example.com -o page.pdf --provider playwright
+browsers crawl https://example.com --maxPages 5 --provider playwright
+browsers search "browser automation" --provider hyperbrowser
+browsers extract https://example.com --prompt "Extract the heading"
+browsers session create --provider kernel
 ```
 
-## Library
+`search` is Hyperbrowser. `extract` is Cloudflare or Hyperbrowser. The rest take `-p` when you do not want the default.
 
-```typescript
-import { create, resolveProvider } from "@agntn/browsers";
+### Commands
 
-// Auto-detect provider from env vars
-const providerName = resolveProvider();
-const provider = create(providerName);
+| Command      | What it does                         | Example                                               |
+| ------------ | ------------------------------------ | ----------------------------------------------------- |
+| `scrape`     | Rendered page, markdown if it exists | `browsers scrape https://example.com -p playwright`   |
+| `screenshot` | Image to a file                      | `browsers screenshot https://example.com -o page.png` |
+| `crawl`      | Follow links, cap with `--maxPages`  | `browsers crawl https://example.com --maxPages 5`     |
+| `pdf`        | URL to a PDF file                    | `browsers pdf https://example.com -o page.pdf`        |
+| `links`      | Unique hrefs                         | `browsers links https://example.com -p playwright`    |
+| `search`     | Hyperbrowser web search              | `browsers search "browser automation"`                |
+| `extract`    | Structured extract with a prompt     | `browsers extract https://example.com --prompt "..."` |
+| `session`    | `create`, `list`, `release`          | `browsers session create -p kernel`                   |
+| `providers`  | Who is configured, what they can do  | `browsers providers`                                  |
+| `mcp`        | MCP server on stdio                  | `browsers mcp`                                        |
 
-// Check capabilities
-const caps = provider.capabilities();
-console.log(caps.statelessScrape, caps.cdp, caps.crawl);
-
-// Stateless scrape (no session needed for Steel, Cloudflare, Browserless, etc.)
-const result = await provider.scrape("https://example.com", {
-  waitFor: "#content",
-});
-console.log(result.markdown ?? result.text ?? result.html);
-
-// Session-based workflow
-const session = await provider.createSession({
-  stealth: true,
-  region: "eu-west-1",
-});
-await provider.navigate("https://example.com", session);
-const screenshot = await provider.screenshot({ fullPage: true }, session);
-const evalResult = await provider.evaluate("document.title", session);
-await provider.releaseSession(session.id);
-
-// Crawl (providers that support it)
-if (provider.crawl) {
-  const crawlResult = await provider.crawl("https://example.com", { maxPages: 10 });
-}
-
-// PDF generation
-if (provider.pdf) {
-  const pdf = await provider.pdf("https://example.com");
-}
-
-// Extract links
-if (provider.links) {
-  const links = await provider.links("https://example.com");
-}
-
-// AI-powered extraction
-if (provider.extract) {
-  const extracted = await provider.extract("https://example.com", {
-    prompt: "Extract product name, price, and description",
-  });
-}
-```
-
-## Providers
-
-| Provider         | Env Key                          | Scrape      | Screenshot  | Navigate | Evaluate | Crawl | PDF | Links | Extract | Search | CDP |
-| ---------------- | -------------------------------- | ----------- | ----------- | -------- | -------- | ----- | --- | ----- | ------- | ------ | --- |
-| **Steel**        | `STEEL_API_KEY`                  | ✓ stateless | ✓ session   | ✗        | ✗        | ✗     | ✗   | ✗     | ✗       | ✗      | ✓   |
-| **Browserbase**  | `BROWSERBASE_API_KEY`            | ✓ stateless | ✓ session   | ✗        | ✗        | ✗     | ✗   | ✗     | ✗       | ✗      | ✓   |
-| **Kernel**       | `KERNEL_API_KEY`                 | ✓ session   | ✓ session   | ✓        | ✓        | ✗     | ✗   | ✗     | ✗       | ✗      | ✓   |
-| **Browserless**  | `BROWSERLESS_API_KEY`            | ✓ stateless | ✓ stateless | ✓        | ✓        | ✗     | ✓   | ✗     | ✗       | ✗      | ✓   |
-| **Hyperbrowser** | `HYPERBROWSER_API_KEY`           | ✓ stateless | ✓ session   | ✗        | ✗        | ✓     | ✗   | ✗     | ✓       | ✓      | ✓   |
-| **Anchor**       | `ANCHOR_API_KEY`                 | ✗           | ✓ session   | ✗        | ✗        | ✗     | ✗   | ✗     | ✗       | ✗      | ✓   |
-| **Cloudflare**   | `CF_API_TOKEN` + `CF_ACCOUNT_ID` | ✓ stateless | ✓ stateless | ✗        | ✗        | ✓     | ✓   | ✓     | ✓       | ✗      | ✓   |
-| **Playwright**   | _(local)_                        | ✓ stateless | ✓ session   | ✓        | ✓        | ✓     | ✓   | ✓     | ✗       | ✗      | ✗   |
-
-### Capabilities at runtime
+## 🧠 Library
 
 ```typescript
 import { create } from "@agntn/browsers";
 
-const provider = create("cloudflare");
+const provider = create("playwright");
+const page = await provider.scrape("https://example.com");
+console.log(page.markdown ?? page.text ?? page.html);
+
 const caps = provider.capabilities();
-// {
-//   scrape: true, screenshot: true, navigate: false, evaluate: false,
-//   sessions: true, cdp: true, statelessScrape: true, statelessScreenshot: true,
-//   crawl: true, pdf: true, links: true, search: false, extract: true,
-// }
+console.log(caps.statelessScrape, caps.pdf, caps.cdp);
 ```
 
-## Architecture
+That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resolveProvider()` picks the first one that does. Markdown, text or HTML, whichever came back. Kernel scrape wants a session object. The agent tools open one and close it. The CLI `scrape` command does not.
 
-Follows the same pattern as [@agntn/web](https://github.com/agntn/web), [apkx](https://github.com/oritwoen/apkx), and [omnichron](https://github.com/oritwoen/omnichron):
+## 🗺️ Providers
 
+| Provider         | Auth                             | Capabilities                                                                  |
+| ---------------- | -------------------------------- | ----------------------------------------------------------------------------- |
+| **steel**        | `STEEL_API_KEY`                  | scrape, screenshot (session), sessions, CDP                                   |
+| **browserbase**  | `BROWSERBASE_API_KEY`            | scrape, screenshot (session), sessions, CDP                                   |
+| **kernel**       | `KERNEL_API_KEY`                 | scrape (session), screenshot (session), navigate, evaluate, sessions, CDP     |
+| **browserless**  | `BROWSERLESS_API_KEY`            | scrape, screenshot, navigate, evaluate, sessions, CDP, PDF                    |
+| **hyperbrowser** | `HYPERBROWSER_API_KEY`           | scrape, screenshot (session), sessions, CDP, crawl, search, extract           |
+| **anchor**       | `ANCHOR_API_KEY`                 | screenshot (session), sessions, CDP                                           |
+| **cloudflare**   | `CF_API_TOKEN` + `CF_ACCOUNT_ID` | scrape, screenshot, sessions, CDP, crawl, PDF, links, extract                 |
+| **playwright**   | none, local                      | scrape, screenshot (session), navigate, evaluate, sessions, crawl, PDF, links |
+
+Anchor does not scrape. The row stays, because someone will look for it. Cloudflare also accepts `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+
+## 🤖 Agents
+
+```bash
+browsers mcp
+pi install git:github.com/agntn/browsers
+omp install @agntn/browsers
 ```
-src/
-  core/             - types, registry, client, errors, resolve
-  providers/        - steel, browserbase, kernel, browserless, hyperbrowser, anchor, cloudflare, playwright
-  commands/         - CLI subcommands, including the MCP stdio server
-  tool-operations.ts - shared executors for every agent surface
-packages/
-  pi/extensions/    - Pi extension with eleven browser tools
-  omp/extensions/   - OMP extension with the same eleven tools
-  shared/tui.ts     - compact rendering shared by both extensions
-test/
-  provider, tool operation, Pi, OMP, and MCP coverage
+
+```json
+{
+  "mcpServers": {
+    "browsers": { "command": "browsers", "args": ["mcp"] }
+  }
+}
 ```
 
-Providers self-register on import. Add a new provider by creating a file in `src/providers/` that calls `register()`.
+Eleven tools, `browsers_scrape` through `browsers_capabilities`, the same eleven on MCP, Pi and OMP. They take a URL. They do not drive a session you already opened.
 
-## Adding a provider
+## 🚫 What this does not do
 
-1. Create `src/providers/yourprovider.ts`
-2. Implement `BrowserProvider` interface (including `capabilities()`)
-3. Call `register('yourprovider', 'https://...', factory)` at module level
-4. Add import to `src/providers/index.ts`
-5. Add the key to `browserProviderNames` in `src/tool-contract.ts`
-6. Add any nonstandard environment key to `src/core/resolve.ts`
+Need a fetch that is not a browser? [@agntn/web](https://github.com/agntn/web). Need last year's page? [@agntn/archives](https://github.com/agntn/archives). Need to click through a login? Not this package. The tools never grew `navigate` or `evaluate`.
 
-## License
+## 🧩 Adding a provider
 
-MIT
+Want a ninth? A class that implements `BrowserProvider`, `register()` at module load, a line in `src/providers/index.ts` and the name list in `src/tool-contract.ts`. Nonstandard env keys go in `src/core/resolve.ts`.
+
+## 🛠️ Development
+
+```bash
+pnpm install
+pnpm lint         # builds first, then oxlint and oxfmt --check
+pnpm lint:fix
+pnpm typecheck    # tsc, then a build, then the extensions
+pnpm test:run
+pnpm build        # obuild
+```
+
+## 💛 Thanks
+
+Work on this library ran through two OSS programs, [Claude for Open Source](https://claude.com/contact-sales/claude-for-oss) and [Codex for Open Source](https://developers.openai.com/community/codex-for-oss). Thank you <3
+
+## 📄 License
+
+[MIT](./LICENSE)

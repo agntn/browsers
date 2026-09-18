@@ -13,29 +13,141 @@ import type {
 } from "../core/types";
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
-import { AuthError, normalizeError } from "../core/errors";
+import { AuthError, BrowserError, normalizeError } from "../core/errors";
 import { register } from "../core/registry";
-import { isNotFoundError, assertSessionId, notSupportedViaRest } from "../core/utils";
+import { isNotFoundError, assertUrlOrSession, notSupportedViaRest } from "../core/utils";
 
-interface AnchorSessionResponse {
-  id: string;
-  cdpUrl?: string;
-  wsEndpoint?: string;
-  status?: string;
-  createdAt?: string;
-  [key: string]: unknown;
+/** Every Anchor response wraps its payload in `data`. */
+interface AnchorEnvelope<T> {
+  data?: T;
 }
 
+interface AnchorCreatedSession {
+  id?: string;
+  cdp_url?: string;
+  live_view_url?: string;
+}
+
+/**
+ * Session status as the status routes report it. The single-session route
+ * also carries an `id`, which is the record ID and not the session ID.
+ */
+interface AnchorSessionStatus {
+  session_id?: string;
+  status?: string;
+  created_at?: string;
+}
+
+interface AnchorSessionList {
+  count?: number;
+  items?: AnchorSessionStatus[];
+}
+
+const PNG_SIGNATURE = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const JPEG_SIGNATURE = new Uint8Array([0xff, 0xd8, 0xff]);
+const RIFF_SIGNATURE = new TextEncoder().encode("RIFF");
+const WEBP_SIGNATURE = new TextEncoder().encode("WEBP");
+
+/**
+ * Session section of the create body: proxy and lifetime.
+ *
+ * @param {CreateSessionOptions} options Session options.
+ * @returns {Record<string, unknown>} Anchor `session` settings.
+ */
+function sessionConfig(options: CreateSessionOptions): Record<string, unknown> {
+  const session: Record<string, unknown> = {};
+  if (options.proxy) session.proxy = { type: "custom", active: true, ...options.proxy };
+  if (options.timeout !== undefined) {
+    session.timeout = { max_duration: Math.ceil(options.timeout / 60_000) };
+  }
+  return session;
+}
+
+/**
+ * Browser section of the create body: window, profile and evasion toggles.
+ *
+ * @param {CreateSessionOptions} options Session options.
+ * @returns {Record<string, unknown>} Anchor `browser` settings.
+ */
+function browserConfig(options: CreateSessionOptions): Record<string, unknown> {
+  const browser: Record<string, unknown> = {};
+  if (options.headless !== undefined) browser.headless = { active: options.headless };
+  if (options.viewport) browser.viewport = options.viewport;
+  if (options.profileId) browser.profile = { name: options.profileId };
+  if (options.stealth) browser.extra_stealth = { active: true };
+  if (options.captchaSolving) browser.captcha_solver = { active: true };
+  return browser;
+}
+
+/**
+ * Builds the nested body Anchor reads: session settings under `session`,
+ * browser settings under `browser`. Flat keys are ignored by the API without
+ * an error, so `extra` is merged one level deep into both sections.
+ *
+ * @param {CreateSessionOptions} [options] Session options.
+ * @returns {Record<string, unknown>} Request body for `POST /v1/sessions`.
+ */
 function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
-  const body: Record<string, unknown> = {};
-  if (!options) return body;
-  if (options.region) body.region = options.region;
-  if (options.proxy) body.proxy = options.proxy;
-  if (options.stealth) body.stealth = true;
-  if (options.headless !== undefined) body.headless = options.headless;
-  if (options.viewport) body.viewport = options.viewport;
-  if (options.extra) Object.assign(body, options.extra);
+  if (!options) return {};
+  const { session: extraSession, browser: extraBrowser, ...extra } = options.extra ?? {};
+  const session = Object.assign(sessionConfig(options), extraSession);
+  const browser = Object.assign(browserConfig(options), extraBrowser);
+
+  const body: Record<string, unknown> = { ...extra };
+  if (Object.keys(session).length > 0) body.session = session;
+  if (Object.keys(browser).length > 0) body.browser = browser;
   return body;
+}
+
+/**
+ * Maps a status record onto a session. Anchor does not return the CDP URL
+ * after creation, so only `createSession` can fill it.
+ *
+ * @param {AnchorSessionStatus} status Status record from the API.
+ * @param {string} [fallbackId] Session ID the caller asked for.
+ * @returns {BrowserSession} Session without a CDP URL.
+ */
+function toSession(status: Readonly<AnchorSessionStatus>, fallbackId?: string): BrowserSession {
+  return {
+    id: status.session_id ?? fallbackId ?? "",
+    cdpUrl: undefined,
+    provider: "anchor",
+    createdAt: status.created_at ? new Date(status.created_at).getTime() : Date.now(),
+    metadata: { status: status.status },
+  };
+}
+
+/**
+ * Checks whether the bytes at `offset` spell the signature.
+ *
+ * @param {ArrayLike<number>} image Screenshot bytes.
+ * @param {ArrayLike<number>} signature Bytes to look for.
+ * @param {number} [offset] Position of the signature in the image.
+ * @returns {boolean} Whether the signature is there.
+ */
+function hasSignature(image: ArrayLike<number>, signature: ArrayLike<number>, offset = 0): boolean {
+  for (let index = 0; index < signature.length; index += 1) {
+    if (image[offset + index] !== signature[index]) return false;
+  }
+  return true;
+}
+
+/**
+ * Reads the image type from the bytes. The screenshot route labels every
+ * response `image/png` and sends JPEG for most of them.
+ *
+ * @param {ArrayLike<number>} image Screenshot bytes.
+ * @param {string} declared Content type the response declared.
+ * @returns {string} MIME type of the bytes.
+ */
+function imageMimeType(image: ArrayLike<number>, declared: string): string {
+  if (hasSignature(image, JPEG_SIGNATURE)) return "image/jpeg";
+  if (hasSignature(image, PNG_SIGNATURE)) return "image/png";
+  if (hasSignature(image, RIFF_SIGNATURE) && hasSignature(image, WEBP_SIGNATURE, 8)) {
+    return "image/webp";
+  }
+  const declaredType = declared.split(";")[0]?.trim() ?? "";
+  return declaredType.startsWith("image/") ? declaredType : "image/png";
 }
 
 class AnchorProvider implements BrowserProvider {
@@ -56,6 +168,13 @@ class AnchorProvider implements BrowserProvider {
     return "anchor";
   }
 
+  /**
+   * The screenshot tool accepts a bare URL, but a call without a session
+   * leaves a two-minute session running on the account, so the executors
+   * open and release their own instead.
+   *
+   * @returns {ProviderCapabilities} What Anchor does over REST.
+   */
   capabilities(): ProviderCapabilities {
     return {
       scrape: false,
@@ -76,25 +195,27 @@ class AnchorProvider implements BrowserProvider {
 
   private headers(): Record<string, string> {
     return {
-      Authorization: `Bearer ${this.apiKey}`,
+      "anchor-api-key": this.apiKey,
       "Content-Type": "application/json",
     };
   }
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
-      const res = await this.client.postJSON<AnchorSessionResponse>(
+      const res = await this.client.postJSON<AnchorEnvelope<AnchorCreatedSession>>(
         `${this.baseURL}/v1/sessions`,
         createSessionBody(options),
         this.headers(),
       );
+      const data = res.data ?? {};
+      if (!data.id) throw new BrowserError("Anchor returned a session without an ID");
 
       return {
-        id: res.id,
-        cdpUrl: res.cdpUrl ?? res.wsEndpoint,
+        id: data.id,
+        cdpUrl: data.cdp_url,
         provider: "anchor",
         createdAt: Date.now(),
-        metadata: { status: res.status },
+        metadata: { liveViewUrl: data.live_view_url },
       };
     } catch (error) {
       throw normalizeError(error, "anchor");
@@ -103,17 +224,11 @@ class AnchorProvider implements BrowserProvider {
 
   async getSession(sessionId: string): Promise<BrowserSession | null> {
     try {
-      const res = await this.client.getJSON<AnchorSessionResponse>(
+      const res = await this.client.getJSON<AnchorEnvelope<AnchorSessionStatus>>(
         `${this.baseURL}/v1/sessions/${sessionId}`,
         this.headers(),
       );
-      return {
-        id: res.id,
-        cdpUrl: res.cdpUrl ?? res.wsEndpoint,
-        provider: "anchor",
-        createdAt: res.createdAt ? new Date(res.createdAt).getTime() : Date.now(),
-        metadata: { status: res.status },
-      };
+      return toSession(res.data ?? {}, sessionId);
     } catch (error: unknown) {
       if (isNotFoundError(error)) return null;
       throw normalizeError(error, "anchor");
@@ -122,17 +237,11 @@ class AnchorProvider implements BrowserProvider {
 
   async listSessions(): Promise<BrowserSession[]> {
     try {
-      const res = await this.client.getJSON<AnchorSessionResponse[]>(
-        `${this.baseURL}/v1/sessions`,
+      const res = await this.client.getJSON<AnchorEnvelope<AnchorSessionList>>(
+        `${this.baseURL}/v1/sessions/all/status`,
         this.headers(),
       );
-      return res.map((s) => ({
-        id: s.id,
-        cdpUrl: s.cdpUrl ?? s.wsEndpoint,
-        provider: "anchor",
-        createdAt: s.createdAt ? new Date(s.createdAt).getTime() : Date.now(),
-        metadata: { status: s.status },
-      }));
+      return (res.data?.items ?? []).map((status) => toSession(status));
     } catch {
       return [];
     }
@@ -159,22 +268,23 @@ class AnchorProvider implements BrowserProvider {
     session?: BrowserSession,
   ): Promise<ScreenshotResult> {
     try {
-      assertSessionId(session?.id, "anchor", "screenshot");
-      const body: Record<string, unknown> = {
-        sessionId: session.id,
-        fullPage: options.fullPage ?? true,
-      };
-      if (options.selector) body.selector = options.selector;
+      assertUrlOrSession(options.url, session, "anchor", "screenshot");
+      const body: Record<string, unknown> = { capture_full_height: options.fullPage ?? true };
+      if (options.url) body.url = options.url;
+      if (options.quality !== undefined) body.image_quality = options.quality;
 
-      const res = await this.client.postJSON<{ data?: string; screenshot?: string }>(
-        `${this.baseURL}/v1/screenshot`,
+      const query = session ? `?sessionId=${encodeURIComponent(session.id)}` : "";
+      const res = await this.client.postResponse(
+        `${this.baseURL}/v1/tools/screenshot${query}`,
         body,
         this.headers(),
       );
+      const image = Buffer.from(await res.arrayBuffer());
+      const mimeType = imageMimeType(image, res.headers.get("content-type") ?? "");
 
       return {
-        data: res.data ?? res.screenshot ?? "",
-        mimeType: `image/${options.format ?? "png"}`,
+        data: `data:${mimeType};base64,${image.toString("base64")}`,
+        mimeType,
       };
     } catch (error) {
       throw normalizeError(error, "anchor");
@@ -195,7 +305,10 @@ class AnchorProvider implements BrowserProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
-      await this.client.getJSON<{ status?: string }>(`${this.baseURL}/v1/health`, this.headers());
+      await this.client.getJSON<AnchorEnvelope<AnchorSessionList>>(
+        `${this.baseURL}/v1/sessions/all/status`,
+        this.headers(),
+      );
       return true;
     } catch {
       return false;

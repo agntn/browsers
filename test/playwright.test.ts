@@ -46,6 +46,20 @@ describe("playwright provider (local)", () => {
     expect(after.some((s) => s.id === session.id)).toBe(false);
   });
 
+  it("releases a session created by another provider instance", async () => {
+    const session = await provider.createSession({ headless: true });
+    sessions.push(session);
+
+    const releaseProvider = create("playwright");
+    await expect(releaseProvider.getSession(session.id)).resolves.toEqual(session);
+    await expect(releaseProvider.listSessions()).resolves.toContainEqual(session);
+    await releaseProvider.releaseSession(session.id);
+    sessions.pop();
+
+    await expect(releaseProvider.getSession(session.id)).resolves.toBeNull();
+    await expect(provider.listSessions()).resolves.not.toContainEqual(session);
+  });
+
   it("scrapes a data: URL", async () => {
     const result = await provider.scrape(
       "data:text/html,<html><head><title>Test</title></head><body>Hello</body></html>",

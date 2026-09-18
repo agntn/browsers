@@ -54,6 +54,10 @@ export default defineCommand({
   async run({ args }) {
     const { name: providerName, provider } = resolveAndCreate(args.provider, args.browser);
     consola.info(`Screenshot via ${providerName}...`);
+    const viewport =
+      args.width && args.height
+        ? { width: Number(args.width), height: Number(args.height) }
+        : undefined;
 
     try {
       const result = await screenshotWithSessionWhenNeeded(
@@ -62,13 +66,9 @@ export default defineCommand({
           url: args.url,
           format: args.format as "png" | "jpeg" | "webp",
           fullPage: args.fullPage,
+          viewport,
         },
-        {
-          viewport:
-            args.width && args.height
-              ? { width: Number(args.width), height: Number(args.height) }
-              : undefined,
-        },
+        { viewport },
       );
 
       const outputPath = resolve(args.output);

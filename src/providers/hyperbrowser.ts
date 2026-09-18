@@ -54,7 +54,7 @@ function createScreenshotBody(options: ScreenshotOptions): Record<string, unknow
   if (!options.url) {
     throw new InvalidInputError("hyperbrowser screenshot requires a URL");
   }
-  return {
+  const body: Record<string, unknown> = {
     url: options.url,
     outputs: {
       formats: [
@@ -62,6 +62,8 @@ function createScreenshotBody(options: ScreenshotOptions): Record<string, unknow
       ],
     },
   };
+  if (options.viewport) body.browser = { screen: options.viewport };
+  return body;
 }
 
 function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {

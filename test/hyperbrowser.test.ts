@@ -198,6 +198,16 @@ describe("hyperbrowser current session API", () => {
     });
     expect(requests[0]?.apiKey).toBe("test");
     expect(requests[1]?.apiKey).toBeUndefined();
+
+    await provider.screenshot({
+      url: "https://example.com",
+      viewport: { width: 800, height: 600 },
+    });
+    expect(JSON.parse(requests[2]?.body ?? "")).toEqual({
+      url: "https://example.com",
+      browser: { screen: { width: 800, height: 600 } },
+      outputs: { formats: [{ type: "screenshot", fullPage: true, format: "png" }] },
+    });
   });
 
   it("reports a failed fetch instead of an empty screenshot", async () => {

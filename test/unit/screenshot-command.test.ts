@@ -94,7 +94,12 @@ describe("screenshot command", () => {
 
     expect(createSession).toHaveBeenCalledWith({ viewport: { width: 800, height: 600 } });
     expect(providerScreenshot).toHaveBeenCalledWith(
-      { url: "https://example.test", format: "png", fullPage: true },
+      {
+        url: "https://example.test",
+        format: "png",
+        fullPage: true,
+        viewport: { width: 800, height: 600 },
+      },
       expect.objectContaining({ id: "session-1" }),
     );
     expect(releaseSession).toHaveBeenCalledWith("session-1");
@@ -107,7 +112,17 @@ describe("screenshot command", () => {
     providerScreenshot.mockResolvedValueOnce({ data: PNG_DATA, mimeType: "image/png" });
 
     await runCommand(screenshot, {
-      rawArgs: ["https://example.test", "--provider", "shottest", "--output", output("bare.png")],
+      rawArgs: [
+        "https://example.test",
+        "--provider",
+        "shottest",
+        "--output",
+        output("bare.png"),
+        "--width",
+        "800",
+        "--height",
+        "600",
+      ],
     });
 
     expect(createSession).not.toHaveBeenCalled();
@@ -116,6 +131,7 @@ describe("screenshot command", () => {
       url: "https://example.test",
       format: "png",
       fullPage: true,
+      viewport: { width: 800, height: 600 },
     });
     expect(readFileSync(output("bare.png"))).toEqual(PNG_BYTES);
   });
@@ -150,6 +166,7 @@ describe("screenshot command", () => {
       url: "https://example.test",
       format: "png",
       fullPage: true,
+      viewport: undefined,
     });
     expect(exit).toHaveBeenCalledWith(1);
   });

@@ -54,6 +54,7 @@ export interface ScreenshotOptions {
   quality?: number;
   fullPage?: boolean;
   encoding?: "base64" | "url";
+  viewport?: { width: number; height: number };
 }
 
 export interface ScreenshotResult {

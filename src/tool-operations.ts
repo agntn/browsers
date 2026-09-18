@@ -2,8 +2,8 @@ import "./providers/index";
 import { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS } from "./tool-contract";
 import { create, providers } from "./core/registry";
 import { resolveProvider } from "./core/resolve";
-import type { BrowserProvider, ProviderCapabilities, ScrapeResult } from "./core/types";
-import { resolveCloudflareBrowser } from "./core/utils";
+import type { BrowserProvider, ProviderCapabilities } from "./core/types";
+import { resolveCloudflareBrowser, scrapeWithSessionWhenNeeded } from "./core/utils";
 
 export type { ProviderCapabilities } from "./core/types";
 
@@ -143,24 +143,6 @@ function resolveScrapeMaxChars(value?: number): number {
     throw new RangeError(`maxChars must be an integer between 1 and ${MAX_SCRAPE_MAX_CHARS}.`);
   }
   return maxChars;
-}
-
-async function scrapeWithSessionWhenNeeded(
-  provider: Readonly<BrowserProvider>,
-  url: string,
-  options: Readonly<{ waitFor?: string; maxChars: number }>,
-): Promise<ScrapeResult> {
-  const capabilities = provider.capabilities();
-  if (!capabilities.scrape || capabilities.statelessScrape) {
-    return provider.scrape(url, options);
-  }
-
-  const session = await provider.createSession();
-  try {
-    return await provider.scrape(url, options, session);
-  } finally {
-    await provider.releaseSession(session.id).catch(() => undefined);
-  }
 }
 
 /**

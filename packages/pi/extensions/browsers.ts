@@ -148,7 +148,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     promptSnippet: "Take a screenshot of a URL with a cloud browser.",
     promptGuidelines: [
       "Use browsers_screenshot when the user needs a visual capture of a webpage.",
-      "Cloudflare and Browserless work statelessly (no session needed).",
+      "Cloudflare, Browserless and Hyperbrowser work statelessly (no session needed).",
       "Other providers open a temporary session inside this tool, capture, and release it.",
     ],
     parameters: browserToolSchemas.browsers_screenshot,
@@ -266,7 +266,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     promptSnippet: "Check capabilities of a browser provider before using it.",
     promptGuidelines: [
       "Use browsers_capabilities before browsers_scrape/browsers_screenshot to check if the provider supports the operation.",
-      "Some providers support stateless operations (no session needed): cloudflare, browserless for both scrape and screenshot.",
+      "Some providers support stateless operations (no session needed): cloudflare, browserless and hyperbrowser for both scrape and screenshot.",
       "Navigate and evaluate flags describe the library API. No tool accepts a session ID except browsers_release.",
     ],
     parameters: browserToolSchemas.browsers_capabilities,

@@ -15,7 +15,7 @@ import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, normalizeError } from "../core/errors";
 import { register } from "../core/registry";
-import { isNotFoundError, assertSessionId, notSupportedViaRest } from "../core/utils";
+import { isNotFoundError, notSupportedViaRest } from "../core/utils";
 
 interface BrowserbaseSessionResponse {
   id: string;
@@ -58,7 +58,7 @@ class BrowserbaseProvider implements BrowserProvider {
   capabilities(): ProviderCapabilities {
     return {
       scrape: true,
-      screenshot: true,
+      screenshot: false,
       navigate: false,
       evaluate: false,
       sessions: true,
@@ -175,32 +175,18 @@ class BrowserbaseProvider implements BrowserProvider {
     }
   }
 
+  /**
+   * Browserbase has no screenshot route; screenshots go over the session's CDP URL.
+   *
+   * @param {ScreenshotOptions} _options Screenshot options.
+   * @param {BrowserSession} [_session] Browser session.
+   * @returns {Promise<ScreenshotResult>} Never; the call always throws.
+   */
   async screenshot(
-    options: ScreenshotOptions,
-    session?: BrowserSession,
+    _options: ScreenshotOptions,
+    _session?: BrowserSession,
   ): Promise<ScreenshotResult> {
-    try {
-      assertSessionId(session?.id, "browserbase", "screenshot");
-      const body: Record<string, unknown> = {
-        sessionId: session.id,
-        fullPage: options.fullPage ?? true,
-        format: options.format ?? "png",
-      };
-      if (options.selector) body.selector = options.selector;
-
-      const res = await this.client.postJSON<{ data?: string; screenshot?: string }>(
-        `${this.baseURL}/v1/screenshot`,
-        body,
-        this.headers(),
-      );
-
-      return {
-        data: res.data ?? res.screenshot ?? "",
-        mimeType: `image/${options.format ?? "png"}`,
-      };
-    } catch (error) {
-      throw normalizeError(error, "browserbase");
-    }
+    notSupportedViaRest("browserbase", "screenshot");
   }
 
   async navigate(_url: string, _session: BrowserSession): Promise<void> {

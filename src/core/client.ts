@@ -99,6 +99,27 @@ export class Client {
     }
   }
 
+  /**
+   * GET whose response is bytes, such as a screenshot a vendor stores at a URL.
+   *
+   * @param {string} url Target URL.
+   * @param {Readonly<Record<string, string>>} [headers] Request headers.
+   * @param {AbortSignal} [signal] Cancellation signal.
+   * @returns {Promise<ArrayBuffer>} Response body.
+   */
+  async getRaw(
+    url: string,
+    headers?: Readonly<Record<string, string>>,
+    signal?: AbortSignal,
+  ): Promise<ArrayBuffer> {
+    try {
+      const res = await this.fetch.raw(url, { headers, signal, responseType: "arrayBuffer" });
+      return res._data as ArrayBuffer;
+    } catch (error) {
+      throw this.mapError(error, url);
+    }
+  }
+
   async postRaw(
     url: string,
     body: Readonly<Record<string, unknown>>,

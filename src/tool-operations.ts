@@ -3,7 +3,11 @@ import { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS } from "./tool-contract"
 import { create, providers } from "./core/registry";
 import { resolveProvider } from "./core/resolve";
 import type { BrowserProvider, ProviderCapabilities } from "./core/types";
-import { resolveCloudflareBrowser, scrapeWithSessionWhenNeeded } from "./core/utils";
+import {
+  resolveCloudflareBrowser,
+  scrapeWithSessionWhenNeeded,
+  screenshotWithSessionWhenNeeded,
+} from "./core/utils";
 
 export type { ProviderCapabilities } from "./core/types";
 
@@ -243,28 +247,13 @@ export async function browserScreenshot(
   params: Readonly<BrowserScreenshotParams>,
 ): Promise<ToolResult<{ url: string; provider: string; saved: boolean }>> {
   const { name, provider } = getProvider(params.provider, params.browser);
-  const capabilities = provider.capabilities();
-  const options = {
+  const result = await screenshotWithSessionWhenNeeded(provider, {
     url: params.url,
     fullPage: params.fullPage,
     format: screenshotFormat(params.format),
-  };
-
-  if (capabilities.statelessScreenshot) {
-    const result = await provider.screenshot(options);
-    return screenshotResult(params.url, name, result.data.length, true);
-  }
-
-  const session = await provider.createSession();
-  try {
-    if (capabilities.navigate) {
-      await provider.navigate(params.url, session).catch(() => undefined);
-    }
-    const result = await provider.screenshot(options, session);
-    return screenshotResult(params.url, name, result.data.length, false);
-  } finally {
-    await provider.releaseSession(session.id).catch(() => undefined);
-  }
+  });
+  const stateless = provider.capabilities().statelessScreenshot;
+  return screenshotResult(params.url, name, result.data.length, stateless);
 }
 
 function screenshotFormat(format?: string): "png" | "jpeg" | "webp" | undefined {

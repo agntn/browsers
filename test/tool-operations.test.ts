@@ -135,6 +135,19 @@ describe("browser tool operations", () => {
     expect(scrape).not.toHaveBeenCalled();
   });
 
+  it("rejects Kitesurf with providers other than Cloudflare before I/O", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+
+    await expect(
+      browserScrape({
+        provider: "tooltest",
+        browser: "kitesurf",
+        url: "https://example.test",
+      }),
+    ).rejects.toThrow("The Kitesurf browser is only available with Cloudflare");
+    expect(scrape).not.toHaveBeenCalled();
+  });
+
   it("keeps session credentials out of the shared result", async () => {
     process.env.TOOLTEST_API_KEY = "test";
 

@@ -20,6 +20,10 @@ export default defineCommand({
       alias: "p",
       description: "Provider (cloudflare, browserless)",
     },
+    browser: {
+      type: "string",
+      description: "Cloudflare browser engine: kitesurf",
+    },
     output: {
       type: "string",
       alias: "o",
@@ -33,7 +37,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = resolveAndCreate(args.provider);
+    const { name: providerName, provider } = resolveAndCreate(args.provider, args.browser);
     if (!provider.pdf) {
       consola.error(`Provider ${providerName} does not support PDF generation.`);
       process.exit(1);

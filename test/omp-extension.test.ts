@@ -164,22 +164,41 @@ describe("browsers OMP extension", () => {
     const { tools } = registerExtension();
     const samples: Record<(typeof browserToolNames)[number], { valid: unknown; invalid: unknown }> =
       {
-        browsers_scrape: { valid: { url: "https://example.test" }, invalid: {} },
-        browsers_session: { valid: {}, invalid: { extra: true } },
-        browsers_release: { valid: { sessionId: "session-1" }, invalid: {} },
+        browsers_scrape: {
+          valid: { url: "https://example.test", browser: "kitesurf" },
+          invalid: {},
+        },
+        browsers_session: { valid: { browser: "kitesurf" }, invalid: { extra: true } },
+        browsers_release: {
+          valid: { sessionId: "session-1", browser: "kitesurf" },
+          invalid: {},
+        },
         browsers_providers: { valid: {}, invalid: { extra: true } },
-        browsers_screenshot: { valid: { url: "https://example.test" }, invalid: {} },
+        browsers_screenshot: {
+          valid: { url: "https://example.test", browser: "kitesurf" },
+          invalid: {},
+        },
         browsers_extract: {
           valid: {
             url: "https://example.test",
+            browser: "kitesurf",
             prompt: "Extract title",
             schema: { type: "object" },
           },
           invalid: { url: "https://example.test" },
         },
-        browsers_crawl: { valid: { url: "https://example.test", maxPages: 10 }, invalid: {} },
-        browsers_pdf: { valid: { url: "https://example.test" }, invalid: {} },
-        browsers_links: { valid: { url: "https://example.test" }, invalid: {} },
+        browsers_crawl: {
+          valid: { url: "https://example.test", browser: "kitesurf", maxPages: 10 },
+          invalid: {},
+        },
+        browsers_pdf: {
+          valid: { url: "https://example.test", browser: "kitesurf" },
+          invalid: {},
+        },
+        browsers_links: {
+          valid: { url: "https://example.test", browser: "kitesurf" },
+          invalid: {},
+        },
         browsers_search: { valid: { query: "browser agents" }, invalid: {} },
         browsers_capabilities: { valid: { provider: "playwright" }, invalid: {} },
       };
@@ -200,10 +219,12 @@ describe("browsers OMP extension", () => {
     }
   });
 
-  it("declares the scrape limit enforced by the shared executor", () => {
+  it("declares the scrape contract enforced by the shared executor", () => {
     const tool = requireTool(registerExtension().tools, "browsers_scrape");
 
     expect(accepts(tool, { url: "https://example.test" })).toBe(true);
+    expect(accepts(tool, { url: "https://example.test", browser: "kitesurf" })).toBe(true);
+    expect(accepts(tool, { url: "https://example.test", browser: "chromium" })).toBe(false);
     expect(accepts(tool, { url: "https://example.test", maxChars: 200_000 })).toBe(true);
     expect(accepts(tool, { url: "https://example.test", maxChars: 200_001 })).toBe(false);
     expect(accepts(tool, { url: "https://example.test", maxChars: 10.5 })).toBe(false);

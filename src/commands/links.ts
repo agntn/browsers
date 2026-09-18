@@ -18,10 +18,18 @@ export default defineCommand({
       alias: "p",
       description: "Provider (cloudflare)",
     },
+    browser: {
+      type: "string",
+      description: "Cloudflare browser engine: kitesurf",
+    },
   },
   async run({ args }) {
     try {
-      const result = await browserLinks({ url: args.url, provider: args.provider });
+      const result = await browserLinks({
+        url: args.url,
+        provider: args.provider,
+        browser: args.browser,
+      });
       for (const link of result.details.links) {
         console.log(link);
       }

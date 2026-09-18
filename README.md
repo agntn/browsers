@@ -79,6 +79,7 @@ Filled dot means that key was in the env on this run. Playwright is always fille
 ```bash
 browsers scrape https://example.com --provider playwright --format html
 browsers scrape https://example.com --provider playwright --waitFor h1
+browsers scrape https://example.com --browser kitesurf
 browsers screenshot https://example.com -o page.png
 browsers pdf https://example.com -o page.pdf --provider playwright
 browsers crawl https://example.com --maxPages 5 --provider playwright
@@ -87,7 +88,7 @@ browsers extract https://example.com --prompt "Extract the heading"
 browsers session create --provider kernel
 ```
 
-`search` is Hyperbrowser. `extract` is Cloudflare or Hyperbrowser. The rest take `-p` when you do not want the default.
+`search` is Hyperbrowser. `extract` is Cloudflare or Hyperbrowser. The rest take `-p` when you do not want the default. `--browser kitesurf` picks Cloudflare and opts into Kitesurf. Leave it out and Cloudflare stays on Chromium.
 
 ### Commands
 
@@ -117,7 +118,7 @@ const caps = provider.capabilities();
 console.log(caps.statelessScrape, caps.pdf, caps.cdp);
 ```
 
-That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resolveProvider()` picks the first one that does. Markdown, text or HTML, whichever came back. Kernel scrape wants a session object. The agent tools open one and close it. The CLI `scrape` command does not.
+That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resolveProvider()` picks the first one that does. Want Kitesurf on Cloudflare? Use `create("cloudflare", { browser: "kitesurf" })`. Without that option it stays on Chromium. Kernel scrape wants a session object. The agent tools open one and close it. The CLI `scrape` command does not.
 
 ## 🗺️ Providers
 
@@ -150,7 +151,7 @@ omp install @agntn/browsers
 }
 ```
 
-Eleven tools, `browsers_scrape` through `browsers_capabilities`, the same eleven on MCP, Pi and OMP. They take a URL. They do not drive a session you already opened.
+Eleven tools, `browsers_scrape` through `browsers_capabilities`, the same eleven on MCP, Pi and OMP. Cloudflare calls backed by Browser Run take `browser: "kitesurf"`. No `provider` needed then. They do not drive a session you already opened.
 
 ## 🚫 What this does not do
 

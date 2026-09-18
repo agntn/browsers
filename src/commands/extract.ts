@@ -18,6 +18,10 @@ export default defineCommand({
       alias: "p",
       description: "Provider (cloudflare, hyperbrowser)",
     },
+    browser: {
+      type: "string",
+      description: "Cloudflare browser engine: kitesurf",
+    },
     prompt: {
       type: "string",
       description: "Extraction prompt",
@@ -25,7 +29,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = resolveAndCreate(args.provider);
+    const { name: providerName, provider } = resolveAndCreate(args.provider, args.browser);
     if (!provider.extract) {
       consola.error(`Provider ${providerName} does not support structured extraction.`);
       process.exit(1);

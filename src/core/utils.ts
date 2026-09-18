@@ -1,5 +1,6 @@
 import type { HTTPError } from "./errors";
 import { InvalidInputError, UnsupportedOperationError } from "./errors";
+import type { CloudflareBrowser } from "./types";
 
 /**
  * Check whether an error is an HTTP 404 from the provider API.
@@ -49,6 +50,27 @@ export function assertUrlOrSession(
   if (!url && !session?.id) {
     throw new InvalidInputError(`${provider} ${operation} requires either a URL or a session`);
   }
+}
+
+/**
+ * Keeps Kitesurf on Cloudflare and rejects bad values before a request.
+ *
+ * @param {string} provider Resolved provider name.
+ * @param {string} browser Requested browser engine.
+ * @returns {CloudflareBrowser | undefined} The validated Cloudflare browser engine.
+ */
+export function resolveCloudflareBrowser(
+  provider: string,
+  browser?: string,
+): CloudflareBrowser | undefined {
+  if (browser === undefined) return undefined;
+  if (browser !== "kitesurf") {
+    throw new InvalidInputError(`Unsupported Cloudflare browser: ${JSON.stringify(browser)}`);
+  }
+  if (provider !== "cloudflare") {
+    throw new InvalidInputError("The Kitesurf browser is only available with Cloudflare");
+  }
+  return browser;
 }
 
 /**

@@ -47,6 +47,10 @@ export default defineCommand({
       alias: "p",
       description: "Provider name (cloudflare, hyperbrowser)",
     },
+    browser: {
+      type: "string",
+      description: "Cloudflare browser engine: kitesurf",
+    },
     maxPages: {
       type: "string",
       description: "Max pages to crawl (default: 10)",
@@ -57,7 +61,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = resolveAndCreate(args.provider);
+    const { name: providerName, provider } = resolveAndCreate(args.provider, args.browser);
     if (!provider.crawl) {
       consola.error(`Provider ${providerName} does not support crawl.`);
       process.exit(1);

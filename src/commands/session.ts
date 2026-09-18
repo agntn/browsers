@@ -16,6 +16,10 @@ export default defineCommand({
           alias: "p",
           description: "Browser provider name",
         },
+        browser: {
+          type: "string",
+          description: "Cloudflare browser engine: kitesurf",
+        },
         region: {
           type: "string",
           alias: "r",
@@ -23,7 +27,7 @@ export default defineCommand({
         },
       },
       async run({ args }) {
-        const { provider } = resolveAndCreate(args.provider);
+        const { provider } = resolveAndCreate(args.provider, args.browser);
         try {
           const session = await provider.createSession({ region: args.region });
           consola.success(`Session created: ${session.id}`);
@@ -48,9 +52,13 @@ export default defineCommand({
           alias: "p",
           description: "Browser provider name",
         },
+        browser: {
+          type: "string",
+          description: "Cloudflare browser engine: kitesurf",
+        },
       },
       async run({ args }) {
-        const { provider } = resolveAndCreate(args.provider);
+        const { provider } = resolveAndCreate(args.provider, args.browser);
         try {
           await provider.releaseSession(args.sessionId);
           consola.success(`Session ${args.sessionId} released.`);
@@ -68,9 +76,13 @@ export default defineCommand({
           alias: "p",
           description: "Browser provider name",
         },
+        browser: {
+          type: "string",
+          description: "Cloudflare browser engine: kitesurf",
+        },
       },
       async run({ args }) {
-        const { provider } = resolveAndCreate(args.provider);
+        const { provider } = resolveAndCreate(args.provider, args.browser);
         try {
           const sessions = await provider.listSessions();
           if (sessions.length === 0) {

@@ -52,6 +52,7 @@ describe("browsers MCP server", () => {
       type: "object",
       required: ["url"],
       properties: {
+        browser: { const: "kitesurf" },
         maxChars: { type: "integer", minimum: 1, maximum: 200_000 },
       },
     });
@@ -78,13 +79,19 @@ describe("browsers MCP server", () => {
   it("rejects arguments outside the shared contract", async () => {
     const client = await connectTestClient();
 
-    const response = await client.callTool({
+    const invalidLimit = await client.callTool({
       name: "browsers_scrape",
       arguments: { url: "https://example.test", maxChars: 200_001 },
     });
+    const invalidBrowser = await client.callTool({
+      name: "browsers_scrape",
+      arguments: { url: "https://example.test", browser: "chromium" },
+    });
 
-    expect(response.isError).toBe(true);
-    expect(contentTexts(response.content)[0]).toContain("Invalid arguments");
+    expect(invalidLimit.isError).toBe(true);
+    expect(contentTexts(invalidLimit.content)[0]).toContain("Invalid arguments");
+    expect(invalidBrowser.isError).toBe(true);
+    expect(contentTexts(invalidBrowser.content)[0]).toContain("Invalid arguments");
   });
 
   it("rejects prototype property names as unknown tools", async () => {

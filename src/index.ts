@@ -6,6 +6,7 @@ export { builtinProviders, type BrowserProviderName } from "./core/providers";
 
 export type {
   BrowserSession,
+  CloudflareBrowser,
   CreateSessionOptions,
   ScrapeResult,
   ScrapeOptions,

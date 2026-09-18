@@ -3,6 +3,7 @@ import { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS } from "./tool-contract"
 import { create, providers } from "./core/registry";
 import { resolveProvider } from "./core/resolve";
 import type { BrowserProvider, ProviderCapabilities, ScrapeResult } from "./core/types";
+import { resolveCloudflareBrowser } from "./core/utils";
 
 export type { ProviderCapabilities } from "./core/types";
 
@@ -17,6 +18,7 @@ export interface ToolResult<Details> {
 export interface BrowserScrapeParams {
   url: string;
   provider?: string;
+  browser?: string;
   waitFor?: string;
   maxChars?: number;
 }
@@ -24,6 +26,7 @@ export interface BrowserScrapeParams {
 /** Arguments accepted by the browser session tool. */
 export interface BrowserSessionParams {
   provider?: string;
+  browser?: string;
   region?: string;
 }
 
@@ -31,12 +34,14 @@ export interface BrowserSessionParams {
 export interface BrowserReleaseParams {
   sessionId: string;
   provider?: string;
+  browser?: string;
 }
 
 /** Arguments accepted by the browser screenshot tool. */
 export interface BrowserScreenshotParams {
   url: string;
   provider?: string;
+  browser?: string;
   format?: string;
   fullPage?: boolean;
 }
@@ -45,6 +50,7 @@ export interface BrowserScreenshotParams {
 export interface BrowserExtractParams {
   url: string;
   provider?: string;
+  browser?: string;
   prompt: string;
   schema?: Readonly<Record<string, unknown>>;
 }
@@ -53,6 +59,7 @@ export interface BrowserExtractParams {
 export interface BrowserCrawlParams {
   url: string;
   provider?: string;
+  browser?: string;
   maxPages?: number;
 }
 
@@ -60,6 +67,7 @@ export interface BrowserCrawlParams {
 export interface BrowserUrlParams {
   url: string;
   provider?: string;
+  browser?: string;
 }
 
 /** Arguments accepted by the browser search tool. */
@@ -120,9 +128,13 @@ export function errorMessage(error: unknown): string {
   return sanitizeField(error instanceof Error ? error.message : String(error));
 }
 
-function getProvider(preferred?: string): { name: string; provider: BrowserProvider } {
-  const name = resolveProvider(preferred);
-  return { name, provider: create(name) };
+function getProvider(
+  preferred?: string,
+  browser?: string,
+): { name: string; provider: BrowserProvider } {
+  const name = resolveProvider(browser && !preferred ? "cloudflare" : preferred);
+  const selectedBrowser = resolveCloudflareBrowser(name, browser);
+  return { name, provider: create(name, { browser: selectedBrowser }) };
 }
 
 function resolveScrapeMaxChars(value?: number): number {
@@ -161,7 +173,7 @@ export async function browserScrape(
   params: Readonly<BrowserScrapeParams>,
 ): Promise<ToolResult<BrowserScrapeDetails>> {
   const maxChars = resolveScrapeMaxChars(params.maxChars);
-  const { name, provider } = getProvider(params.provider);
+  const { name, provider } = getProvider(params.provider, params.browser);
   const result = await scrapeWithSessionWhenNeeded(provider, params.url, {
     waitFor: params.waitFor,
     maxChars,
@@ -188,7 +200,7 @@ export async function browserScrape(
 export async function browserSession(
   params: Readonly<BrowserSessionParams>,
 ): Promise<ToolResult<BrowserSessionDetails>> {
-  const { name, provider } = getProvider(params.provider);
+  const { name, provider } = getProvider(params.provider, params.browser);
   const session = await provider.createSession({ region: params.region });
   return {
     content: content(`[provider=${name}] Session created: ${sanitizeField(session.id)}`),
@@ -207,7 +219,7 @@ export async function browserSession(
 export async function releaseBrowserSession(
   params: Readonly<BrowserReleaseParams>,
 ): Promise<ToolResult<{ released: boolean }>> {
-  const { name, provider } = getProvider(params.provider);
+  const { name, provider } = getProvider(params.provider, params.browser);
   await provider.releaseSession(params.sessionId);
   return {
     content: content(`[provider=${name}] Session ${sanitizeField(params.sessionId)} released.`),
@@ -248,7 +260,7 @@ export function listBrowserProviders(): ToolResult<{ providers: BrowserProviderS
 export async function browserScreenshot(
   params: Readonly<BrowserScreenshotParams>,
 ): Promise<ToolResult<{ url: string; provider: string; saved: boolean }>> {
-  const { name, provider } = getProvider(params.provider);
+  const { name, provider } = getProvider(params.provider, params.browser);
   const capabilities = provider.capabilities();
   const options = {
     url: params.url,
@@ -304,7 +316,7 @@ function screenshotResult(
 export async function browserExtract(
   params: Readonly<BrowserExtractParams>,
 ): Promise<ToolResult<{ url: string; provider: string; data: unknown }>> {
-  const { name, provider } = getProvider(params.provider);
+  const { name, provider } = getProvider(params.provider, params.browser);
   if (!provider.extract) throw new Error(`Provider ${name} does not support extract.`);
   const result = await provider.extract(params.url, {
     prompt: params.prompt,
@@ -327,7 +339,7 @@ export async function browserExtract(
 export async function browserCrawl(
   params: Readonly<BrowserCrawlParams>,
 ): Promise<ToolResult<{ jobId?: string; pages: number }>> {
-  const { name, provider } = getProvider(params.provider);
+  const { name, provider } = getProvider(params.provider, params.browser);
   if (!provider.crawl) throw new Error(`Provider ${name} does not support crawl.`);
   const result = await provider.crawl(params.url, { maxPages: params.maxPages ?? 10 });
   const lines = [`[provider=${name}] Crawled ${result.pages.length} pages.`];
@@ -349,7 +361,7 @@ export async function browserCrawl(
 export async function browserPdf(
   params: Readonly<BrowserUrlParams>,
 ): Promise<ToolResult<{ url: string; provider: string; pdfLength: number }>> {
-  const { name, provider } = getProvider(params.provider);
+  const { name, provider } = getProvider(params.provider, params.browser);
   if (!provider.pdf) throw new Error(`Provider ${name} does not support PDF generation.`);
   const result = await provider.pdf(params.url);
   return {
@@ -367,7 +379,7 @@ export async function browserPdf(
 export async function browserLinks(
   params: Readonly<BrowserUrlParams>,
 ): Promise<ToolResult<{ url: string; links: string[] }>> {
-  const { name, provider } = getProvider(params.provider);
+  const { name, provider } = getProvider(params.provider, params.browser);
   if (!provider.links) throw new Error(`Provider ${name} does not support link extraction.`);
   const result = await provider.links(params.url);
   const links = [...new Set(result.links.map((link) => sanitizeField(link.href)))];

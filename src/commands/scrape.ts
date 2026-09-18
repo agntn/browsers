@@ -35,6 +35,10 @@ export default defineCommand({
       alias: "p",
       description: "Browser provider name (default: first with API key set)",
     },
+    browser: {
+      type: "string",
+      description: "Cloudflare browser engine: kitesurf",
+    },
     format: {
       type: "string",
       alias: "f",
@@ -51,7 +55,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = resolveAndCreate(args.provider);
+    const { name: providerName, provider } = resolveAndCreate(args.provider, args.browser);
     consola.info(`Scraping via ${providerName}...`);
 
     try {

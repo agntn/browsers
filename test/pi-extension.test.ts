@@ -182,6 +182,7 @@ describe("browsers Pi extension", () => {
   it("keeps the shared scrape bounds in the Pi schema", () => {
     expect(registerTools().get("browsers_scrape")?.parameters).toMatchObject({
       properties: {
+        browser: { const: "kitesurf" },
         maxChars: {
           type: "integer",
           minimum: 1,

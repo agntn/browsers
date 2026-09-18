@@ -11,12 +11,19 @@ const provider = Type.Optional(
   }),
 );
 
+const browser = Type.Optional(
+  Type.Literal("kitesurf", {
+    description: "Use Cloudflare's Kitesurf engine instead of the default Chromium browser.",
+  }),
+);
+
 /** TypeBox schemas shared by the Pi extension and MCP server. */
 export const browserToolSchemas = {
   browsers_scrape: Type.Object(
     {
       url: Type.String({ description: "URL to scrape" }),
       provider,
+      browser,
       waitFor: Type.Optional(
         Type.String({ description: "CSS selector to wait for before extraction" }),
       ),
@@ -33,6 +40,7 @@ export const browserToolSchemas = {
   browsers_session: Type.Object(
     {
       provider,
+      browser,
       region: Type.Optional(
         Type.String({ description: "Preferred region (e.g. us-east-1, eu-west-1)" }),
       ),
@@ -43,6 +51,7 @@ export const browserToolSchemas = {
     {
       sessionId: Type.String({ description: "Session ID to release" }),
       provider,
+      browser,
     },
     { additionalProperties: false },
   ),
@@ -51,6 +60,7 @@ export const browserToolSchemas = {
     {
       url: Type.String({ description: "URL to screenshot" }),
       provider,
+      browser,
       format: Type.Optional(
         Type.String({ description: "Image format: png, jpeg, webp. Default: png." }),
       ),
@@ -64,6 +74,7 @@ export const browserToolSchemas = {
       provider: Type.Optional(
         Type.String({ description: "Provider. One of: cloudflare, hyperbrowser." }),
       ),
+      browser,
       prompt: Type.String({
         description: "What to extract (e.g. 'Extract product name, price, and description')",
       }),
@@ -81,6 +92,7 @@ export const browserToolSchemas = {
       provider: Type.Optional(
         Type.String({ description: "Provider. One of: cloudflare, hyperbrowser, playwright." }),
       ),
+      browser,
       maxPages: Type.Optional(Type.Number({ description: "Max pages to crawl. Default: 10." })),
     },
     { additionalProperties: false },
@@ -91,6 +103,7 @@ export const browserToolSchemas = {
       provider: Type.Optional(
         Type.String({ description: "Provider. One of: cloudflare, browserless, playwright." }),
       ),
+      browser,
     },
     { additionalProperties: false },
   ),
@@ -98,6 +111,7 @@ export const browserToolSchemas = {
     {
       url: Type.String({ description: "URL to extract links from" }),
       provider,
+      browser,
     },
     { additionalProperties: false },
   ),

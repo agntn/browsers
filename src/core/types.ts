@@ -7,6 +7,9 @@ export interface BrowserSession {
   metadata?: Record<string, unknown>;
 }
 
+/** Cloudflare Browser Run engine that callers can opt into. */
+export type CloudflareBrowser = "kitesurf";
+
 /** Options for session creation. */
 export interface CreateSessionOptions {
   region?: string;
@@ -189,6 +192,7 @@ export interface ProviderConfig {
   apiKey?: string;
   accountID?: string;
   baseURL?: string;
+  browser?: CloudflareBrowser;
 }
 
 export type BrowserProviderFactory = (config: ProviderConfig) => BrowserProvider;

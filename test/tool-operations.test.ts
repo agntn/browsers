@@ -221,8 +221,8 @@ describe("browser tool operations", () => {
   it("lists registered providers and reports capabilities consistently", async () => {
     process.env.TOOLTEST_API_KEY = "test";
 
-    const listing = listBrowserProviders();
-    const capabilities = browserCapabilities({ provider: "tooltest" });
+    const listing = await listBrowserProviders();
+    const capabilities = await browserCapabilities({ provider: "tooltest" });
 
     expect(listing.details.providers).toContainEqual(
       expect.objectContaining({ name: "tooltest", configured: true }),

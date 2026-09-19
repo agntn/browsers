@@ -27,7 +27,7 @@ export default defineCommand({
         },
       },
       async run({ args }) {
-        const { provider } = resolveAndCreate(args.provider, args.browser);
+        const { provider } = await resolveAndCreate(args.provider, args.browser);
         try {
           const session = await provider.createSession({ region: args.region });
           consola.success(`Session created: ${session.id}`);
@@ -58,7 +58,7 @@ export default defineCommand({
         },
       },
       async run({ args }) {
-        const { provider } = resolveAndCreate(args.provider, args.browser);
+        const { provider } = await resolveAndCreate(args.provider, args.browser);
         try {
           await provider.releaseSession(args.sessionId);
           consola.success(`Session ${args.sessionId} released.`);
@@ -82,7 +82,7 @@ export default defineCommand({
         },
       },
       async run({ args }) {
-        const { provider } = resolveAndCreate(args.provider, args.browser);
+        const { provider } = await resolveAndCreate(args.provider, args.browser);
         try {
           const sessions = await provider.listSessions();
           if (sessions.length === 0) {

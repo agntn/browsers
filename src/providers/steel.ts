@@ -14,7 +14,6 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, BrowserError, normalizeError } from "../core/errors";
-import { register } from "../core/registry";
 import { isNotFoundError, assertSessionId, notSupportedViaRest } from "../core/utils";
 
 interface SteelSessionResponse {
@@ -272,5 +271,4 @@ class SteelProvider implements BrowserProvider {
   }
 }
 
-const factory: BrowserProviderFactory = (config) => new SteelProvider(config);
-register("steel", "https://api.steel.dev", factory);
+export const factory: BrowserProviderFactory = (config) => new SteelProvider(config);

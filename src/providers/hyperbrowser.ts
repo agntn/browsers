@@ -20,7 +20,6 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, BrowserError, InvalidInputError, normalizeError } from "../core/errors";
-import { register } from "../core/registry";
 import { isNotFoundError, notSupportedViaRest } from "../core/utils";
 
 interface HyperbrowserSessionResponse {
@@ -360,5 +359,4 @@ class HyperbrowserProvider implements BrowserProvider {
   }
 }
 
-const factory: BrowserProviderFactory = (config) => new HyperbrowserProvider(config);
-register("hyperbrowser", "https://api.hyperbrowser.ai", factory);
+export const factory: BrowserProviderFactory = (config) => new HyperbrowserProvider(config);

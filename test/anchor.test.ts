@@ -1,7 +1,6 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import "../src/providers/index";
 import { create } from "../src/core/registry";
 import { AuthError } from "../src/core/errors";
 
@@ -99,7 +98,7 @@ describe("anchor provider", () => {
   });
 
   it("sends the key in the anchor-api-key header", async () => {
-    const provider = create("anchor", { apiKey: API_KEY, baseURL });
+    const provider = await create("anchor", { apiKey: API_KEY, baseURL });
 
     await expect(provider.createSession()).resolves.toMatchObject({ id: SESSION_ID });
     expect(requests).toHaveLength(1);
@@ -108,13 +107,13 @@ describe("anchor provider", () => {
   });
 
   it("reports a rejected key as an auth error", async () => {
-    const provider = create("anchor", { apiKey: "sk-wrong", baseURL });
+    const provider = await create("anchor", { apiKey: "sk-wrong", baseURL });
 
     await expect(provider.createSession()).rejects.toBeInstanceOf(AuthError);
   });
 
   it("nests session options under session and browser", async () => {
-    const provider = create("anchor", { apiKey: API_KEY, baseURL });
+    const provider = await create("anchor", { apiKey: API_KEY, baseURL });
 
     await provider.createSession({
       headless: true,
@@ -146,7 +145,7 @@ describe("anchor provider", () => {
   });
 
   it("unwraps the data envelope on every session route", async () => {
-    const provider = create("anchor", { apiKey: API_KEY, baseURL });
+    const provider = await create("anchor", { apiKey: API_KEY, baseURL });
 
     const created = await provider.createSession();
     expect(created).toMatchObject({
@@ -182,7 +181,7 @@ describe("anchor provider", () => {
   });
 
   it("screenshots through the tools route with or without a session", async () => {
-    const provider = create("anchor", { apiKey: API_KEY, baseURL });
+    const provider = await create("anchor", { apiKey: API_KEY, baseURL });
     expect(provider.capabilities().statelessScreenshot).toBe(false);
 
     const stateless = await provider.screenshot({ url: "https://example.com", quality: 80 });
@@ -208,12 +207,12 @@ describe("anchor provider", () => {
   });
 
   it("probes availability on the sessions status route", async () => {
-    const provider = create("anchor", { apiKey: API_KEY, baseURL });
+    const provider = await create("anchor", { apiKey: API_KEY, baseURL });
 
     expect(await provider.isAvailable?.()).toBe(true);
     expect(requests[0]).toMatchObject({ method: "GET", url: "/v1/sessions/all/status" });
 
-    const rejected = create("anchor", { apiKey: "sk-wrong", baseURL });
+    const rejected = await create("anchor", { apiKey: "sk-wrong", baseURL });
     expect(await rejected.isAvailable?.()).toBe(false);
   });
 });

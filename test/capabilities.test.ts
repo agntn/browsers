@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
-import "../src/providers/index";
 import { create, providers } from "../src/core/registry";
-import type { ProviderConfig } from "../src/core/types";
+import type { BrowserProvider, ProviderConfig } from "../src/core/types";
 
 const all = providers();
 const testConfig = {
@@ -9,16 +8,20 @@ const testConfig = {
   accountID: "test-account",
 } satisfies ProviderConfig;
 
+async function everyProvider(): Promise<BrowserProvider[]> {
+  return Promise.all(all.map((name) => create(name, testConfig)));
+}
+
 describe("provider capabilities", () => {
   for (const name of all) {
     describe(name, () => {
-      it("creates with explicit provider configuration", () => {
-        const provider = create(name, testConfig);
+      it("creates with explicit provider configuration", async () => {
+        const provider = await create(name, testConfig);
         expect(provider.name()).toBe(name);
       });
 
-      it("returns capabilities", () => {
-        const provider = create(name, testConfig);
+      it("returns capabilities", async () => {
+        const provider = await create(name, testConfig);
         const caps = provider.capabilities();
         expect(typeof caps).toBe("object");
         expect(typeof caps.scrape).toBe("boolean");
@@ -34,8 +37,8 @@ describe("provider capabilities", () => {
         expect(typeof caps.extract).toBe("boolean");
       });
 
-      it("implements all core methods", () => {
-        const provider = create(name, testConfig);
+      it("implements all core methods", async () => {
+        const provider = await create(name, testConfig);
         expect(typeof provider.createSession).toBe("function");
         expect(typeof provider.getSession).toBe("function");
         expect(typeof provider.listSessions).toBe("function");
@@ -50,51 +53,41 @@ describe("provider capabilities", () => {
 });
 
 describe("capability-specific optional methods", () => {
-  it("crawl providers have crawl()", () => {
-    for (const name of all) {
-      const provider = create(name, testConfig);
-      const caps = provider.capabilities();
-      if (caps.crawl) {
+  it("crawl providers have crawl()", async () => {
+    for (const provider of await everyProvider()) {
+      if (provider.capabilities().crawl) {
         expect(typeof provider.crawl).toBe("function");
       }
     }
   });
 
-  it("pdf providers have pdf()", () => {
-    for (const name of all) {
-      const provider = create(name, testConfig);
-      const caps = provider.capabilities();
-      if (caps.pdf) {
+  it("pdf providers have pdf()", async () => {
+    for (const provider of await everyProvider()) {
+      if (provider.capabilities().pdf) {
         expect(typeof provider.pdf).toBe("function");
       }
     }
   });
 
-  it("search providers have search()", () => {
-    for (const name of all) {
-      const provider = create(name, testConfig);
-      const caps = provider.capabilities();
-      if (caps.search) {
+  it("search providers have search()", async () => {
+    for (const provider of await everyProvider()) {
+      if (provider.capabilities().search) {
         expect(typeof provider.search).toBe("function");
       }
     }
   });
 
-  it("extract providers have extract()", () => {
-    for (const name of all) {
-      const provider = create(name, testConfig);
-      const caps = provider.capabilities();
-      if (caps.extract) {
+  it("extract providers have extract()", async () => {
+    for (const provider of await everyProvider()) {
+      if (provider.capabilities().extract) {
         expect(typeof provider.extract).toBe("function");
       }
     }
   });
 
-  it("links providers have links()", () => {
-    for (const name of all) {
-      const provider = create(name, testConfig);
-      const caps = provider.capabilities();
-      if (caps.links) {
+  it("links providers have links()", async () => {
+    for (const provider of await everyProvider()) {
+      if (provider.capabilities().links) {
         expect(typeof provider.links).toBe("function");
       }
     }

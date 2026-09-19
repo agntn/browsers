@@ -14,7 +14,6 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, normalizeError } from "../core/errors";
-import { register } from "../core/registry";
 import { isNotFoundError, assertSessionId } from "../core/utils";
 
 interface KernelSessionResponse {
@@ -223,5 +222,4 @@ class KernelProvider implements BrowserProvider {
   }
 }
 
-const factory: BrowserProviderFactory = (config) => new KernelProvider(config);
-register("kernel", "https://api.onkernel.com", factory);
+export const factory: BrowserProviderFactory = (config) => new KernelProvider(config);

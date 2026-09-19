@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import "../src/providers/index";
 import { resetDefaultClientForTests } from "../src/core/client";
 import { create } from "../src/core/registry";
 import { browserScrape } from "../src/tool-operations";
@@ -62,7 +61,7 @@ describe("cloudflare browser selection", () => {
     );
     resetDefaultClientForTests();
 
-    const provider = create("cloudflare", {
+    const provider = await create("cloudflare", {
       apiKey: "test-token",
       accountID: "test-account",
       browser: "kitesurf",
@@ -133,7 +132,7 @@ describe("cloudflare browser selection", () => {
     );
     resetDefaultClientForTests();
 
-    const provider = create("cloudflare", {
+    const provider = await create("cloudflare", {
       apiKey: "test-token",
       accountID: "test-account",
     });
@@ -144,13 +143,13 @@ describe("cloudflare browser selection", () => {
     ]);
   });
 
-  it("rejects undocumented browser engines before network I/O", () => {
-    expect(() =>
+  it("rejects undocumented browser engines before network I/O", async () => {
+    await expect(
       create("cloudflare", {
         apiKey: "test-token",
         accountID: "test-account",
         browser: "firefox" as never,
       }),
-    ).toThrow('Unsupported Cloudflare browser: "firefox"');
+    ).rejects.toThrow('Unsupported Cloudflare browser: "firefox"');
   });
 });

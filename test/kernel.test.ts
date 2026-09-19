@@ -1,7 +1,6 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import "../src/providers/index";
 import { create } from "../src/core/registry";
 
 interface CapturedRequest {
@@ -82,7 +81,7 @@ describe("kernel current API contract", () => {
   });
 
   it("creates and maps a browser session", async () => {
-    const provider = create("kernel", { apiKey: "test", baseURL });
+    const provider = await create("kernel", { apiKey: "test", baseURL });
     const session = await provider.createSession({
       region: "eu-west",
       headless: true,
@@ -112,7 +111,7 @@ describe("kernel current API contract", () => {
   });
 
   it("uses the current lifecycle and browser control routes", async () => {
-    const provider = create("kernel", { apiKey: "test", baseURL });
+    const provider = await create("kernel", { apiKey: "test", baseURL });
 
     await expect(provider.getSession("session-1")).resolves.toMatchObject({
       id: "session-1",
@@ -158,7 +157,7 @@ describe("kernel current API contract", () => {
   });
 
   it("rejects failed Playwright execution envelopes", async () => {
-    const provider = create("kernel", { apiKey: "test", baseURL });
+    const provider = await create("kernel", { apiKey: "test", baseURL });
     const session = { id: "session-1", provider: "kernel", createdAt: 0 };
 
     await expect(provider.evaluate("throw new Error('nope')", session)).rejects.toThrow(

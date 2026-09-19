@@ -1,5 +1,3 @@
-import "./providers/index";
-
 export { version } from "./version";
 
 export { builtinProviders, type BrowserProviderName } from "./core/providers";
@@ -51,7 +49,7 @@ export {
 } from "./core/errors";
 
 export { Client, defaultClient } from "./core/client";
-export { register, create, providers, has } from "./core/registry";
+export { register, create, providers, has, type ProviderEntry } from "./core/registry";
 export { resolveProvider, providerEnvKey } from "./core/resolve";
 export {
   isNotFoundError,

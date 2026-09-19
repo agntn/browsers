@@ -9,16 +9,16 @@ import { resolveCloudflareBrowser } from "../core/utils";
  *
  * @param {string} [preferred] Preferred provider name.
  * @param {string} [browser] Optional Cloudflare browser engine.
- * @returns {{ name: string; provider: BrowserProvider }} Resolved name and provider.
+ * @returns {Promise<{ name: string; provider: BrowserProvider }>} Resolved name and provider.
  */
-export function resolveAndCreate(
+export async function resolveAndCreate(
   preferred?: string,
   browser?: string,
-): { name: string; provider: BrowserProvider } {
+): Promise<{ name: string; provider: BrowserProvider }> {
   try {
     const name = resolveProvider(browser && !preferred ? "cloudflare" : preferred);
     const selectedBrowser = resolveCloudflareBrowser(name, browser);
-    const provider = create(name, { browser: selectedBrowser });
+    const provider = await create(name, { browser: selectedBrowser });
     return { name, provider };
   } catch (error) {
     consola.error(error instanceof Error ? error.message : String(error));

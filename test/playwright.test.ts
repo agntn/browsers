@@ -1,15 +1,17 @@
 import { createServer } from "node:http";
 import type { ServerResponse } from "node:http";
-import { describe, it, expect, afterAll } from "vitest";
-// Import providers/index to register all providers
-import "../src/providers/index";
+import { describe, it, expect, afterAll, beforeAll } from "vitest";
 import { create } from "../src/core/registry";
 import { SessionNotFoundError } from "../src/core/errors";
-import type { BrowserSession } from "../src/core/types";
+import type { BrowserProvider, BrowserSession } from "../src/core/types";
 
 describe("playwright provider (local)", () => {
-  const provider = create("playwright");
+  let provider: BrowserProvider;
   const sessions: BrowserSession[] = [];
+
+  beforeAll(async () => {
+    provider = await create("playwright");
+  });
 
   afterAll(async () => {
     for (const s of sessions) {
@@ -50,7 +52,7 @@ describe("playwright provider (local)", () => {
     const session = await provider.createSession({ headless: true });
     sessions.push(session);
 
-    const releaseProvider = create("playwright");
+    const releaseProvider = await create("playwright");
     await expect(releaseProvider.getSession(session.id)).resolves.toEqual(session);
     await expect(releaseProvider.listSessions()).resolves.toContainEqual(session);
     await releaseProvider.releaseSession(session.id);

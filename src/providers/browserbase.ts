@@ -14,7 +14,6 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, normalizeError } from "../core/errors";
-import { register } from "../core/registry";
 import { isNotFoundError, notSupportedViaRest } from "../core/utils";
 
 interface BrowserbaseSessionResponse {
@@ -215,5 +214,4 @@ class BrowserbaseProvider implements BrowserProvider {
   }
 }
 
-const factory: BrowserProviderFactory = (config) => new BrowserbaseProvider(config);
-register("browserbase", "https://api.browserbase.com", factory);
+export const factory: BrowserProviderFactory = (config) => new BrowserbaseProvider(config);

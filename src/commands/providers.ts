@@ -38,7 +38,7 @@ function capabilityTags(capabilities: Readonly<ProviderCapabilities>): string {
 
 async function printAvailability(name: string): Promise<void> {
   try {
-    const provider = create(name);
+    const provider = await create(name);
     const available = provider.isAvailable ? await provider.isAvailable() : true;
     console.log(`${available ? "✓" : "✗"} ${name}`);
   } catch {
@@ -46,13 +46,13 @@ async function printAvailability(name: string): Promise<void> {
   }
 }
 
-function printCapabilities(name: string): void {
+async function printCapabilities(name: string): Promise<void> {
   const hasKey = _hasKey(name);
   const envHint = providerEnvHint(name);
 
   let tags = "";
   try {
-    tags = capabilityTags(create(name).capabilities());
+    tags = capabilityTags((await create(name)).capabilities());
   } catch {
     tags = "(cannot instantiate)";
   }
@@ -81,6 +81,6 @@ export default defineCommand({
       for (const name of all) await printAvailability(name);
       return;
     }
-    for (const name of all) printCapabilities(name);
+    for (const name of all) await printCapabilities(name);
   },
 });

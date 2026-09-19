@@ -1,7 +1,6 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import "../src/providers/index";
 import { create } from "../src/core/registry";
 
 async function readBody(request: IncomingMessage): Promise<string> {
@@ -45,7 +44,7 @@ describe("steel scrape responses", () => {
   });
 
   it("rejects a Cloudflare interstitial without blocking ordinary pages", async () => {
-    const provider = create("steel", { apiKey: "test", baseURL });
+    const provider = await create("steel", { apiKey: "test", baseURL });
 
     await expect(provider.scrape("https://blocked.example")).rejects.toThrow(
       "Steel returned a Cloudflare challenge instead of page content",

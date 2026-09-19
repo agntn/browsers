@@ -22,7 +22,6 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, normalizeError } from "../core/errors";
-import { register } from "../core/registry";
 import { assertUrlOrSession, notSupportedViaRest, resolveCloudflareBrowser } from "../core/utils";
 
 interface CfEnvelope<T = unknown> {
@@ -437,5 +436,4 @@ class CloudflareProvider implements BrowserProvider {
   }
 }
 
-const factory: BrowserProviderFactory = (config) => new CloudflareProvider(config);
-register("cloudflare", "https://api.cloudflare.com", factory);
+export const factory: BrowserProviderFactory = (config) => new CloudflareProvider(config);

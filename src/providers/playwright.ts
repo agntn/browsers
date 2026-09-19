@@ -18,7 +18,6 @@ import type {
   LinksResult,
 } from "../core/types";
 import { BrowserError, SessionNotFoundError, normalizeError } from "../core/errors";
-import { register } from "../core/registry";
 import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
 import type { Browser, Page } from "playwright";
@@ -407,5 +406,4 @@ class PlaywrightProvider implements BrowserProvider {
   }
 }
 
-const factory: BrowserProviderFactory = (config) => new PlaywrightProvider(config);
-register("playwright", "local", factory);
+export const factory: BrowserProviderFactory = (config) => new PlaywrightProvider(config);

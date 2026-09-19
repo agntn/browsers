@@ -1,7 +1,6 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import "../src/providers/index";
 import { create } from "../src/core/registry";
 
 interface CapturedRequest {
@@ -89,7 +88,7 @@ describe("browserless current session API", () => {
   });
 
   it("creates and releases through the URLs returned by Browserless", async () => {
-    const provider = create("browserless", { apiKey: "test", baseURL });
+    const provider = await create("browserless", { apiKey: "test", baseURL });
     const session = await provider.createSession({
       timeout: 120_000,
       stealth: true,
@@ -103,7 +102,7 @@ describe("browserless current session API", () => {
     });
     expect(session.metadata).toBeUndefined();
 
-    const releaseProvider = create("browserless", { apiKey: "test", baseURL });
+    const releaseProvider = await create("browserless", { apiKey: "test", baseURL });
     await expect(releaseProvider.getSession(session.id)).resolves.toEqual(session);
     await expect(releaseProvider.listSessions()).resolves.toEqual([session]);
     await releaseProvider.releaseSession(session.id);
@@ -125,7 +124,7 @@ describe("browserless current session API", () => {
   });
 
   it("captures screenshots and PDFs from endpoints that refuse JSON clients", async () => {
-    const provider = create("browserless", { apiKey: "test", baseURL });
+    const provider = await create("browserless", { apiKey: "test", baseURL });
 
     const screenshot = await provider.screenshot({ url: "https://example.com" });
     const pdf = await provider.pdf?.("https://example.com");

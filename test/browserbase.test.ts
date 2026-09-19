@@ -1,7 +1,6 @@
 import { createServer } from "node:http";
 import type { Server } from "node:http";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import "../src/providers/index";
 import { create } from "../src/core/registry";
 import { UnsupportedOperationError } from "../src/core/errors";
 
@@ -41,7 +40,7 @@ describe("browserbase releaseSession", () => {
   });
 
   it("releases through the documented session update, not DELETE", async () => {
-    const provider = create("browserbase", { apiKey: "test", baseURL });
+    const provider = await create("browserbase", { apiKey: "test", baseURL });
     await provider.releaseSession("s1");
 
     expect(captured.method).toBe("POST");
@@ -50,7 +49,7 @@ describe("browserbase releaseSession", () => {
   });
 
   it("does not advertise or request screenshots", async () => {
-    const provider = create("browserbase", { apiKey: "test", baseURL });
+    const provider = await create("browserbase", { apiKey: "test", baseURL });
     captured.method = undefined;
     captured.url = undefined;
 

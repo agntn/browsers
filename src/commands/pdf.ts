@@ -37,7 +37,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = resolveAndCreate(args.provider, args.browser);
+    const { name: providerName, provider } = await resolveAndCreate(args.provider, args.browser);
     if (!provider.pdf) {
       consola.error(`Provider ${providerName} does not support PDF generation.`);
       process.exit(1);

@@ -25,7 +25,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = resolveAndCreate(args.provider);
+    const { name: providerName, provider } = await resolveAndCreate(args.provider);
     if (!provider.search) {
       consola.error(`Provider ${providerName} does not support web search.`);
       process.exit(1);

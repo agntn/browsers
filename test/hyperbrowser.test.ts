@@ -1,7 +1,6 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import "../src/providers/index";
 import { create } from "../src/core/registry";
 
 interface CapturedRequest {
@@ -112,7 +111,7 @@ describe("hyperbrowser current session API", () => {
   });
 
   it("uses the current lifecycle without exposing provider session metadata", async () => {
-    const provider = create("hyperbrowser", { apiKey: "test", baseURL });
+    const provider = await create("hyperbrowser", { apiKey: "test", baseURL });
     const session = await provider.createSession({
       region: "us-west",
       stealth: true,
@@ -174,7 +173,7 @@ describe("hyperbrowser current session API", () => {
   });
 
   it("screenshots through the fetch route without a session", async () => {
-    const provider = create("hyperbrowser", { apiKey: "test", baseURL });
+    const provider = await create("hyperbrowser", { apiKey: "test", baseURL });
     requests.length = 0;
 
     expect(provider.capabilities().statelessScreenshot).toBe(true);
@@ -211,7 +210,7 @@ describe("hyperbrowser current session API", () => {
   });
 
   it("reports a failed fetch instead of an empty screenshot", async () => {
-    const provider = create("hyperbrowser", { apiKey: "test", baseURL });
+    const provider = await create("hyperbrowser", { apiKey: "test", baseURL });
 
     await expect(provider.screenshot({ url: "https://down.example/" })).rejects.toThrow(
       "Hyperbrowser returned no screenshot: net::ERR_TUNNEL_CONNECTION_FAILED at https://down.example",

@@ -16,7 +16,6 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, normalizeError, SessionNotFoundError } from "../core/errors";
-import { register } from "../core/registry";
 import { assertUrlOrSession } from "../core/utils";
 
 interface BrowserlessSessionResponse {
@@ -232,5 +231,4 @@ class BrowserlessProvider implements BrowserProvider {
   }
 }
 
-const factory: BrowserProviderFactory = (config) => new BrowserlessProvider(config);
-register("browserless", "https://chrome.browserless.io", factory);
+export const factory: BrowserProviderFactory = (config) => new BrowserlessProvider(config);

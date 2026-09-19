@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { defineCommand, runMain } from "citty";
-import "./providers/index";
 import { normalizeMainArgs } from "./cli-args";
 import { version } from "./version";
 

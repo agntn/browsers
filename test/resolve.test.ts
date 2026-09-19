@@ -1,6 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-// Import providers/index first to ensure all providers are registered
-import "../src/providers/index";
 import { resolveProvider, _hasKey, providerEnvKey, providerEnvHint } from "../src/core/resolve";
 
 describe("_hasKey", () => {

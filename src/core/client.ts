@@ -1,13 +1,12 @@
-import { ofetch, FetchError } from "ofetch";
-import type { $Fetch } from "ofetch";
+import type { $Fetch, FetchError } from "ofetch";
 import type { ClientOptions } from "./types";
 import { HTTPError, RateLimitError, parseRetryAfter } from "./errors";
+import { lazy } from "./lazy";
 import { version } from "../version";
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY = 100;
 const DEFAULT_TIMEOUT = 30_000;
-const DEFAULT_USER_AGENT = `browsers/${version}`;
 
 /**
  * Headers for a POST whose response is text or bytes: ofetch asks for JSON
@@ -27,20 +26,29 @@ export class Client {
   readonly baseDelay: number;
   readonly timeout: number;
   readonly userAgent: string;
-  private readonly fetch: $Fetch;
-
-  constructor(options: ClientOptions = {}) {
-    this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
-    this.baseDelay = options.baseDelay ?? DEFAULT_BASE_DELAY;
-    this.timeout = options.timeout ?? DEFAULT_TIMEOUT;
-    this.userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
-    this.fetch = ofetch.create({
+  private FetchError: typeof FetchError | undefined;
+  /**
+   * The configured ofetch instance, imported and created on the first request: ofetch and its
+   * fetch polyfill are the heaviest modules the package imports, and a process that only
+   * resolves or lists providers never needs them.
+   */
+  private readonly http = lazy(async (): Promise<$Fetch> => {
+    const ofetch = await import("ofetch");
+    this.FetchError = ofetch.FetchError;
+    return ofetch.ofetch.create({
       timeout: this.timeout,
       retry: this.maxRetries,
       retryDelay: this.baseDelay,
       retryStatusCodes: [408, 429, 500, 502, 503, 504],
       headers: { "User-Agent": this.userAgent },
     });
+  });
+
+  constructor(options: ClientOptions = {}) {
+    this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.baseDelay = options.baseDelay ?? DEFAULT_BASE_DELAY;
+    this.timeout = options.timeout ?? DEFAULT_TIMEOUT;
+    this.userAgent = options.userAgent ?? `browsers/${version}`;
   }
 
   async getJSON<T>(
@@ -48,8 +56,9 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<T> {
+    const fetch = await this.http();
     try {
-      return await this.fetch<T>(url, { headers, signal });
+      return await fetch<T>(url, { headers, signal });
     } catch (error) {
       throw this.mapError(error, url);
     }
@@ -61,8 +70,9 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<T> {
+    const fetch = await this.http();
     try {
-      return await this.fetch<T>(url, { method: "POST", body, headers, signal });
+      return await fetch<T>(url, { method: "POST", body, headers, signal });
     } catch (error) {
       throw this.mapError(error, url);
     }
@@ -73,8 +83,9 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<T> {
+    const fetch = await this.http();
     try {
-      return await this.fetch<T>(url, { method: "PUT", headers, signal });
+      return await fetch<T>(url, { method: "PUT", headers, signal });
     } catch (error) {
       throw this.mapError(error, url);
     }
@@ -86,8 +97,9 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<string> {
+    const fetch = await this.http();
     try {
-      const res = await this.fetch.raw(url, {
+      const res = await fetch.raw(url, {
         method: "POST",
         body,
         headers: acceptAnyType(headers),
@@ -112,8 +124,9 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<ArrayBuffer> {
+    const fetch = await this.http();
     try {
-      const res = await this.fetch.raw(url, { headers, signal, responseType: "arrayBuffer" });
+      const res = await fetch.raw(url, { headers, signal, responseType: "arrayBuffer" });
       return res._data as ArrayBuffer;
     } catch (error) {
       throw this.mapError(error, url);
@@ -126,8 +139,9 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<ArrayBuffer> {
+    const fetch = await this.http();
     try {
-      const res = await this.fetch.raw(url, {
+      const res = await fetch.raw(url, {
         method: "POST",
         body,
         headers: acceptAnyType(headers),
@@ -145,8 +159,9 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<T> {
+    const fetch = await this.http();
     try {
-      return await this.fetch<T>(url, { method: "DELETE", headers, signal });
+      return await fetch<T>(url, { method: "DELETE", headers, signal });
     } catch (error) {
       throw this.mapError(error, url);
     }
@@ -167,8 +182,9 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<{ headers: Headers; arrayBuffer(): Promise<ArrayBuffer>; json(): Promise<unknown> }> {
+    const fetch = await this.http();
     try {
-      const res = await this.fetch.raw(url, {
+      const res = await fetch.raw(url, {
         method: "POST",
         body,
         headers: acceptAnyType(headers),
@@ -187,7 +203,7 @@ export class Client {
   }
 
   private mapError(error: unknown, url: string): Error {
-    if (error instanceof FetchError) {
+    if (this.FetchError !== undefined && error instanceof this.FetchError) {
       if (error.statusCode === 429) {
         const retryAfter = parseRetryAfter(error.response?.headers.get("Retry-After"));
         return new RateLimitError(retryAfter);

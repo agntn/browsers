@@ -14,7 +14,6 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, BrowserError, normalizeError } from "../core/errors";
-import { register } from "../core/registry";
 import { isNotFoundError, assertUrlOrSession, notSupportedViaRest } from "../core/utils";
 
 /** Every Anchor response wraps its payload in `data`. */
@@ -316,5 +315,4 @@ class AnchorProvider implements BrowserProvider {
   }
 }
 
-const factory: BrowserProviderFactory = (config) => new AnchorProvider(config);
-register("anchor", "https://api.anchorbrowser.io", factory);
+export const factory: BrowserProviderFactory = (config) => new AnchorProvider(config);

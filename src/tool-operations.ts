@@ -1,4 +1,3 @@
-import "./providers/index";
 import { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS } from "./tool-contract";
 import { create, providers } from "./core/registry";
 import { resolveProvider } from "./core/resolve";
@@ -132,13 +131,13 @@ export function errorMessage(error: unknown): string {
   return sanitizeField(error instanceof Error ? error.message : String(error));
 }
 
-function getProvider(
+async function getProvider(
   preferred?: string,
   browser?: string,
-): { name: string; provider: BrowserProvider } {
+): Promise<{ name: string; provider: BrowserProvider }> {
   const name = resolveProvider(browser && !preferred ? "cloudflare" : preferred);
   const selectedBrowser = resolveCloudflareBrowser(name, browser);
-  return { name, provider: create(name, { browser: selectedBrowser }) };
+  return { name, provider: await create(name, { browser: selectedBrowser }) };
 }
 
 function resolveScrapeMaxChars(value?: number): number {
@@ -159,7 +158,7 @@ export async function browserScrape(
   params: Readonly<BrowserScrapeParams>,
 ): Promise<ToolResult<BrowserScrapeDetails>> {
   const maxChars = resolveScrapeMaxChars(params.maxChars);
-  const { name, provider } = getProvider(params.provider, params.browser);
+  const { name, provider } = await getProvider(params.provider, params.browser);
   const result = await scrapeWithSessionWhenNeeded(provider, params.url, {
     waitFor: params.waitFor,
     maxChars,
@@ -186,7 +185,7 @@ export async function browserScrape(
 export async function browserSession(
   params: Readonly<BrowserSessionParams>,
 ): Promise<ToolResult<BrowserSessionDetails>> {
-  const { name, provider } = getProvider(params.provider, params.browser);
+  const { name, provider } = await getProvider(params.provider, params.browser);
   const session = await provider.createSession({ region: params.region });
   return {
     content: content(`[provider=${name}] Session created: ${sanitizeField(session.id)}`),
@@ -205,7 +204,7 @@ export async function browserSession(
 export async function releaseBrowserSession(
   params: Readonly<BrowserReleaseParams>,
 ): Promise<ToolResult<{ released: boolean }>> {
-  const { name, provider } = getProvider(params.provider, params.browser);
+  const { name, provider } = await getProvider(params.provider, params.browser);
   await provider.releaseSession(params.sessionId);
   return {
     content: content(`[provider=${name}] Session ${sanitizeField(params.sessionId)} released.`),
@@ -214,19 +213,31 @@ export async function releaseBrowserSession(
 }
 
 /**
+ * Describes one registered provider, or marks it unconfigured when it cannot be built.
+ *
+ * @param name - Provider name.
+ * @returns {Promise<BrowserProviderStatus>} Configuration state and capability flags.
+ */
+async function providerStatus(name: string): Promise<BrowserProviderStatus> {
+  try {
+    const provider = await create(name);
+    return { name, configured: true, capabilities: { ...provider.capabilities() } };
+  } catch {
+    return { name, configured: false, capabilities: {} };
+  }
+}
+
+/**
  * Lists registered providers, configuration state, and capabilities.
  *
- * @returns {ToolResult<{ providers: BrowserProviderStatus[] }>} Provider discovery rows.
+ * Every provider module loads here, because the capability flags live on the instances.
+ *
+ * @returns {Promise<ToolResult<{ providers: BrowserProviderStatus[] }>>} Provider discovery rows.
  */
-export function listBrowserProviders(): ToolResult<{ providers: BrowserProviderStatus[] }> {
-  const rows = providers().map((name): BrowserProviderStatus => {
-    try {
-      const provider = create(name);
-      return { name, configured: true, capabilities: { ...provider.capabilities() } };
-    } catch {
-      return { name, configured: false, capabilities: {} };
-    }
-  });
+export async function listBrowserProviders(): Promise<
+  ToolResult<{ providers: BrowserProviderStatus[] }>
+> {
+  const rows = await Promise.all(providers().map(providerStatus));
   const lines = rows.map((row) => {
     const tags = Object.entries(row.capabilities)
       .filter(([, supported]) => supported)
@@ -246,7 +257,7 @@ export function listBrowserProviders(): ToolResult<{ providers: BrowserProviderS
 export async function browserScreenshot(
   params: Readonly<BrowserScreenshotParams>,
 ): Promise<ToolResult<{ url: string; provider: string; saved: boolean }>> {
-  const { name, provider } = getProvider(params.provider, params.browser);
+  const { name, provider } = await getProvider(params.provider, params.browser);
   const result = await screenshotWithSessionWhenNeeded(provider, {
     url: params.url,
     fullPage: params.fullPage,
@@ -287,7 +298,7 @@ function screenshotResult(
 export async function browserExtract(
   params: Readonly<BrowserExtractParams>,
 ): Promise<ToolResult<{ url: string; provider: string; data: unknown }>> {
-  const { name, provider } = getProvider(params.provider, params.browser);
+  const { name, provider } = await getProvider(params.provider, params.browser);
   if (!provider.extract) throw new Error(`Provider ${name} does not support extract.`);
   const result = await provider.extract(params.url, {
     prompt: params.prompt,
@@ -310,7 +321,7 @@ export async function browserExtract(
 export async function browserCrawl(
   params: Readonly<BrowserCrawlParams>,
 ): Promise<ToolResult<{ jobId?: string; pages: number }>> {
-  const { name, provider } = getProvider(params.provider, params.browser);
+  const { name, provider } = await getProvider(params.provider, params.browser);
   if (!provider.crawl) throw new Error(`Provider ${name} does not support crawl.`);
   const result = await provider.crawl(params.url, { maxPages: params.maxPages ?? 10 });
   const lines = [`[provider=${name}] Crawled ${result.pages.length} pages.`];
@@ -332,7 +343,7 @@ export async function browserCrawl(
 export async function browserPdf(
   params: Readonly<BrowserUrlParams>,
 ): Promise<ToolResult<{ url: string; provider: string; pdfLength: number }>> {
-  const { name, provider } = getProvider(params.provider, params.browser);
+  const { name, provider } = await getProvider(params.provider, params.browser);
   if (!provider.pdf) throw new Error(`Provider ${name} does not support PDF generation.`);
   const result = await provider.pdf(params.url);
   return {
@@ -350,7 +361,7 @@ export async function browserPdf(
 export async function browserLinks(
   params: Readonly<BrowserUrlParams>,
 ): Promise<ToolResult<{ url: string; links: string[] }>> {
-  const { name, provider } = getProvider(params.provider, params.browser);
+  const { name, provider } = await getProvider(params.provider, params.browser);
   if (!provider.links) throw new Error(`Provider ${name} does not support link extraction.`);
   const result = await provider.links(params.url);
   const links = [...new Set(result.links.map((link) => sanitizeField(link.href)))];
@@ -369,7 +380,7 @@ export async function browserLinks(
 export async function browserSearch(
   params: Readonly<BrowserSearchParams>,
 ): Promise<ToolResult<{ results: Array<{ url: string; title: string; snippet: string }> }>> {
-  const { name, provider } = getProvider("hyperbrowser");
+  const { name, provider } = await getProvider("hyperbrowser");
   if (!provider.search) throw new Error(`Provider ${name} does not support web search.`);
   const results = await provider.search(params.query);
   const rows = results.map((result) => ({
@@ -391,12 +402,12 @@ export async function browserSearch(
  * Reports the capability flags of one provider.
  *
  * @param params - Provider lookup arguments.
- * @returns {ToolResult<{ provider: string; capabilities: ProviderCapabilities }>} Provider capability flags.
+ * @returns {Promise<ToolResult<{ provider: string; capabilities: ProviderCapabilities }>>} Provider capability flags.
  */
-export function browserCapabilities(
+export async function browserCapabilities(
   params: Readonly<BrowserCapabilitiesParams>,
-): ToolResult<{ provider: string; capabilities: ProviderCapabilities }> {
-  const { name, provider } = getProvider(params.provider);
+): Promise<ToolResult<{ provider: string; capabilities: ProviderCapabilities }>> {
+  const { name, provider } = await getProvider(params.provider);
   const capabilities = provider.capabilities();
   const lines = Object.entries(capabilities).map(
     ([key, supported]) => `  ${key}: ${supported ? "✓" : "✗"}`,

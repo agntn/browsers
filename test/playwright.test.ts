@@ -5,7 +5,8 @@ import { create } from "../src/core/registry";
 import { SessionNotFoundError } from "../src/core/errors";
 import type { BrowserProvider, BrowserSession } from "../src/core/types";
 
-describe("playwright provider (local)", () => {
+// A cold Chrome launch on a CI runner takes longer than the 5 s vitest default.
+describe("playwright provider (local)", { timeout: 30_000 }, () => {
   let provider: BrowserProvider;
   const sessions: BrowserSession[] = [];
 

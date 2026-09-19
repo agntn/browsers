@@ -7,12 +7,14 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 ## Structure
 
 - `src/core/types.ts` — interfaces: BrowserSession, ScrapeResult, ScreenshotResult, EvaluateResult, BrowserProvider
-- `src/core/registry.ts` — self-registering provider pattern (register/create/providers/has)
-- `src/core/client.ts` - HTTP client with retry, error mapping, URL sanitization
+- `src/core/registry.ts` - provider table seeded from the manifest (register/create/providers/has); `create()` is async and imports one provider module
+- `src/core/client.ts` - HTTP client with retry, error mapping, URL sanitization; ofetch loads on the first request
+- `src/core/lazy.ts` - one-shot async memo used by the client and the MCP server
 - `src/core/errors.ts` - typed error hierarchy (BrowserError, HTTPError, AuthError, SessionError, etc.)
 - `src/tool-operations.ts` - executors shared by MCP, Pi, and OMP
-- `src/mcp.ts` - MCP stdio server surface
-- `src/providers/*.ts` - one file per provider, self-registers on import
+- `src/mcp.ts` - MCP stdio server surface; schemas load on the first `tools/list`, the validator on the first `tools/call`
+- `src/providers/index.ts` - the manifest: key, default URL and a literal `import()` per provider
+- `src/providers/*.ts` - one file per provider, exports `factory`; nothing runs at import
 - `src/commands/*.ts` - CLI subcommands (citty)
 - `packages/pi/extensions/browsers.ts` - Pi agent tools
 - `packages/omp/extensions/browsers.ts` - OMP agent tools
@@ -23,10 +25,12 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 
 1. Create `src/providers/yourprovider.ts`
 2. Implement `BrowserProvider` interface
-3. Call `register('yourprovider', 'https://...', factory)` at module level
-4. Add import to `src/providers/index.ts`
+3. Export `factory: BrowserProviderFactory`; do not import the registry
+4. Add a manifest entry (key, default URL, `load: () => import("./yourprovider").then((m) => m.factory)`) to `src/providers/index.ts`
 5. Add the key to `browserProviderNames` in `src/tool-contract.ts`
 6. Add any nonstandard environment key to `src/core/resolve.ts`
+
+`test/registry.test.ts` fails when the manifest, the provider files and `browserProviderNames` disagree; `test/loads.test.ts` fails when an entry or a CLI usage path starts loading a provider, ofetch, TypeBox or the MCP SDK.
 
 ## Conventions
 
@@ -34,5 +38,5 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 - Linting and formatting use oxlint + oxfmt through `@agntn/ox`; type-aware lint runs after `pnpm build`
 - ofetch for HTTP, citty for CLI, consola for logging
 - API keys from env: `PROVIDERNAME_API_KEY`
-- Self-registering providers (no central wiring)
+- Nothing runs at import: providers load on the first `create()`, ofetch on the first request, and the MCP server imports TypeBox on the first `tools/list`; `sideEffects: false` in `package.json` states that and has to stay true
 - Conventional commits, no body

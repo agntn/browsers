@@ -110,7 +110,7 @@ browsers session create --provider kernel
 ```typescript
 import { create } from "@agntn/browsers";
 
-const provider = create("playwright");
+const provider = await create("playwright");
 const page = await provider.scrape("https://example.com");
 console.log(page.markdown ?? page.text ?? page.html);
 
@@ -119,6 +119,8 @@ console.log(caps.statelessScrape, caps.pdf, caps.cdp);
 ```
 
 That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resolveProvider()` picks the first one that does. Want Kitesurf on Cloudflare? Use `create("cloudflare", { browser: "kitesurf" })`. Without that option it stays on Chromium. Kernel scrape wants a session object. The agent tools and the CLI `scrape` command open one and close it.
+
+`create()` is async because that first call is where the provider module gets imported. Importing the package loads no provider and no HTTP client, `providers()` and `has()` answer from a manifest, and `@agntn/browsers/providers/steel` gives you one provider's `factory` directly.
 
 ## 🗺️ Providers
 
@@ -159,7 +161,7 @@ Need a fetch that is not a browser? [@agntn/web](https://github.com/agntn/web). 
 
 ## 🧩 Adding a provider
 
-Want a ninth? A class that implements `BrowserProvider`, `register()` at module load, a line in `src/providers/index.ts` and the name list in `src/tool-contract.ts`. Nonstandard env keys go in `src/core/resolve.ts`.
+Want a ninth? A class that implements `BrowserProvider`, an exported `factory`, a manifest entry in `src/providers/index.ts` and the name list in `src/tool-contract.ts`. Nonstandard env keys go in `src/core/resolve.ts`. Outside the package, `register(name, defaultURL, factory)` adds one at runtime.
 
 ## 🛠️ Development
 

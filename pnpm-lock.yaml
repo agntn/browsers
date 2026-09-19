@@ -30,8 +30,8 @@ importers:
         specifier: 7.2.0
         version: 7.2.0
       typebox:
-        specifier: 1.3.14
-        version: 1.3.14
+        specifier: 1.3.32
+        version: 1.3.32
     devDependencies:
       '@agntn/ox':
         specifier: 0.1.0
@@ -2945,8 +2945,8 @@ packages:
   typebox@1.1.38:
     resolution: {integrity: sha512-pZ0aQPmMmXoUvSbeuWf/Hzsc+avNw/Zd6VeE8CFgkVGWyuHPJvqeJJDeJqLve+K70LvjYIoleGcoJHPT17cWoA==}
 
-  typebox@1.3.14:
-    resolution: {integrity: sha512-uD3FHZb4St/7E7eY0YANSt+yZABDDlbeJbXhUU17x2GZLyHUiQ6+mxSpZhZtnJSjKy/7PZ49r7SDZHG4F3JsLw==}
+  typebox@1.3.32:
+    resolution: {integrity: sha512-iOdeK75dQ3OSdYviLGldHC9jFSo4exAjr5pN0XcLnYkI8bfz7G9v2q55cz+AyWhE9i8oVrHbcvOMCssgfD10Cg==}
 
   typed-query-selector@2.12.2:
     resolution: {integrity: sha512-EOPFbyIub4ngnEdqi2yOcNeDLaX/0jcE1JoAXQDDMIthap7FoN795lc/SHfIq2d416VufXpM8z/lD+WRm2gfOQ==}
@@ -5825,7 +5825,7 @@ snapshots:
 
   typebox@1.1.38: {}
 
-  typebox@1.3.14: {}
+  typebox@1.3.32: {}
 
   typed-query-selector@2.12.2: {}
 

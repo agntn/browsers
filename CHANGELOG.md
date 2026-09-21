@@ -1,6 +1,50 @@
 # Changelog
 
 
+## v0.3.0
+
+[compare changes](https://github.com/agntn/browsers/compare/v0.2.0...v0.3.0)
+
+### 🚀 Enhancements
+
+- **cloudflare:** Support the Kitesurf engine ([#40](https://github.com/agntn/browsers/pull/40))
+
+### 🩹 Fixes
+
+- **tools:** Stop advertising session driving ([#39](https://github.com/agntn/browsers/pull/39))
+- **playwright:** Sessions outlive their instance ([#41](https://github.com/agntn/browsers/pull/41))
+- **cli:** Scrape opens the session Kernel needs ([#42](https://github.com/agntn/browsers/pull/42))
+- **client:** Accept any type on binary posts ([#43](https://github.com/agntn/browsers/pull/43))
+- **anchor:** Match the documented API ([#44](https://github.com/agntn/browsers/pull/44))
+- **screenshot:** Use routes the providers have ([#45](https://github.com/agntn/browsers/pull/45))
+- **client:** Retry after a request times out ([#60](https://github.com/agntn/browsers/pull/60))
+
+### 💅 Refactors
+
+- ⚠️  Load a provider when a call names it ([#51](https://github.com/agntn/browsers/pull/51))
+
+### 📖 Documentation
+
+- README shows a scrape, not a table ([#38](https://github.com/agntn/browsers/pull/38))
+
+### 🏡 Chore
+
+- Add `renovate.json` ([9af2369](https://github.com/agntn/browsers/commit/9af2369))
+
+### 🤖 CI
+
+- Add test, autofix and publish workflows ([#53](https://github.com/agntn/browsers/pull/53))
+
+#### ⚠️ Breaking Changes
+
+- ⚠️  Load a provider when a call names it ([#51](https://github.com/agntn/browsers/pull/51))
+
+### ❤️ Contributors
+
+- Ori ([@oritwoen](https://github.com/oritwoen))
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+- Aei ([@aeitwoen](https://github.com/aeitwoen))
+
 ## v0.2.0
 
 

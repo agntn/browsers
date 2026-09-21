@@ -1,4 +1,4 @@
-import type { $Fetch, FetchError } from "ofetch";
+import type { $Fetch, FetchError, FetchOptions } from "ofetch";
 import type { ClientOptions } from "./types";
 import { HTTPError, RateLimitError, parseRetryAfter } from "./errors";
 import { lazy } from "./lazy";
@@ -58,7 +58,7 @@ export class Client {
   ): Promise<T> {
     const fetch = await this.http();
     try {
-      return await fetch<T>(url, { headers, signal });
+      return await fetch<T>(url, { headers, ...this.retryControl(signal) });
     } catch (error) {
       throw this.mapError(error, url);
     }
@@ -72,7 +72,7 @@ export class Client {
   ): Promise<T> {
     const fetch = await this.http();
     try {
-      return await fetch<T>(url, { method: "POST", body, headers, signal });
+      return await fetch<T>(url, { method: "POST", body, headers, ...this.retryControl(signal) });
     } catch (error) {
       throw this.mapError(error, url);
     }
@@ -85,7 +85,7 @@ export class Client {
   ): Promise<T> {
     const fetch = await this.http();
     try {
-      return await fetch<T>(url, { method: "PUT", headers, signal });
+      return await fetch<T>(url, { method: "PUT", headers, ...this.retryControl(signal) });
     } catch (error) {
       throw this.mapError(error, url);
     }
@@ -103,7 +103,7 @@ export class Client {
         method: "POST",
         body,
         headers: acceptAnyType(headers),
-        signal,
+        ...this.retryControl(signal),
       });
       return typeof res._data === "string" ? res._data : String(res._data);
     } catch (error) {
@@ -126,7 +126,11 @@ export class Client {
   ): Promise<ArrayBuffer> {
     const fetch = await this.http();
     try {
-      const res = await fetch.raw(url, { headers, signal, responseType: "arrayBuffer" });
+      const res = await fetch.raw(url, {
+        headers,
+        ...this.retryControl(signal),
+        responseType: "arrayBuffer",
+      });
       return res._data as ArrayBuffer;
     } catch (error) {
       throw this.mapError(error, url);
@@ -145,7 +149,7 @@ export class Client {
         method: "POST",
         body,
         headers: acceptAnyType(headers),
-        signal,
+        ...this.retryControl(signal),
         responseType: "arrayBuffer",
       });
       return res._data as ArrayBuffer;
@@ -161,7 +165,7 @@ export class Client {
   ): Promise<T> {
     const fetch = await this.http();
     try {
-      return await fetch<T>(url, { method: "DELETE", headers, signal });
+      return await fetch<T>(url, { method: "DELETE", headers, ...this.retryControl(signal) });
     } catch (error) {
       throw this.mapError(error, url);
     }
@@ -188,7 +192,7 @@ export class Client {
         method: "POST",
         body,
         headers: acceptAnyType(headers),
-        signal,
+        ...this.retryControl(signal),
       });
       const data: unknown = res._data;
       return {
@@ -200,6 +204,26 @@ export class Client {
     } catch (error) {
       throw this.mapError(error, url);
     }
+  }
+
+  /**
+   * ofetch carries its generated signal into retries; each attempt needs its own clock.
+   * @param {AbortSignal} [signal] Caller cancellation, shared across attempts.
+   * @returns {FetchOptions} Hooks that renew the timeout without renewing cancellation.
+   */
+  private retryControl(signal?: AbortSignal): Pick<FetchOptions, "onRequest" | "onRequestError"> {
+    return {
+      onRequest: ({ options }) => {
+        signal?.throwIfAborted();
+        const timeout =
+          this.timeout > 0 ? AbortSignal.timeout(Math.trunc(this.timeout)) : undefined;
+        const signals = [signal, timeout].filter((candidate) => candidate !== undefined);
+        options.signal = signals.length > 0 ? AbortSignal.any(signals) : undefined;
+      },
+      onRequestError: ({ options }) => {
+        if (signal?.aborted) options.retry = false;
+      },
+    };
   }
 
   private mapError(error: unknown, url: string): Error {

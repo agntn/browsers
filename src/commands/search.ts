@@ -25,11 +25,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = await resolveAndCreate(args.provider);
-    if (!provider.search) {
-      consola.error(`Provider ${providerName} does not support web search.`);
-      process.exit(1);
-    }
+    const { provider } = await resolveAndCreate(args.provider, undefined, "search");
     try {
       const results = await provider.search(args.query, {
         maxResults: args.maxResults ? Number(args.maxResults) : 10,

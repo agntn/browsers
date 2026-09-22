@@ -1,5 +1,7 @@
-import { providers as listProviders } from "./registry";
+import { create, providers as listProviders } from "./registry";
 import { UnknownProviderError, NoProviderConfiguredError, AuthError } from "./errors";
+import type { BrowserProvider } from "./types";
+import { resolveCloudflareBrowser } from "./utils";
 
 type ProviderEnvRequirements = readonly (readonly [string, ...string[]])[];
 
@@ -51,6 +53,84 @@ export function resolveProvider(preferred?: string): string {
     if (_hasKey(name)) return name;
   }
   throw new NoProviderConfiguredError();
+}
+
+/** Optional operations a provider may leave unimplemented. */
+export type ProviderOperation = "crawl" | "pdf" | "search" | "extract" | "links";
+
+/** A provider known to implement `O`. */
+export type ProviderWith<O extends ProviderOperation> = BrowserProvider &
+  Required<Pick<BrowserProvider, O>>;
+
+const operationLabels: Readonly<Record<ProviderOperation, string>> = {
+  crawl: "crawl",
+  pdf: "PDF generation",
+  search: "web search",
+  extract: "structured extraction",
+  links: "link extraction",
+};
+
+function supports<O extends ProviderOperation>(
+  provider: Readonly<BrowserProvider>,
+  operation: O,
+): provider is ProviderWith<O> {
+  return typeof provider[operation] === "function";
+}
+
+/**
+ * Build the first configured provider, in registry order, that implements `operation`.
+ *
+ * @param {ProviderOperation} operation Operation the provider has to implement.
+ * @returns {Promise<{ name: string; provider: ProviderWith<O> }>} Resolved name and provider.
+ */
+async function firstProviderWith<O extends ProviderOperation>(
+  operation: O,
+): Promise<{ name: string; provider: ProviderWith<O> }> {
+  const checked: string[] = [];
+  for (const name of listProviders()) {
+    if (!_hasKey(name)) continue;
+    const provider = await create(name);
+    if (supports(provider, operation)) return { name, provider };
+    checked.push(name);
+  }
+  if (checked.length === 0) throw new NoProviderConfiguredError();
+  throw new Error(
+    `No configured provider supports ${operationLabels[operation]} (checked: ${checked.join(", ")}).`,
+  );
+}
+
+/**
+ * Resolve and build the provider for one call.
+ *
+ * A Cloudflare `browser` without a provider selects Cloudflare. With an `operation` and no
+ * provider, the first configured provider that implements it wins; a named provider that lacks
+ * it is rejected rather than replaced.
+ *
+ * @param {string} [preferred] Preferred provider name.
+ * @param {string} [browser] Optional Cloudflare browser engine.
+ * @returns {Promise<{ name: string; provider: BrowserProvider }>} Resolved name and provider.
+ */
+export async function createProvider(
+  preferred?: string,
+  browser?: string,
+): Promise<{ name: string; provider: BrowserProvider }>;
+export async function createProvider<O extends ProviderOperation>(
+  preferred: string | undefined,
+  browser: string | undefined,
+  operation: O,
+): Promise<{ name: string; provider: ProviderWith<O> }>;
+export async function createProvider(
+  preferred?: string,
+  browser?: string,
+  operation?: ProviderOperation,
+): Promise<{ name: string; provider: BrowserProvider }> {
+  if (operation && !preferred && !browser) return firstProviderWith(operation);
+  const name = resolveProvider(browser && !preferred ? "cloudflare" : preferred);
+  const provider = await create(name, { browser: resolveCloudflareBrowser(name, browser) });
+  if (operation && !supports(provider, operation)) {
+    throw new Error(`Provider ${name} does not support ${operationLabels[operation]}.`);
+  }
+  return { name, provider };
 }
 
 /**

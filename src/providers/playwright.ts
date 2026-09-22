@@ -20,7 +20,7 @@ import type {
 import { BrowserError, SessionNotFoundError, normalizeError } from "../core/errors";
 import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
-import type { Browser, Page } from "playwright";
+import type { Browser, Page } from "playwright-core";
 
 function resolveSystemChromium(): string | undefined {
   const candidates = [
@@ -65,7 +65,9 @@ interface PageLease {
 function normalizePlaywrightError(error: unknown): BrowserError {
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("executable") || message.includes("browserType.launch")) {
-    return new BrowserError("Playwright browser not found. Run: npx playwright install chromium");
+    return new BrowserError(
+      "Playwright browser not found. Run: npx playwright-core install chromium",
+    );
   }
   return normalizeError(error, "playwright");
 }
@@ -249,7 +251,7 @@ class PlaywrightProvider implements BrowserProvider {
 
   private async acquirePage(session?: BrowserSession): Promise<PageLease> {
     if (session) return { page: this.getPage(session) };
-    const { chromium } = await import("playwright");
+    const { chromium } = await import("playwright-core");
     const browser = await chromium.launch({
       headless: true,
       executablePath: resolveSystemChromium(),
@@ -275,7 +277,7 @@ class PlaywrightProvider implements BrowserProvider {
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
-      const { chromium } = await import("playwright");
+      const { chromium } = await import("playwright-core");
       const browser = await chromium.launch({
         headless: options?.headless ?? true,
         executablePath: resolveSystemChromium(),
@@ -393,7 +395,7 @@ class PlaywrightProvider implements BrowserProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
-      const { chromium } = await import("playwright");
+      const { chromium } = await import("playwright-core");
       const browser = await chromium.launch({
         headless: true,
         executablePath: resolveSystemChromium(),

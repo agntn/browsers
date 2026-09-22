@@ -45,7 +45,7 @@ This domain is for use in documentation examples without needing permission. Avo
 Learn more
 ```
 
-No key, no account. Playwright runs Chromium here. After `pnpm add`, that command is `pnpm exec browsers`, or install it once with `pnpm add -g @agntn/browsers`. Skip `--provider` and the first configured backend wins. Steel if that key is set. Playwright if nothing else is.
+No key, no account. Playwright runs Chromium here. After `pnpm add`, that command is `pnpm exec browsers`, or install it once with `pnpm add -g @agntn/browsers`. Skip `--provider` and the first configured backend that can run the command wins. Steel if that key is set. Playwright if nothing else is. `links` on a Steel setup skips Steel, which has no links endpoint.
 
 The scrape said "Learn more" and dropped the href. This did not:
 

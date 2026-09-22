@@ -29,11 +29,11 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = await resolveAndCreate(args.provider, args.browser);
-    if (!provider.extract) {
-      consola.error(`Provider ${providerName} does not support structured extraction.`);
-      process.exit(1);
-    }
+    const { name: providerName, provider } = await resolveAndCreate(
+      args.provider,
+      args.browser,
+      "extract",
+    );
     consola.info(`Extracting via ${providerName}...`);
     try {
       const result = await provider.extract(args.url, { prompt: args.prompt });

@@ -61,11 +61,11 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = await resolveAndCreate(args.provider, args.browser);
-    if (!provider.crawl) {
-      consola.error(`Provider ${providerName} does not support crawl.`);
-      process.exit(1);
-    }
+    const { name: providerName, provider } = await resolveAndCreate(
+      args.provider,
+      args.browser,
+      "crawl",
+    );
     consola.info(`Crawling via ${providerName}...`);
     try {
       const result = await provider.crawl(args.url, {

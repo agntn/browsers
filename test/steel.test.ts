@@ -61,3 +61,53 @@ describe("steel scrape responses", () => {
     });
   });
 });
+
+describe("steel screenshots", () => {
+  const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
+  const session = { id: "session-1", provider: "steel", createdAt: 0 };
+  let server: Server;
+  let baseURL: string;
+
+  beforeAll(async () => {
+    server = createServer(async (request, response) => {
+      if (request.method === "GET" && request.url === "/static/shot.png") {
+        response.setHeader("Content-Type", "image/png");
+        response.end(PNG_BYTES);
+        return;
+      }
+      const body = JSON.parse(await readBody(request)) as { url?: string };
+      response.setHeader("Content-Type", "application/json");
+      response.end(
+        JSON.stringify(
+          body.url === "https://empty.example" ? {} : { url: `${baseURL}/static/shot.png` },
+        ),
+      );
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (typeof address === "object" && address) baseURL = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  });
+
+  it("fetches the hosted image instead of returning its URL", async () => {
+    const provider = await create("steel", { apiKey: "test", baseURL });
+
+    await expect(provider.screenshot({ url: "https://example.com" }, session)).resolves.toEqual({
+      data: `data:image/png;base64,${PNG_BYTES.toString("base64")}`,
+      mimeType: "image/png",
+    });
+  });
+
+  it("reports a response without an image", async () => {
+    const provider = await create("steel", { apiKey: "test", baseURL });
+
+    await expect(provider.screenshot({ url: "https://empty.example" }, session)).rejects.toThrow(
+      "Steel returned no screenshot",
+    );
+  });
+});

@@ -1,3 +1,6 @@
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { BrowserProvider } from "../src/core/types";
 import { register } from "../src/core/registry";
@@ -12,6 +15,8 @@ import {
 } from "../src/tool-operations";
 
 const previousApiKey = process.env.TOOLTEST_API_KEY;
+const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
+const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]);
 let statelessScrape = true;
 const createSession = vi.fn<BrowserProvider["createSession"]>().mockResolvedValue({
   id: "session-1",
@@ -199,9 +204,12 @@ describe("browser tool operations", () => {
     ]);
   });
 
-  it("returns stateless screenshots without exposing the image twice", async () => {
+  it("returns the screenshot as an image block, typed by its bytes", async () => {
     process.env.TOOLTEST_API_KEY = "test";
-    screenshot.mockResolvedValue({ data: "base64-image", mimeType: "image/png" });
+    screenshot.mockResolvedValue({
+      data: `data:image/png;base64,${JPEG_BYTES.toString("base64")}`,
+      mimeType: "image/png",
+    });
 
     const result = await browserScreenshot({
       provider: "tooltest",
@@ -209,13 +217,85 @@ describe("browser tool operations", () => {
       fullPage: true,
     });
 
-    expect(result.content[0]?.text).toContain("Data length: 12 chars");
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: "[provider=tooltest] Stateless screenshot of https://example.test: image/jpeg, 6 bytes.",
+      },
+      { type: "image", data: JPEG_BYTES.toString("base64"), mimeType: "image/jpeg" },
+    ]);
     expect(result.details).toEqual({
       url: "https://example.test",
       provider: "tooltest",
+      mimeType: "image/jpeg",
+      bytes: 6,
       saved: false,
     });
-    expect(JSON.stringify(result)).not.toContain("base64-image");
+  });
+
+  it("writes the screenshot to path instead of returning it", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    screenshot.mockResolvedValue({ data: PNG_BYTES.toString("base64"), mimeType: "image/png" });
+    const directory = await mkdtemp(join(tmpdir(), "browsers-screenshot-"));
+    const path = join(directory, "nested", "page.png");
+
+    try {
+      const result = await browserScreenshot({
+        provider: "tooltest",
+        url: "https://example.test",
+        path,
+      });
+
+      expect(await readFile(path)).toEqual(PNG_BYTES);
+      expect(result.content).toEqual([
+        {
+          type: "text",
+          text: `[provider=tooltest] Stateless screenshot of https://example.test: image/png, 12 bytes, saved to ${path}.`,
+        },
+      ]);
+      expect(result.details).toEqual({
+        url: "https://example.test",
+        provider: "tooltest",
+        mimeType: "image/png",
+        bytes: 12,
+        saved: true,
+        path,
+      });
+      await expect(
+        browserScreenshot({ provider: "tooltest", url: "https://example.test", path }),
+      ).rejects.toThrow("EEXIST");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["an empty payload", "", "tooltest returned an empty screenshot"],
+    ["an empty data URL", "data:image/png;base64,", "tooltest returned an empty screenshot"],
+    [
+      "a hosted URL",
+      "https://images.example.test/shot.png",
+      "tooltest returned a screenshot that is not base64 image data",
+    ],
+  ])("fails on %s instead of reporting a screenshot", async (_case, data, message) => {
+    process.env.TOOLTEST_API_KEY = "test";
+    screenshot.mockResolvedValue({ data, mimeType: "image/png" });
+
+    await expect(
+      browserScreenshot({ provider: "tooltest", url: "https://example.test" }),
+    ).rejects.toThrow(message);
+  });
+
+  it("asks for path when the screenshot is too large to return", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    const large = Buffer.concat([PNG_BYTES, Buffer.alloc(4 * 1024 * 1024)]);
+    screenshot.mockResolvedValue({ data: large.toString("base64"), mimeType: "image/png" });
+
+    await expect(
+      browserScreenshot({ provider: "tooltest", url: "https://example.test" }),
+    ).rejects.toThrow(
+      `Screenshot is ${large.length} bytes, too large to return inline. Pass path to save it to a file.`,
+    );
   });
 
   it("lists registered providers and reports capabilities consistently", async () => {

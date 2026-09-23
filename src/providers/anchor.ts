@@ -14,7 +14,12 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, BrowserError, normalizeError } from "../core/errors";
-import { isNotFoundError, assertUrlOrSession, notSupportedViaRest } from "../core/utils";
+import {
+  isNotFoundError,
+  assertUrlOrSession,
+  imageMimeType,
+  notSupportedViaRest,
+} from "../core/utils";
 
 /** Every Anchor response wraps its payload in `data`. */
 interface AnchorEnvelope<T> {
@@ -41,11 +46,6 @@ interface AnchorSessionList {
   count?: number;
   items?: AnchorSessionStatus[];
 }
-
-const PNG_SIGNATURE = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const JPEG_SIGNATURE = new Uint8Array([0xff, 0xd8, 0xff]);
-const RIFF_SIGNATURE = new TextEncoder().encode("RIFF");
-const WEBP_SIGNATURE = new TextEncoder().encode("WEBP");
 
 /**
  * Session section of the create body: proxy and lifetime.
@@ -114,39 +114,6 @@ function toSession(status: Readonly<AnchorSessionStatus>, fallbackId?: string): 
     createdAt: status.created_at ? new Date(status.created_at).getTime() : Date.now(),
     metadata: { status: status.status },
   };
-}
-
-/**
- * Checks whether the bytes at `offset` spell the signature.
- *
- * @param {ArrayLike<number>} image Screenshot bytes.
- * @param {ArrayLike<number>} signature Bytes to look for.
- * @param {number} [offset] Position of the signature in the image.
- * @returns {boolean} Whether the signature is there.
- */
-function hasSignature(image: ArrayLike<number>, signature: ArrayLike<number>, offset = 0): boolean {
-  for (let index = 0; index < signature.length; index += 1) {
-    if (image[offset + index] !== signature[index]) return false;
-  }
-  return true;
-}
-
-/**
- * Reads the image type from the bytes. The screenshot route labels every
- * response `image/png` and sends JPEG for most of them.
- *
- * @param {ArrayLike<number>} image Screenshot bytes.
- * @param {string} declared Content type the response declared.
- * @returns {string} MIME type of the bytes.
- */
-function imageMimeType(image: ArrayLike<number>, declared: string): string {
-  if (hasSignature(image, JPEG_SIGNATURE)) return "image/jpeg";
-  if (hasSignature(image, PNG_SIGNATURE)) return "image/png";
-  if (hasSignature(image, RIFF_SIGNATURE) && hasSignature(image, WEBP_SIGNATURE, 8)) {
-    return "image/webp";
-  }
-  const declaredType = declared.split(";")[0]?.trim() ?? "";
-  return declaredType.startsWith("image/") ? declaredType : "image/png";
 }
 
 class AnchorProvider implements BrowserProvider {

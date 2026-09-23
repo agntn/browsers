@@ -10,6 +10,44 @@ import type {
   ScreenshotResult,
 } from "./types";
 
+const PNG_SIGNATURE = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const JPEG_SIGNATURE = new Uint8Array([0xff, 0xd8, 0xff]);
+const RIFF_SIGNATURE = new TextEncoder().encode("RIFF");
+const WEBP_SIGNATURE = new TextEncoder().encode("WEBP");
+
+/**
+ * Checks whether the bytes at `offset` spell the signature.
+ *
+ * @param {ArrayLike<number>} image Screenshot bytes.
+ * @param {ArrayLike<number>} signature Bytes to look for.
+ * @param {number} [offset] Position of the signature in the image.
+ * @returns {boolean} Whether the signature is there.
+ */
+function hasSignature(image: ArrayLike<number>, signature: ArrayLike<number>, offset = 0): boolean {
+  for (let index = 0; index < signature.length; index += 1) {
+    if (image[offset + index] !== signature[index]) return false;
+  }
+  return true;
+}
+
+/**
+ * Reads the image type from the bytes. Screenshot labels are not reliable:
+ * Anchor declares `image/png` and sends JPEG for most of them.
+ *
+ * @param {ArrayLike<number>} image Screenshot bytes.
+ * @param {string} declared Content type the response declared.
+ * @returns {string} MIME type of the bytes.
+ */
+export function imageMimeType(image: ArrayLike<number>, declared: string): string {
+  if (hasSignature(image, JPEG_SIGNATURE)) return "image/jpeg";
+  if (hasSignature(image, PNG_SIGNATURE)) return "image/png";
+  if (hasSignature(image, RIFF_SIGNATURE) && hasSignature(image, WEBP_SIGNATURE, 8)) {
+    return "image/webp";
+  }
+  const declaredType = declared.split(";")[0]?.trim() ?? "";
+  return declaredType.startsWith("image/") ? declaredType : "image/png";
+}
+
 /**
  * Check whether an error is an HTTP 404 from the provider API.
  *

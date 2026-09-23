@@ -1,14 +1,28 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS } from "./tool-contract";
+import { BrowserError } from "./core/errors";
 import { create, providers } from "./core/registry";
 import { createProvider } from "./core/resolve";
-import type { ProviderCapabilities } from "./core/types";
-import { scrapeWithSessionWhenNeeded, screenshotWithSessionWhenNeeded } from "./core/utils";
+import type { ProviderCapabilities, ScreenshotResult } from "./core/types";
+import {
+  imageMimeType,
+  scrapeWithSessionWhenNeeded,
+  screenshotWithSessionWhenNeeded,
+} from "./core/utils";
 
 export type { ProviderCapabilities } from "./core/types";
 
-/** Text shown to the model plus structured details retained by agent harnesses. */
+/** An image shown to the model, as base64 with its MIME type. */
+export interface ImageContent {
+  type: "image";
+  data: string;
+  mimeType: string;
+}
+
+/** Text and images shown to the model plus structured details retained by agent harnesses. */
 export interface ToolResult<Details> {
-  content: Array<{ type: "text"; text: string }>;
+  content: Array<{ type: "text"; text: string } | ImageContent>;
   details: Details;
   isError?: boolean;
 }
@@ -43,6 +57,7 @@ export interface BrowserScreenshotParams {
   browser?: string;
   format?: string;
   fullPage?: boolean;
+  path?: string;
 }
 
 /** Arguments accepted by the browser extraction tool. */
@@ -235,23 +250,76 @@ export async function listBrowserProviders(): Promise<
   return { content: content(lines.join("\n")), details: { providers: rows } };
 }
 
+/** Screenshot metadata kept by agent harnesses; the image itself is never repeated here. */
+export interface BrowserScreenshotDetails {
+  url: string;
+  provider: string;
+  mimeType: string;
+  bytes: number;
+  saved: boolean;
+  path?: string;
+}
+
+/**
+ * Base64 length above which a screenshot is not inlined. Model APIs refuse
+ * larger images (Anthropic caps one image at 5 MB), so a bigger capture has
+ * to go to a file.
+ */
+const MAX_INLINE_IMAGE_CHARS = 5 * 1024 * 1024;
+
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+
 /**
  * Takes a stateless screenshot or manages a temporary provider session.
  *
+ * Without `path` the image comes back as an image content block. With `path`
+ * it is written to that file, which must not exist yet, and only the path
+ * comes back.
+ *
  * @param params - Screenshot arguments.
- * @returns {Promise<ToolResult<{ url: string; provider: string; saved: boolean }>>} Screenshot metadata without duplicating image data.
+ * @returns {Promise<ToolResult<BrowserScreenshotDetails>>} The image or the saved file, with metadata.
  */
 export async function browserScreenshot(
   params: Readonly<BrowserScreenshotParams>,
-): Promise<ToolResult<{ url: string; provider: string; saved: boolean }>> {
+): Promise<ToolResult<BrowserScreenshotDetails>> {
   const { name, provider } = await createProvider(params.provider, params.browser);
   const result = await screenshotWithSessionWhenNeeded(provider, {
     url: params.url,
     fullPage: params.fullPage,
     format: screenshotFormat(params.format),
   });
-  const stateless = provider.capabilities().statelessScreenshot;
-  return screenshotResult(params.url, name, result.data.length, stateless);
+  const image = screenshotImage(result, name);
+  const mode = provider.capabilities().statelessScreenshot ? "Stateless screenshot" : "Screenshot";
+  const summary = `[provider=${name}] ${mode} of ${sanitizeField(params.url)}: ${image.mimeType}, ${image.bytes.length} bytes`;
+  const details = {
+    url: params.url,
+    provider: name,
+    mimeType: image.mimeType,
+    bytes: image.bytes.length,
+  };
+
+  if (params.path !== undefined) {
+    const path = resolve(params.path);
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, image.bytes, { flag: "wx" });
+    return {
+      content: content(`${summary}, saved to ${sanitizeField(path)}.`),
+      details: { ...details, saved: true, path },
+    };
+  }
+
+  if (image.data.length > MAX_INLINE_IMAGE_CHARS) {
+    throw new BrowserError(
+      `Screenshot is ${image.bytes.length} bytes, too large to return inline. Pass path to save it to a file.`,
+    );
+  }
+  return {
+    content: [
+      { type: "text", text: `${summary}.` },
+      { type: "image", data: image.data, mimeType: image.mimeType },
+    ],
+    details: { ...details, saved: false },
+  };
 }
 
 function screenshotFormat(format?: string): "png" | "jpeg" | "webp" | undefined {
@@ -261,19 +329,31 @@ function screenshotFormat(format?: string): "png" | "jpeg" | "webp" | undefined 
   throw new Error(`Unsupported screenshot format: ${JSON.stringify(format)}`);
 }
 
-function screenshotResult(
-  url: string,
+/**
+ * Decodes a provider screenshot, a data URL or bare base64, into image bytes.
+ *
+ * @param result - Screenshot returned by the provider.
+ * @param provider - Provider name for error messages.
+ * @returns {{ data: string; mimeType: string; bytes: Buffer }} Base64, MIME type read from the bytes, and the bytes.
+ */
+function screenshotImage(
+  result: Readonly<ScreenshotResult>,
   provider: string,
-  dataLength: number,
-  stateless: boolean,
-): ToolResult<{ url: string; provider: string; saved: boolean }> {
-  const mode = stateless ? "Stateless screenshot" : "Screenshot";
-  return {
-    content: content(
-      `[provider=${provider}] ${mode} of ${sanitizeField(url)}. Data length: ${dataLength} chars.`,
-    ),
-    details: { url, provider, saved: false },
-  };
+): { data: string; mimeType: string; bytes: Buffer } {
+  const header = /^data:([^;,]*)(?:;[^,]*)?,/.exec(result.data);
+  const payload = (header ? result.data.slice(header[0].length) : result.data).replaceAll(
+    /\s/g,
+    "",
+  );
+  if (payload.length === 0) {
+    throw new BrowserError(`${provider} returned an empty screenshot`);
+  }
+  if (!BASE64.test(payload)) {
+    throw new BrowserError(`${provider} returned a screenshot that is not base64 image data`);
+  }
+  const bytes = Buffer.from(payload, "base64");
+  const mimeType = imageMimeType(bytes, header?.[1] || result.mimeType);
+  return { data: bytes.toString("base64"), mimeType, bytes };
 }
 
 /**

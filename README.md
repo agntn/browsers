@@ -153,7 +153,7 @@ omp install @agntn/browsers
 }
 ```
 
-Eleven tools, `browsers_scrape` through `browsers_capabilities`, the same eleven on MCP, Pi and OMP. Cloudflare calls backed by Browser Run take `browser: "kitesurf"`. No `provider` needed then. They do not drive a session you already opened.
+Eleven tools, `browsers_scrape` through `browsers_capabilities`, the same eleven on MCP, Pi and OMP. Cloudflare calls backed by Browser Run take `browser: "kitesurf"`. No `provider` needed then. They do not drive a session you already opened. `browsers_screenshot` hands the image back to the model. A full page too big for that goes to a file: pass `path`, and it refuses to overwrite one that exists.
 
 ## 🚫 What this does not do
 

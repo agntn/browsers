@@ -65,6 +65,12 @@ export const browserToolSchemas = {
         Type.String({ description: "Image format: png, jpeg, webp. Default: png." }),
       ),
       fullPage: Type.Optional(Type.Boolean({ description: "Capture full page. Default: true." })),
+      path: Type.Optional(
+        Type.String({
+          description:
+            "File to write the image to instead of returning it. A relative path resolves against the working directory of the process running the tool. The file must not exist yet.",
+        }),
+      ),
     },
     { additionalProperties: false },
   ),

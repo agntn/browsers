@@ -139,6 +139,13 @@ function buildParameterSchemas(pi: ExtensionAPI) {
         ),
         browser,
         maxPages: Type.Optional(Type.Number({ description: "Max pages to crawl. Default: 10." })),
+        maxChars: Type.Optional(
+          Type.Integer({
+            description: `Maximum page content characters to return across all pages. Defaults to ${DEFAULT_SCRAPE_MAX_CHARS}; accepted range: 1-${MAX_SCRAPE_MAX_CHARS}.`,
+            minimum: 1,
+            maximum: MAX_SCRAPE_MAX_CHARS,
+          }),
+        ),
       },
       { additionalProperties: false },
     ),

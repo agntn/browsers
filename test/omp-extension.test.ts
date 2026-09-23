@@ -188,8 +188,8 @@ describe("browsers OMP extension", () => {
           invalid: { url: "https://example.test" },
         },
         browsers_crawl: {
-          valid: { url: "https://example.test", browser: "kitesurf", maxPages: 10 },
-          invalid: {},
+          valid: { url: "https://example.test", browser: "kitesurf", maxPages: 10, maxChars: 500 },
+          invalid: { url: "https://example.test", maxChars: 200_001 },
         },
         browsers_pdf: {
           valid: { url: "https://example.test", browser: "kitesurf", path: "page.pdf" },

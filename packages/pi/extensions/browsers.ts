@@ -189,7 +189,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     promptGuidelines: [
       "Use browsers_crawl when the user needs content from multiple pages of a website.",
       "Both cloudflare and hyperbrowser return async job IDs. Results may need polling.",
-      "Pass maxPages to limit the crawl scope.",
+      "Pass maxPages to limit the crawl scope and maxChars to bound the returned content.",
     ],
     parameters: browserToolSchemas.browsers_crawl,
     ...statusRenderers("browsers_crawl"),

@@ -188,7 +188,11 @@ const CALL_DESCRIPTIONS: Readonly<Record<BrowserToolName, CallDescriber>> = {
   browsers_extract: (record) =>
     urlCall(record, [scalar(record, "browser"), prefixedField(record, "prompt", "prompt")]),
   browsers_crawl: (record) =>
-    urlCall(record, [scalar(record, "browser"), countedField(record, "maxPages", "page")]),
+    urlCall(record, [
+      scalar(record, "browser"),
+      countedField(record, "maxPages", "page"),
+      countedField(record, "maxChars", "char"),
+    ]),
   browsers_pdf: (record) => urlCall(record, [scalar(record, "browser")]),
   browsers_links: (record) => urlCall(record, [scalar(record, "browser")]),
   browsers_search: (record) => ({ subject: scalar(record, "query"), meta: [] }),

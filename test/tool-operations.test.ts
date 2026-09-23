@@ -6,6 +6,7 @@ import type { BrowserProvider } from "../src/core/types";
 import { register } from "../src/core/registry";
 import {
   browserCapabilities,
+  browserCrawl,
   browserLinks,
   browserPdf,
   browserScrape,
@@ -32,6 +33,7 @@ const scrape = vi.fn<BrowserProvider["scrape"]>();
 const screenshot = vi.fn<BrowserProvider["screenshot"]>();
 const links = vi.fn<NonNullable<BrowserProvider["links"]>>();
 const pdf = vi.fn<NonNullable<BrowserProvider["pdf"]>>();
+const crawl = vi.fn<NonNullable<BrowserProvider["crawl"]>>();
 
 function toolTestProvider(): BrowserProvider {
   return {
@@ -45,7 +47,7 @@ function toolTestProvider(): BrowserProvider {
       cdp: true,
       statelessScrape,
       statelessScreenshot: true,
-      crawl: false,
+      crawl: true,
       pdf: true,
       links: true,
       search: false,
@@ -61,6 +63,7 @@ function toolTestProvider(): BrowserProvider {
     evaluate: vi.fn().mockResolvedValue({ value: undefined }),
     links,
     pdf,
+    crawl,
   };
 }
 
@@ -181,6 +184,70 @@ describe("browser tool operations", () => {
 
     expect(releaseSession).toHaveBeenCalledWith("session-1");
     expect(result.details).toEqual({ released: true });
+  });
+
+  it("returns every crawled page with its content under one budget", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    crawl.mockResolvedValueOnce({
+      pages: [
+        { url: "https://example.test/", title: "Home", text: "abcdef" },
+        { url: "https://example.test/a", markdown: "# ghijkl" },
+        { url: "https://example.test/b", title: "B\u001B[31m", html: "<p>mn</p>" },
+      ],
+      totalFound: 3,
+    });
+
+    const result = await browserCrawl({
+      provider: "tooltest",
+      url: "https://example.test/",
+      maxPages: 3,
+      maxChars: 10,
+    });
+
+    expect(crawl).toHaveBeenCalledWith("https://example.test/", { maxPages: 3 });
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: [
+          "[provider=tooltest] Crawled 3 pages.",
+          "",
+          "--- https://example.test/ (Home)",
+          "abcdef",
+          "",
+          "--- https://example.test/a",
+          "# gh",
+          "",
+          "--- https://example.test/b (B [31m)",
+          "",
+          "[truncated 13 of 23 page content characters]",
+        ].join("\n"),
+      },
+    ]);
+    expect(result.details).toEqual({ jobId: undefined, pages: 3 });
+  });
+
+  it("reports an async crawl job that has no pages yet", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    crawl.mockResolvedValueOnce({ pages: [], totalFound: 0, jobId: "job-1", status: "running" });
+
+    const result = await browserCrawl({ provider: "tooltest", url: "https://example.test/" });
+
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: "[provider=tooltest] Crawled 0 pages.\nJob ID: job-1 (status: running)",
+      },
+    ]);
+    expect(result.details).toEqual({ jobId: "job-1", pages: 0 });
+  });
+
+  it("rejects an invalid crawl limit before provider I/O", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+
+    await expect(
+      browserCrawl({ provider: "tooltest", url: "https://example.test/", maxChars: 0 }),
+    ).rejects.toThrow("maxChars must be an integer between 1 and 200000");
+    expect(crawl).not.toHaveBeenCalled();
   });
 
   it("deduplicates links in order of first appearance across visible and structured output", async () => {

@@ -4,7 +4,7 @@ import { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS } from "./tool-contract"
 import { BrowserError } from "./core/errors";
 import { create, providers } from "./core/registry";
 import { createProvider } from "./core/resolve";
-import type { ProviderCapabilities, ScreenshotResult } from "./core/types";
+import type { CrawlPage, ProviderCapabilities, ScreenshotResult } from "./core/types";
 import {
   imageMimeType,
   scrapeWithSessionWhenNeeded,
@@ -75,6 +75,7 @@ export interface BrowserCrawlParams {
   provider?: string;
   browser?: string;
   maxPages?: number;
+  maxChars?: number;
 }
 
 /** Arguments accepted by the browser PDF tool. */
@@ -150,7 +151,7 @@ export function errorMessage(error: unknown): string {
   return sanitizeField(error instanceof Error ? error.message : String(error));
 }
 
-function resolveScrapeMaxChars(value?: number): number {
+function resolveMaxChars(value?: number): number {
   const maxChars = value ?? DEFAULT_SCRAPE_MAX_CHARS;
   if (!Number.isInteger(maxChars) || maxChars < 1 || maxChars > MAX_SCRAPE_MAX_CHARS) {
     throw new RangeError(`maxChars must be an integer between 1 and ${MAX_SCRAPE_MAX_CHARS}.`);
@@ -167,7 +168,7 @@ function resolveScrapeMaxChars(value?: number): number {
 export async function browserScrape(
   params: Readonly<BrowserScrapeParams>,
 ): Promise<ToolResult<BrowserScrapeDetails>> {
-  const maxChars = resolveScrapeMaxChars(params.maxChars);
+  const maxChars = resolveMaxChars(params.maxChars);
   const { name, provider } = await createProvider(params.provider, params.browser);
   const result = await scrapeWithSessionWhenNeeded(provider, params.url, {
     waitFor: params.waitFor,
@@ -422,21 +423,54 @@ export async function browserExtract(
   };
 }
 
+type CrawlPageContent = Readonly<Pick<CrawlPage, "url" | "title" | "text" | "markdown" | "html">>;
+
 /**
- * Crawls a site through a capable provider.
+ * Lays out crawled pages as a header each, with content cut to one shared budget.
+ *
+ * @param pages - Pages in crawl order.
+ * @param maxChars - Content characters allowed across all pages.
+ * @returns {string[]} Output lines, ending with a truncation note when content was cut.
+ */
+function crawlPageLines(pages: readonly CrawlPageContent[], maxChars: number): string[] {
+  const lines: string[] = [];
+  let budget = maxChars;
+  let total = 0;
+  for (const page of pages) {
+    const pageContent = page.text || page.markdown || page.html || "";
+    const title = page.title ? ` (${sanitizeField(page.title)})` : "";
+    const body = pageContent.slice(0, budget);
+    budget -= body.length;
+    total += pageContent.length;
+    lines.push("", `--- ${sanitizeField(page.url)}${title}`);
+    if (body) lines.push(body);
+  }
+  if (total > maxChars) {
+    lines.push("", `[truncated ${total - maxChars} of ${total} page content characters]`);
+  }
+  return lines;
+}
+
+/**
+ * Crawls a site through a capable provider and returns each page it read.
+ *
+ * Every page gets a header with its URL and title. Page content shares one
+ * `maxChars` budget in crawl order, so later pages may keep only the header.
  *
  * @param params - Crawl arguments.
- * @returns {Promise<ToolResult<{ jobId?: string; pages: number }>>} Crawl job identity and page count.
+ * @returns {Promise<ToolResult<{ jobId?: string; pages: number }>>} Page content, crawl job identity and page count.
  */
 export async function browserCrawl(
   params: Readonly<BrowserCrawlParams>,
 ): Promise<ToolResult<{ jobId?: string; pages: number }>> {
+  const maxChars = resolveMaxChars(params.maxChars);
   const { name, provider } = await createProvider(params.provider, params.browser, "crawl");
   const result = await provider.crawl(params.url, { maxPages: params.maxPages ?? 10 });
   const lines = [`[provider=${name}] Crawled ${result.pages.length} pages.`];
   if (result.jobId) {
     lines.push(`Job ID: ${sanitizeField(result.jobId)} (status: ${result.status})`);
   }
+  lines.push(...crawlPageLines(result.pages, maxChars));
   return {
     content: content(lines.join("\n")),
     details: { jobId: result.jobId, pages: result.pages.length },

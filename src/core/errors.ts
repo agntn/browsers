@@ -5,13 +5,53 @@ export class BrowserError extends Error {
   }
 }
 
+/** Longest provider reason an error message carries; the full body stays on `HTTPError.body`. */
+const MAX_REASON_CHARS = 300;
+
+function reasonFields(data: unknown): string[] {
+  if (typeof data === "string") return [data];
+  if (typeof data !== "object" || data === null) return [];
+  if (Array.isArray(data)) return reasonFields(data[0]);
+  const { message, error, errors, detail } = data as Record<string, unknown>;
+  const main = typeof message === "string" ? [message] : reasonFields(error ?? errors);
+  return typeof detail === "string" ? [...main, detail] : main;
+}
+
+/**
+ * The provider's own explanation of a failed request, read from the response body.
+ *
+ * JSON bodies give up their `message`, `error` or `detail` field and never land whole; an HTML
+ * page gives nothing. The result is one line of at most `MAX_REASON_CHARS` characters, since
+ * the message reaches the agent as it is.
+ *
+ * @param body - Response body as the client received it.
+ * @returns {string | undefined} A short reason, or `undefined` when the body has none.
+ */
+function responseReason(body: string): string | undefined {
+  const text = body.trim();
+  if (!text || text.startsWith("<")) return undefined;
+  let fields: string[];
+  try {
+    fields = reasonFields(JSON.parse(text));
+  } catch {
+    fields = [text];
+  }
+  const reason = fields.join(" ").replaceAll(/\s+/g, " ").trim();
+  if (!reason) return undefined;
+  const chars = Array.from(reason);
+  return chars.length > MAX_REASON_CHARS
+    ? `${chars.slice(0, MAX_REASON_CHARS - 1).join("")}…`
+    : reason;
+}
+
 export class HTTPError extends BrowserError {
   readonly statusCode: number;
   readonly url: string;
   readonly body: string;
 
   constructor(statusCode: number, url: string, body: string) {
-    super(`HTTP ${statusCode}: ${url}`);
+    const reason = responseReason(body);
+    super(`HTTP ${statusCode}${url ? ` from ${url}` : ""}${reason ? `: ${reason}` : ""}`);
     this.name = "HTTPError";
     this.statusCode = statusCode;
     this.url = url;
@@ -204,12 +244,15 @@ function normalizeStatusError(error: StatusError, provider?: string): BrowserErr
   }
 }
 
+function authFailure(body: string, provider?: string): AuthError {
+  const reason = responseReason(body) ?? "Invalid or missing API key";
+  const target = provider ? ` for ${provider}` : "";
+  return new AuthError(`Authentication failed${target}: ${reason}`, effectiveProvider(provider));
+}
+
 export function normalizeError(error: unknown, provider?: string): BrowserError {
   if (error instanceof HTTPError) {
-    if (error.statusCode === 401) {
-      const message = messageOrDefault(error.body, "Invalid or missing API key");
-      return new AuthError(`Authentication failed: ${message}`, effectiveProvider(provider));
-    }
+    if (error.statusCode === 401) return authFailure(error.body, provider);
     if (error.statusCode === 402 || error.statusCode === 403) {
       return new PaymentError(
         `Payment required: ${error.message}`,

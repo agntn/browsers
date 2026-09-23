@@ -7,6 +7,7 @@ import { register } from "../src/core/registry";
 import {
   browserCapabilities,
   browserLinks,
+  browserPdf,
   browserScrape,
   browserSession,
   browserScreenshot,
@@ -17,6 +18,7 @@ import {
 const previousApiKey = process.env.TOOLTEST_API_KEY;
 const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
 const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]);
+const PDF_BYTES = Buffer.from("%PDF-1.7\n%%EOF\n");
 let statelessScrape = true;
 const createSession = vi.fn<BrowserProvider["createSession"]>().mockResolvedValue({
   id: "session-1",
@@ -29,6 +31,7 @@ const releaseSession = vi.fn<(sessionId: string) => Promise<void>>().mockResolve
 const scrape = vi.fn<BrowserProvider["scrape"]>();
 const screenshot = vi.fn<BrowserProvider["screenshot"]>();
 const links = vi.fn<NonNullable<BrowserProvider["links"]>>();
+const pdf = vi.fn<NonNullable<BrowserProvider["pdf"]>>();
 
 function toolTestProvider(): BrowserProvider {
   return {
@@ -43,7 +46,7 @@ function toolTestProvider(): BrowserProvider {
       statelessScrape,
       statelessScreenshot: true,
       crawl: false,
-      pdf: false,
+      pdf: true,
       links: true,
       search: false,
       extract: false,
@@ -57,6 +60,7 @@ function toolTestProvider(): BrowserProvider {
     navigate: vi.fn().mockResolvedValue(undefined),
     evaluate: vi.fn().mockResolvedValue({ value: undefined }),
     links,
+    pdf,
   };
 }
 
@@ -296,6 +300,68 @@ describe("browser tool operations", () => {
     ).rejects.toThrow(
       `Screenshot is ${large.length} bytes, too large to return inline. Pass path to save it to a file.`,
     );
+  });
+
+  it("writes the PDF to path and returns only the file", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    pdf.mockResolvedValue({
+      data: `data:application/pdf;base64,${PDF_BYTES.toString("base64")}`,
+      mimeType: "application/pdf",
+    });
+    const directory = await mkdtemp(join(tmpdir(), "browsers-pdf-"));
+    const path = join(directory, "nested", "page.pdf");
+
+    try {
+      const result = await browserPdf({ provider: "tooltest", url: "https://example.test", path });
+
+      expect(await readFile(path)).toEqual(PDF_BYTES);
+      expect(result.content).toEqual([
+        {
+          type: "text",
+          text: `[provider=tooltest] PDF of https://example.test: ${PDF_BYTES.length} bytes, saved to ${path}.`,
+        },
+      ]);
+      expect(result.details).toEqual({
+        url: "https://example.test",
+        provider: "tooltest",
+        bytes: PDF_BYTES.length,
+        path,
+      });
+      await expect(
+        browserPdf({ provider: "tooltest", url: "https://example.test", path }),
+      ).rejects.toThrow("EEXIST");
+      expect(await readFile(path)).toEqual(PDF_BYTES);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["an empty payload", "", "tooltest returned an empty PDF"],
+    [
+      "a hosted URL",
+      "https://files.example.test/page.pdf",
+      "tooltest returned a PDF that is not base64 PDF data",
+    ],
+    [
+      "base64 that is not a PDF",
+      PNG_BYTES.toString("base64"),
+      "tooltest returned a PDF that does not start with %PDF-",
+    ],
+  ])("fails on %s instead of writing a file", async (_case, data, message) => {
+    process.env.TOOLTEST_API_KEY = "test";
+    pdf.mockResolvedValue({ data, mimeType: "application/pdf" });
+    const directory = await mkdtemp(join(tmpdir(), "browsers-pdf-"));
+    const path = join(directory, "page.pdf");
+
+    try {
+      await expect(
+        browserPdf({ provider: "tooltest", url: "https://example.test", path }),
+      ).rejects.toThrow(message);
+      await expect(readFile(path)).rejects.toThrow("ENOENT");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("lists registered providers and reports capabilities consistently", async () => {

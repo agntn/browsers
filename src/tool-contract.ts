@@ -65,7 +65,7 @@ export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> 
   browsers_crawl:
     "Crawl a website following links. Cloudflare and Hyperbrowser support async crawl jobs. Returns pages with markdown/HTML content.",
   browsers_pdf:
-    "Generate a PDF from a URL. Cloudflare and Browserless support stateless PDF generation.",
+    "Generate a PDF from a URL and write it to `path`. Cloudflare and Browserless support stateless PDF generation.",
   browsers_links:
     "Extract all links from a webpage. Cloudflare and Playwright support stateless link extraction.",
   browsers_search: "Web search via browser provider. Hyperbrowser supports native web search.",

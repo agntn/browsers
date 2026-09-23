@@ -205,17 +205,14 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     name: "browsers_pdf",
     label: browserToolLabels.browsers_pdf,
     description: browserToolDescriptions.browsers_pdf,
-    promptSnippet: "Generate a PDF from a URL.",
+    promptSnippet: "Save a PDF of a URL to a file.",
     promptGuidelines: [
       "Use browsers_pdf when the user needs a PDF of a webpage.",
       "Cloudflare and Browserless work statelessly (no session needed).",
     ],
     parameters: browserToolSchemas.browsers_pdf,
     ...statusRenderers("browsers_pdf"),
-    async execute(
-      _toolCallId,
-      params,
-    ): Promise<AgentToolResult<{ url: string; provider: string; pdfLength: number }>> {
+    async execute(_toolCallId, params): Promise<AgentToolResult<BrowserTools.BrowserPdfDetails>> {
       return (await loadToolOperations()).browserPdf(params);
     },
   });

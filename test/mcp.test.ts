@@ -62,6 +62,12 @@ describe("browsers MCP server", () => {
       readOnlyHint: false,
       destructiveHint: true,
     });
+    expect(
+      response.tools.find((tool) => tool.name === "browsers_screenshot")?.annotations,
+    ).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: false,
+    });
   });
 
   it("executes local capability discovery", async () => {

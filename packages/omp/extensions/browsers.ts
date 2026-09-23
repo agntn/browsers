@@ -104,6 +104,12 @@ function buildParameterSchemas(pi: ExtensionAPI) {
           Type.String({ description: "Image format: png, jpeg, webp. Default: png." }),
         ),
         fullPage: Type.Optional(Type.Boolean({ description: "Capture full page. Default: true." })),
+        path: Type.Optional(
+          Type.String({
+            description:
+              "File to write the image to instead of returning it. A relative path resolves against the working directory of the process running the tool. The file must not exist yet.",
+          }),
+        ),
       },
       { additionalProperties: false },
     ),
@@ -253,7 +259,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     },
   });
 
-  pi.registerTool<typeof schemas.screenshot, { url: string; provider: string; saved: boolean }>({
+  pi.registerTool<typeof schemas.screenshot, BrowserTools.BrowserScreenshotDetails>({
     name: "browsers_screenshot",
     label: browserToolLabels.browsers_screenshot,
     description: browserToolDescriptions.browsers_screenshot,

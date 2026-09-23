@@ -14,7 +14,12 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, BrowserError, normalizeError } from "../core/errors";
-import { isNotFoundError, assertSessionId, notSupportedViaRest } from "../core/utils";
+import {
+  isNotFoundError,
+  assertSessionId,
+  imageMimeType,
+  notSupportedViaRest,
+} from "../core/utils";
 
 interface SteelSessionResponse {
   readonly id: string;
@@ -97,16 +102,6 @@ function createScreenshotBody(
   return body;
 }
 
-function toScreenshotResult(
-  response: Readonly<Record<string, unknown>>,
-  format: ScreenshotOptions["format"],
-): ScreenshotResult {
-  return {
-    data: (response.url ?? response.screenshot ?? response.data ?? "") as string,
-    mimeType: `image/${format ?? "png"}`,
-  };
-}
-
 class SteelProvider implements BrowserProvider {
   private readonly client: Client;
   private readonly baseURL: string;
@@ -141,6 +136,29 @@ class SteelProvider implements BrowserProvider {
       search: false,
       extract: false,
     };
+  }
+
+  /**
+   * Turns a screenshot response into image data. Steel answers with a hosted
+   * image URL, so the image is fetched to keep `data` an image, as it is for
+   * every other provider.
+   *
+   * @param {Readonly<Record<string, unknown>>} response Screenshot response body.
+   * @param {ScreenshotOptions["format"]} format Requested image format.
+   * @returns {Promise<ScreenshotResult>} Image as a data URL.
+   */
+  private async screenshotImage(
+    response: Readonly<Record<string, unknown>>,
+    format: ScreenshotOptions["format"],
+  ): Promise<ScreenshotResult> {
+    if (typeof response.url === "string" && response.url) {
+      const image = Buffer.from(await this.client.getRaw(response.url));
+      const mimeType = imageMimeType(image, "");
+      return { data: `data:${mimeType};base64,${image.toString("base64")}`, mimeType };
+    }
+    const data = response.screenshot ?? response.data;
+    if (typeof data !== "string" || !data) throw new BrowserError("Steel returned no screenshot");
+    return { data, mimeType: `image/${format ?? "png"}` };
   }
 
   private headers(): Record<string, string> {
@@ -242,7 +260,7 @@ class SteelProvider implements BrowserProvider {
         createScreenshotBody(options, session),
         this.headers(),
       );
-      return toScreenshotResult(res, options.format);
+      return await this.screenshotImage(res, options.format);
     } catch (error) {
       throw normalizeError(error, "steel");
     }

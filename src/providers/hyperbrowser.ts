@@ -21,7 +21,7 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, BrowserError, InvalidInputError, normalizeError } from "../core/errors";
-import { CRAWL_JOB_TIMEOUT, isNotFoundError, notSupportedViaRest, waitForJob } from "../core/utils";
+import { JOB_TIMEOUT, isNotFoundError, notSupportedViaRest, waitForJob } from "../core/utils";
 
 interface HyperbrowserSessionResponse {
   readonly id: string;
@@ -112,6 +112,35 @@ interface HyperbrowserCrawlBatch {
 
 /** Job states after which Hyperbrowser adds no more pages. */
 const FINISHED_CRAWL_STATUSES = new Set(["completed", "failed", "stopped"]);
+
+interface HyperbrowserExtractJob {
+  readonly status?: string;
+  readonly data?: unknown;
+  readonly error?: string;
+}
+
+/** Job states after which an extract job has its answer. */
+const FINISHED_EXTRACT_STATUSES = new Set(["completed", "failed"]);
+
+/**
+ * Turns the last read of an extract job into a result, or an error when the job failed.
+ *
+ * @param {string} url Page the job extracts from.
+ * @param {string} jobId Job ID the extract started.
+ * @param {HyperbrowserExtractJob} job Last read of the job.
+ * @returns {ExtractResult} The extracted data, or the job ID of a job still running.
+ */
+function extractResult(url: string, jobId: string, job: HyperbrowserExtractJob): ExtractResult {
+  if (job.status === "failed") {
+    throw new BrowserError(
+      `Hyperbrowser extract job ${jobId} failed${job.error ? `: ${job.error}` : ""}`,
+    );
+  }
+  if (job.status !== "completed") {
+    return { url, data: { jobId, status: job.status ?? "pending" } };
+  }
+  return { url, data: job.data };
+}
 
 function crawlPage(page: HyperbrowserCrawlPage): CrawlPage {
   const title = page.metadata?.title;
@@ -309,7 +338,7 @@ class HyperbrowserProvider implements BrowserProvider {
         () =>
           this.client.getJSON<{ status?: string }>(this.crawlURL(jobId, "/status"), this.headers()),
         (current) => FINISHED_CRAWL_STATUSES.has(current.status ?? ""),
-        options?.timeout ?? CRAWL_JOB_TIMEOUT,
+        options?.timeout ?? JOB_TIMEOUT,
       );
       if (!FINISHED_CRAWL_STATUSES.has(job.status ?? "")) {
         return { pages: [], totalFound: 0, jobId, status: "running" };
@@ -385,17 +414,21 @@ class HyperbrowserProvider implements BrowserProvider {
       if (options?.schema) body.schema = options.schema;
       if (options?.prompt) body.prompt = options.prompt;
 
-      const res = await this.client.postJSON<Record<string, unknown>>(
+      const { jobId } = await this.client.postJSON<{ jobId: string }>(
         `${this.baseURL}/api/extract`,
         body,
         this.headers(),
       );
-
-      const jobId = res.jobId as string;
-      return {
-        url,
-        data: { jobId, status: "submitted" },
-      };
+      const job = await waitForJob(
+        () =>
+          this.client.getJSON<HyperbrowserExtractJob>(
+            `${this.baseURL}/api/extract/${encodeURIComponent(jobId)}`,
+            this.headers(),
+          ),
+        (current) => FINISHED_EXTRACT_STATUSES.has(current.status ?? ""),
+        options?.timeout ?? JOB_TIMEOUT,
+      );
+      return extractResult(url, jobId, job);
     } catch (error) {
       throw normalizeError(error, "hyperbrowser");
     }

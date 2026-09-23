@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it } from "vitest";
+import pkg from "../package.json" with { type: "json" };
 import { createMcpServer } from "../src/mcp";
 
 const openConnections: Array<{ close(): Promise<void> }> = [];
@@ -28,6 +29,12 @@ afterEach(async () => {
 });
 
 describe("browsers MCP server", () => {
+  it("reports the package version on initialize", async () => {
+    const client = await connectTestClient();
+
+    expect(client.getServerVersion()).toEqual({ name: "browsers", version: pkg.version });
+  });
+
   it("advertises the complete Pi tool surface", async () => {
     const client = await connectTestClient();
 

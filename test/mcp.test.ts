@@ -75,6 +75,9 @@ describe("browsers MCP server", () => {
       readOnlyHint: false,
       destructiveHint: false,
     });
+    const pdfTool = response.tools.find((tool) => tool.name === "browsers_pdf");
+    expect(pdfTool?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    expect(pdfTool?.inputSchema.required).toEqual(["url", "path"]);
   });
 
   it("executes local capability discovery", async () => {

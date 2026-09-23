@@ -77,6 +77,14 @@ export interface BrowserCrawlParams {
   maxPages?: number;
 }
 
+/** Arguments accepted by the browser PDF tool. */
+export interface BrowserPdfParams {
+  url: string;
+  path: string;
+  provider?: string;
+  browser?: string;
+}
+
 /** Arguments accepted by tools that take a URL and optional provider. */
 export interface BrowserUrlParams {
   url: string;
@@ -299,9 +307,7 @@ export async function browserScreenshot(
   };
 
   if (params.path !== undefined) {
-    const path = resolve(params.path);
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, image.bytes, { flag: "wx" });
+    const path = await writeNewFile(params.path, image.data);
     return {
       content: content(`${summary}, saved to ${sanitizeField(path)}.`),
       details: { ...details, saved: true, path },
@@ -340,20 +346,58 @@ function screenshotImage(
   result: Readonly<ScreenshotResult>,
   provider: string,
 ): { data: string; mimeType: string; bytes: Buffer } {
-  const header = /^data:([^;,]*)(?:;[^,]*)?,/.exec(result.data);
-  const payload = (header ? result.data.slice(header[0].length) : result.data).replaceAll(
-    /\s/g,
-    "",
+  const { bytes, mimeType: declared } = decodeProviderFile(
+    result.data,
+    provider,
+    "screenshot",
+    "image data",
   );
+  const mimeType = imageMimeType(bytes, declared || result.mimeType);
+  return { data: bytes.toString("base64"), mimeType, bytes };
+}
+
+/**
+ * Decodes a file a provider returned as a data URL or bare base64.
+ *
+ * @param data - Data URL or base64 payload.
+ * @param provider - Provider name for error messages.
+ * @param file - What the file is, for error messages.
+ * @param contents - What the payload should hold, for error messages.
+ * @returns {{ data: string; bytes: Buffer; mimeType?: string }} The base64 payload, its bytes, and the MIME type the data URL declared.
+ */
+function decodeProviderFile(
+  data: string,
+  provider: string,
+  file: string,
+  contents: string,
+): { data: string; bytes: Buffer; mimeType?: string } {
+  const header = /^data:([^;,]*)(?:;[^,]*)?,/.exec(data);
+  const payload = (header ? data.slice(header[0].length) : data).replaceAll(/\s/g, "");
   if (payload.length === 0) {
-    throw new BrowserError(`${provider} returned an empty screenshot`);
+    throw new BrowserError(`${provider} returned an empty ${file}`);
   }
   if (!BASE64.test(payload)) {
-    throw new BrowserError(`${provider} returned a screenshot that is not base64 image data`);
+    throw new BrowserError(`${provider} returned a ${file} that is not base64 ${contents}`);
   }
-  const bytes = Buffer.from(payload, "base64");
-  const mimeType = imageMimeType(bytes, header?.[1] || result.mimeType);
-  return { data: bytes.toString("base64"), mimeType, bytes };
+  return {
+    data: payload,
+    bytes: Buffer.from(payload, "base64"),
+    mimeType: header?.[1] || undefined,
+  };
+}
+
+/**
+ * Writes base64 data to a file that must not exist yet, creating its directory.
+ *
+ * @param file - Path as the caller gave it, relative to the working directory.
+ * @param data - File contents as base64.
+ * @returns {Promise<string>} The absolute path written.
+ */
+async function writeNewFile(file: string, data: string): Promise<string> {
+  const path = resolve(file);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, data, { encoding: "base64", flag: "wx" });
+  return path;
 }
 
 /**
@@ -399,20 +443,39 @@ export async function browserCrawl(
   };
 }
 
+/** PDF metadata kept by agent harnesses; the document itself stays in the file. */
+export interface BrowserPdfDetails {
+  url: string;
+  provider: string;
+  bytes: number;
+  path: string;
+}
+
+const PDF_SIGNATURE = Buffer.from("%PDF-");
+
 /**
- * Generates a PDF through a capable provider.
+ * Generates a PDF through a capable provider and writes it to `path`, which
+ * must not exist yet. Only the path comes back, since a PDF cannot be shown
+ * to the model inline.
  *
  * @param params - PDF arguments.
- * @returns {Promise<ToolResult<{ url: string; provider: string; pdfLength: number }>>} PDF metadata without duplicating binary data.
+ * @returns {Promise<ToolResult<BrowserPdfDetails>>} The saved file with its size.
  */
 export async function browserPdf(
-  params: Readonly<BrowserUrlParams>,
-): Promise<ToolResult<{ url: string; provider: string; pdfLength: number }>> {
+  params: Readonly<BrowserPdfParams>,
+): Promise<ToolResult<BrowserPdfDetails>> {
   const { name, provider } = await createProvider(params.provider, params.browser, "pdf");
   const result = await provider.pdf(params.url);
+  const { data, bytes } = decodeProviderFile(result.data, name, "PDF", "PDF data");
+  if (!bytes.subarray(0, PDF_SIGNATURE.length).equals(PDF_SIGNATURE)) {
+    throw new BrowserError(`${name} returned a PDF that does not start with %PDF-`);
+  }
+  const path = await writeNewFile(params.path, data);
   return {
-    content: content(`[provider=${name}] PDF generated: ${result.data.length} chars.`),
-    details: { url: params.url, provider: name, pdfLength: result.data.length },
+    content: content(
+      `[provider=${name}] PDF of ${sanitizeField(params.url)}: ${bytes.length} bytes, saved to ${sanitizeField(path)}.`,
+    ),
+    details: { url: params.url, provider: name, bytes: bytes.length, path },
   };
 }
 

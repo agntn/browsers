@@ -110,6 +110,10 @@ export const browserToolSchemas = {
         Type.String({ description: "Provider. One of: cloudflare, browserless, playwright." }),
       ),
       browser,
+      path: Type.String({
+        description:
+          "File to write the PDF to. A relative path resolves against the working directory of the process running the tool. The file must not exist yet.",
+      }),
     },
     { additionalProperties: false },
   ),

@@ -192,8 +192,8 @@ describe("browsers OMP extension", () => {
           invalid: {},
         },
         browsers_pdf: {
-          valid: { url: "https://example.test", browser: "kitesurf" },
-          invalid: {},
+          valid: { url: "https://example.test", browser: "kitesurf", path: "page.pdf" },
+          invalid: { url: "https://example.test" },
         },
         browsers_links: {
           valid: { url: "https://example.test", browser: "kitesurf" },

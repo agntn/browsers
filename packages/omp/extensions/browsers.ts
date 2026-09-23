@@ -149,6 +149,10 @@ function buildParameterSchemas(pi: ExtensionAPI) {
           Type.String({ description: "Provider. One of: cloudflare, browserless, playwright." }),
         ),
         browser,
+        path: Type.String({
+          description:
+            "File to write the PDF to. A relative path resolves against the working directory of the process running the tool. The file must not exist yet.",
+        }),
       },
       { additionalProperties: false },
     ),
@@ -300,7 +304,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     },
   });
 
-  pi.registerTool<typeof schemas.pdf, { url: string; provider: string; pdfLength: number }>({
+  pi.registerTool<typeof schemas.pdf, BrowserTools.BrowserPdfDetails>({
     name: "browsers_pdf",
     label: browserToolLabels.browsers_pdf,
     description: browserToolDescriptions.browsers_pdf,

@@ -51,7 +51,7 @@ const LOCAL_READ: Tool["annotations"] = {
   openWorldHint: false,
 };
 
-/** Writes a new file when `path` is set and never overwrites one. */
+/** Writes a new file to `path`, when one is given, and never overwrites one. */
 const CAPTURE: Tool["annotations"] = {
   readOnlyHint: false,
   destructiveHint: false,
@@ -124,7 +124,7 @@ const tools = /* @__PURE__ */ lazy(async () => {
     defineTool("browsers_screenshot", schemas.browsers_screenshot, CAPTURE, browserScreenshot),
     defineTool("browsers_extract", schemas.browsers_extract, LIVE_READ, browserExtract),
     defineTool("browsers_crawl", schemas.browsers_crawl, LIVE_READ, browserCrawl),
-    defineTool("browsers_pdf", schemas.browsers_pdf, LIVE_READ, browserPdf),
+    defineTool("browsers_pdf", schemas.browsers_pdf, CAPTURE, browserPdf),
     defineTool("browsers_links", schemas.browsers_links, LIVE_READ, browserLinks),
     defineTool("browsers_search", schemas.browsers_search, LIVE_READ, browserSearch),
     defineTool(

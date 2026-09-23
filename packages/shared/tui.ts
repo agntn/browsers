@@ -281,7 +281,7 @@ const RESULT_META: Readonly<Record<BrowserToolName, ResultMetaRenderer>> = {
   browsers_crawl: (details) =>
     compact([countedField(details, "pages", "page"), prefixedField(details, "jobId", "job")]),
   browsers_pdf: (details) =>
-    compact([scalar(details, "provider"), countedField(details, "pdfLength", "char")]),
+    compact([scalar(details, "provider"), countedField(details, "bytes", "byte")]),
   browsers_links: (details) => {
     const length = listLength(details, "links");
     return length === undefined ? [] : [count(length, "link")];

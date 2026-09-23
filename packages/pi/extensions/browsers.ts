@@ -188,7 +188,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     promptSnippet: "Crawl a website and extract content from multiple pages.",
     promptGuidelines: [
       "Use browsers_crawl when the user needs content from multiple pages of a website.",
-      "Both cloudflare and hyperbrowser return async job IDs. Results may need polling.",
+      "Cloudflare and Hyperbrowser wait up to two minutes for the crawl job; one still running after that returns its job ID and no pages.",
       "Pass maxPages to limit the crawl scope and maxChars to bound the returned content.",
     ],
     parameters: browserToolSchemas.browsers_crawl,

@@ -9,6 +9,7 @@ import type {
   EvaluateResult,
   CrawlResult,
   CrawlOptions,
+  CrawlPage,
   PdfResult,
   PdfOptions,
   LinksResult,
@@ -22,13 +23,33 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, normalizeError } from "../core/errors";
-import { assertUrlOrSession, notSupportedViaRest, resolveCloudflareBrowser } from "../core/utils";
+import {
+  assertUrlOrSession,
+  CRAWL_JOB_TIMEOUT,
+  notSupportedViaRest,
+  resolveCloudflareBrowser,
+  waitForJob,
+} from "../core/utils";
 
 interface CfEnvelope<T = unknown> {
   readonly success: boolean;
   readonly result: T;
   readonly errors?: readonly { readonly code: number; readonly message: string }[];
   readonly messages?: readonly string[];
+}
+
+interface CfCrawlRecord {
+  readonly url?: string;
+  readonly status?: string;
+  readonly markdown?: string;
+  readonly html?: string;
+  readonly metadata?: { readonly title?: string; readonly status?: number };
+}
+
+interface CfCrawlJob {
+  readonly status?: string;
+  readonly records?: readonly CfCrawlRecord[];
+  readonly cursor?: number | string | null;
 }
 
 interface CfSessionResult {
@@ -75,12 +96,24 @@ function createScreenshotBody(
 }
 
 function createCrawlBody(url: string, options?: CrawlOptions): Record<string, unknown> {
-  const body: Record<string, unknown> = { url };
-  if (!options) return body;
-  if (options.maxDepth) body.depth = options.maxDepth;
-  if (options.maxPages) body.limit = options.maxPages;
-  if (options.formats) body.output_format = options.formats[0];
+  const formats = (options?.formats ?? ["markdown"]).filter((format) => format !== "text");
+  const body: Record<string, unknown> = {
+    url,
+    formats: formats.length > 0 ? formats : ["markdown"],
+  };
+  if (options?.maxDepth) body.depth = options.maxDepth;
+  if (options?.maxPages) body.limit = options.maxPages;
   return body;
+}
+
+function crawlPage(record: CfCrawlRecord): CrawlPage {
+  return {
+    url: record.url ?? "",
+    title: record.metadata?.title,
+    markdown: record.markdown,
+    html: record.html,
+    statusCode: record.metadata?.status,
+  };
 }
 
 function createPdfBody(url: string, options?: PdfOptions): Record<string, unknown> {
@@ -326,32 +359,68 @@ class CloudflareProvider implements BrowserProvider {
     _session?: BrowserSession,
   ): Promise<CrawlResult> {
     try {
-      const res = await this.client.postJSON<CfEnvelope<string | Record<string, unknown>>>(
-        this.browserEndpoint("/crawl"),
-        createCrawlBody(url, options),
-        this.headers(),
+      const jobId = this.unwrap(
+        await this.client.postJSON<CfEnvelope<string>>(
+          this.browserEndpoint("/crawl"),
+          createCrawlBody(url, options),
+          this.headers(),
+        ),
       );
-      const result = this.unwrap(res);
+      const job = await waitForJob(
+        () => this.crawlJob(jobId, { limit: "1" }),
+        (current) => current.status !== "running",
+        options?.timeout ?? CRAWL_JOB_TIMEOUT,
+      );
+      if (job.status === "running") return { pages: [], totalFound: 0, jobId, status: "running" };
 
-      if (typeof result === "string") {
-        return { pages: [], totalFound: 0, jobId: result, status: "running" };
-      }
-
-      const pages = (result.pages ?? result.data ?? []) as Array<Record<string, unknown>>;
+      const records = await this.crawlRecords(jobId);
+      const pages = records.filter((record) => record.status === "completed").map(crawlPage);
       return {
-        pages: pages.map((p) => ({
-          url: (p.url ?? "") as string,
-          html: p.html as string,
-          markdown: p.markdown as string,
-          title: p.title as string,
-        })),
+        pages,
         totalFound: pages.length,
-        jobId: result.jobId as string,
-        status: result.status as "completed" | "running" | "failed",
+        jobId,
+        status: job.status === "completed" ? "completed" : "failed",
       };
     } catch (error) {
       throw normalizeError(error, "cloudflare");
     }
+  }
+
+  /**
+   * Reads one crawl job.
+   *
+   * @param {string} jobId Job ID the crawl started.
+   * @param {Readonly<Record<string, string>>} [query] Query parameters such as `limit` or `cursor`.
+   * @returns {Promise<CfCrawlJob>} The job with its status and records.
+   */
+  private async crawlJob(
+    jobId: string,
+    query: Readonly<Record<string, string>> = {},
+  ): Promise<CfCrawlJob> {
+    return this.unwrap(
+      await this.client.getJSON<CfEnvelope<CfCrawlJob>>(
+        this.browserEndpoint(`/crawl/${encodeURIComponent(jobId)}`, new URLSearchParams(query)),
+        this.headers(),
+      ),
+    );
+  }
+
+  /**
+   * Reads every record of a finished job, following the cursor Cloudflare adds past 10 MB.
+   *
+   * @param {string} jobId Job ID the crawl started.
+   * @returns {Promise<CfCrawlRecord[]>} Records in crawl order.
+   */
+  private async crawlRecords(jobId: string): Promise<CfCrawlRecord[]> {
+    const records: CfCrawlRecord[] = [];
+    let cursor: string | undefined;
+    do {
+      const job = await this.crawlJob(jobId, cursor === undefined ? {} : { cursor });
+      records.push(...(job.records ?? []));
+      const next = job.cursor === undefined || job.cursor === null ? undefined : String(job.cursor);
+      cursor = next === cursor ? undefined : next;
+    } while (cursor !== undefined);
+    return records;
   }
 
   async pdf(url: string, options?: PdfOptions, _session?: BrowserSession): Promise<PdfResult> {

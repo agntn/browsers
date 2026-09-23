@@ -63,7 +63,7 @@ export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> 
   browsers_extract:
     "Extract structured data from a URL using AI. Cloudflare returns synchronous results. Hyperbrowser returns an async job ID.",
   browsers_crawl:
-    "Crawl a website following links. Returns each page's URL and title with its text, markdown or HTML, which share one maxChars budget. Cloudflare and Hyperbrowser may return an async job ID instead of pages.",
+    "Crawl a website following links. Returns each page's URL and title with its text, markdown or HTML, which share one maxChars budget. Cloudflare and Hyperbrowser wait up to two minutes for the crawl job; one still running after that returns its job ID and no pages.",
   browsers_pdf:
     "Generate a PDF from a URL and write it to `path`. Cloudflare and Browserless support stateless PDF generation.",
   browsers_links:

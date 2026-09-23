@@ -163,7 +163,66 @@ describe("normalizeError", () => {
 
     expect(result).toBeInstanceOf(PaymentError);
     expect(result).toMatchObject({ statusCode, provider: "steel" });
-    expect(result.message).toBe(`Payment required: HTTP ${statusCode}: https://api.example.com`);
-    expect(result.message).not.toContain("quota exhausted");
+    expect(result.message).toBe(
+      `Payment required: HTTP ${statusCode} from https://api.example.com: quota exhausted`,
+    );
+  });
+
+  it("names the provider and keeps only the reason of a 401 body", () => {
+    const body = '{"statusCode":401,"error":"Unauthorized","message":"Unauthorized"}';
+    const result = normalizeError(new HTTPError(401, "https://api.browserbase.com/v1", body));
+    expect(result.message).toBe("Authentication failed: Unauthorized");
+
+    const named = normalizeError(
+      new HTTPError(401, "https://api.hyperbrowser.ai", '{"error":"NOT AUTHENTICATED"}'),
+      "hyperbrowser",
+    );
+    expect(named).toBeInstanceOf(AuthError);
+    expect(named.message).toBe("Authentication failed for hyperbrowser: NOT AUTHENTICATED");
+  });
+});
+
+describe("HTTPError reason", () => {
+  // Provider bodies as they came back on 2026-09-23, then two other common shapes.
+  it.each([
+    [
+      "steel",
+      422,
+      '{"error":"Unprocessable Entity","message":"The scrape action could not load the target page — the site did not respond, refused the connection, or presented an invalid certificate. Verify the URL is reachable; this is not a Steel failure and was not charged."}',
+      "The scrape action could not load the target page — the site did not respond, refused the connection, or presented an invalid certificate. Verify the URL is reachable; this is not a Steel failure and was not charged.",
+    ],
+    [
+      "cloudflare",
+      422,
+      '{"success":false,"errors":[{"code":5006,"message":"Network connection closed.","detail":"Can also happen due to failure to resolve DNS."}]}',
+      "Network connection closed. Can also happen due to failure to resolve DNS.",
+    ],
+    ["anchor", 404, '{"error":{"code":404,"message":"Session not found"}}', "Session not found"],
+    ["kernel", 404, '{"code":"not_found","message":"browser not found"}', "browser not found"],
+    ["browserless", 500, "Internal Server Error\n", "Internal Server Error"],
+    ["fastapi", 404, '{"detail":"Not Found"}', "Not Found"],
+    ["plain list", 400, '{"errors":["url is required"]}', "url is required"],
+  ])("carries the %s reason", (_provider, statusCode, body, reason) => {
+    const error = new HTTPError(statusCode, "https://api.example.com/v1", body);
+    expect(error.message).toBe(`HTTP ${statusCode} from https://api.example.com/v1: ${reason}`);
+    expect(error.body).toBe(body);
+  });
+
+  it.each([
+    ["an HTML page", "<!DOCTYPE html><html><body><h1>502 Bad Gateway</h1></body></html>"],
+    ["a JSON body with no reason field", '{"code":5006,"success":false}'],
+    ["an empty body", ""],
+  ])("leaves %s out of the message", (_label, body) => {
+    expect(new HTTPError(502, "https://api.example.com", body).message).toBe(
+      "HTTP 502 from https://api.example.com",
+    );
+  });
+
+  it("bounds a long reason to one line", () => {
+    const error = new HTTPError(400, "", `bad\n\n${"x".repeat(1000)} 🧭`);
+    expect(error.message.startsWith("HTTP 400: bad x")).toBe(true);
+    expect(error.message).not.toContain("\n");
+    expect(Array.from(error.message.slice("HTTP 400: ".length))).toHaveLength(300);
+    expect(error.message.endsWith("…")).toBe(true);
   });
 });

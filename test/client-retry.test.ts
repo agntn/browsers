@@ -127,7 +127,7 @@ describe("Client retry timeout", () => {
       response.end("Bad request");
     };
     const client = new Client({ timeout: 150, maxRetries: 1, baseDelay: 1 });
-    await expect(client.getJSON(url)).rejects.toThrow("HTTP 400");
+    await expect(client.getJSON(url)).rejects.toThrow(/^HTTP 400 from .*: Bad request$/);
     expect(count).toBe(1);
   });
 });

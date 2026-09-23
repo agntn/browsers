@@ -25,7 +25,7 @@ import type { Client } from "../core/client";
 import { AuthError, normalizeError } from "../core/errors";
 import {
   assertUrlOrSession,
-  CRAWL_JOB_TIMEOUT,
+  JOB_TIMEOUT,
   notSupportedViaRest,
   resolveCloudflareBrowser,
   waitForJob,
@@ -369,7 +369,7 @@ class CloudflareProvider implements BrowserProvider {
       const job = await waitForJob(
         () => this.crawlJob(jobId, { limit: "1" }),
         (current) => current.status !== "running",
-        options?.timeout ?? CRAWL_JOB_TIMEOUT,
+        options?.timeout ?? JOB_TIMEOUT,
       );
       if (job.status === "running") return { pages: [], totalFound: 0, jobId, status: "running" };
 

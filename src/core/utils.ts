@@ -188,11 +188,11 @@ export function notSupportedViaRest(provider: string, operation: string): never 
   );
 }
 
-/** How long a crawl waits for its job by default. */
-export const CRAWL_JOB_TIMEOUT = 120_000;
+/** How long a crawl or extract waits for its provider job by default. */
+export const JOB_TIMEOUT = 120_000;
 
-/** Pause between two reads of a running crawl job. */
-export const CRAWL_JOB_POLL_INTERVAL = 2_000;
+/** Pause between two reads of a running provider job. */
+export const JOB_POLL_INTERVAL = 2_000;
 
 /**
  * Reads a job until `done` accepts it or the timeout leaves no room for another read.
@@ -209,8 +209,8 @@ export async function waitForJob<T>(
 ): Promise<T> {
   const deadline = Date.now() + timeout;
   let job = await read();
-  while (!done(job) && Date.now() + CRAWL_JOB_POLL_INTERVAL <= deadline) {
-    await new Promise((resolve) => setTimeout(resolve, CRAWL_JOB_POLL_INTERVAL));
+  while (!done(job) && Date.now() + JOB_POLL_INTERVAL <= deadline) {
+    await new Promise((resolve) => setTimeout(resolve, JOB_POLL_INTERVAL));
     job = await read();
   }
   return job;

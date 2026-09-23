@@ -61,7 +61,7 @@ export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> 
   browsers_screenshot:
     "Take a screenshot of a URL using a cloud browser provider and return the image, or write it to `path` for captures too large to return. Cloudflare, Browserless and Hyperbrowser capture without passing a session. Other providers open a temporary session inside this tool. This tool does not accept a session ID.",
   browsers_extract:
-    "Extract structured data from a URL using AI. Cloudflare returns synchronous results. Hyperbrowser returns an async job ID.",
+    "Extract structured data from a URL using AI. Cloudflare answers at once. Hyperbrowser waits up to two minutes for its extract job; one still running after that returns its job ID.",
   browsers_crawl:
     "Crawl a website following links. Returns each page's URL and title with its text, markdown or HTML, which share one maxChars budget. Cloudflare and Hyperbrowser wait up to two minutes for the crawl job; one still running after that returns its job ID and no pages.",
   browsers_pdf:

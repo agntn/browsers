@@ -168,7 +168,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     promptSnippet: "Extract structured data from a URL with AI.",
     promptGuidelines: [
       "Use browsers_extract when the user needs structured data from a webpage (product info, pricing, articles).",
-      "Cloudflare returns results synchronously. Hyperbrowser returns a jobId for async processing.",
+      "Hyperbrowser waits up to two minutes for its extract job; one still running after that returns its job ID.",
       "Pass a prompt describing what to extract.",
     ],
     parameters: browserToolSchemas.browsers_extract,

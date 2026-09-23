@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetDefaultClientForTests } from "../src/core/client";
 import { create } from "../src/core/registry";
-import { CRAWL_JOB_POLL_INTERVAL } from "../src/core/utils";
+import { JOB_POLL_INTERVAL } from "../src/core/utils";
 
 interface Call {
   readonly method: string;
@@ -34,19 +34,20 @@ function stubFetch(answer: (call: Call) => unknown): Call[] {
 }
 
 /**
- * Moves the fake clock until the crawl settles, yielding to I/O such as the lazy ofetch import.
+ * Moves the fake clock until the job settles, yielding to I/O such as the lazy ofetch import.
  *
- * @param {Promise<T> | undefined} promise Crawl in flight.
- * @returns {Promise<T | undefined>} The crawl once it settles.
+ * @param {Promise<T> | undefined} promise Job in flight.
+ * @returns {Promise<T | undefined>} The job once it settles.
  */
 async function settle<T>(promise: Promise<T> | undefined): Promise<T | undefined> {
   let settled = false;
-  void promise?.finally(() => {
+  const markSettled = (): void => {
     settled = true;
-  });
+  };
+  void promise?.then(markSettled, markSettled);
   while (promise && !settled) {
     await new Promise((resolve) => setImmediate(resolve));
-    await vi.advanceTimersByTimeAsync(CRAWL_JOB_POLL_INTERVAL);
+    await vi.advanceTimersByTimeAsync(JOB_POLL_INTERVAL);
   }
   return promise;
 }
@@ -205,5 +206,87 @@ describe("hyperbrowser crawl job", () => {
       "GET https://hyperbrowser.test/api/web/crawl/job-3?page=1",
       "GET https://hyperbrowser.test/api/web/crawl/job-3?page=2",
     ]);
+  });
+});
+
+describe("hyperbrowser extract job", () => {
+  const EXTRACT = "https://hyperbrowser.test/api/extract";
+
+  it("waits for the job and returns its data", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    let reads = 0;
+    const calls = stubFetch(({ method }) => {
+      if (method === "POST") return { jobId: "job-4" };
+      reads += 1;
+      return reads < 2
+        ? { jobId: "job-4", status: "running" }
+        : {
+            jobId: "job-4",
+            status: "completed",
+            metadata: { inputTokens: 286, outputTokens: 10, numPagesScraped: 1 },
+            data: { pageHeading: "Example Domain" },
+          };
+    });
+    const provider = await create("hyperbrowser", {
+      apiKey: "key",
+      baseURL: "https://hyperbrowser.test",
+    });
+
+    const extract = provider.extract?.("https://example.test/", { prompt: "Extract the heading" });
+
+    await expect(settle(extract)).resolves.toEqual({
+      url: "https://example.test/",
+      data: { pageHeading: "Example Domain" },
+    });
+    expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
+      `POST ${EXTRACT}`,
+      `GET ${EXTRACT}/job-4`,
+      `GET ${EXTRACT}/job-4`,
+    ]);
+    expect(calls[0]?.body).toEqual({
+      urls: ["https://example.test/"],
+      prompt: "Extract the heading",
+    });
+  });
+
+  it("reports why a failed job failed", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    stubFetch(({ method }) =>
+      method === "POST"
+        ? { jobId: "job-5" }
+        : { jobId: "job-5", status: "failed", data: {}, error: "Error processing extract" },
+    );
+    const provider = await create("hyperbrowser", {
+      apiKey: "key",
+      baseURL: "https://hyperbrowser.test",
+    });
+
+    const extract = provider.extract?.("https://down.test/", { prompt: "Extract the heading" });
+
+    await expect(settle(extract)).rejects.toThrow(
+      "Hyperbrowser extract job job-5 failed: Error processing extract",
+    );
+  });
+
+  it("returns the job ID of an extract still running at the timeout", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    const calls = stubFetch(({ method }) =>
+      method === "POST" ? { jobId: "job-6" } : { jobId: "job-6", status: "pending" },
+    );
+    const provider = await create("hyperbrowser", {
+      apiKey: "key",
+      baseURL: "https://hyperbrowser.test",
+    });
+
+    const extract = provider.extract?.("https://example.test/", {
+      prompt: "Extract the heading",
+      timeout: 5_000,
+    });
+
+    await expect(settle(extract)).resolves.toEqual({
+      url: "https://example.test/",
+      data: { jobId: "job-6", status: "pending" },
+    });
+    expect(calls).toHaveLength(4);
   });
 });

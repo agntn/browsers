@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v0.4.0
+
+[compare changes](https://github.com/agntn/browsers/compare/v0.3.0...v0.4.0)
+
+### 🩹 Fixes
+
+- Pick a provider that has the capability ([#62](https://github.com/agntn/browsers/pull/62))
+- **screenshot:** Return the image ([#65](https://github.com/agntn/browsers/pull/65))
+- **version:** Read it from package.json ([#66](https://github.com/agntn/browsers/pull/66))
+- **errors:** Keep the provider's reason ([#67](https://github.com/agntn/browsers/pull/67))
+- **pdf:** ⚠️  Write the document to path ([#68](https://github.com/agntn/browsers/pull/68))
+- **crawl:** Show the pages it read ([#69](https://github.com/agntn/browsers/pull/69))
+- **crawl:** Wait for the job to finish ([#70](https://github.com/agntn/browsers/pull/70))
+- **hyperbrowser:** Extract returns the data ([#71](https://github.com/agntn/browsers/pull/71))
+
+#### ⚠️ Breaking Changes
+
+- **pdf:** ⚠️  Write the document to path ([#68](https://github.com/agntn/browsers/pull/68))
+
+### ❤️ Contributors
+
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+- Ori ([@oritwoen](https://github.com/oritwoen))
+
 ## v0.3.0
 
 [compare changes](https://github.com/agntn/browsers/compare/v0.2.0...v0.3.0)

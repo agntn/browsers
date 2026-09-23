@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import pkg from "../package.json" with { type: "json" };
 import { browserProviderNames } from "../src/tool-contract";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
@@ -77,6 +78,10 @@ describe("CLI usage paths", () => {
     expect(result.stdout).toMatch(anchor);
     expect(loadedHeavy(result.loaded)).toEqual([]);
     expect(loadedProviders(result.loaded)).toEqual([]);
+  });
+
+  it("browsers --version prints the package version", () => {
+    expect(cli("--version").stdout.trim()).toBe(pkg.version);
   });
 
   it("browsers mcp still loads the server and the SDK", () => {

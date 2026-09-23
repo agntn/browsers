@@ -86,6 +86,8 @@ describe("cloudflare browser selection", () => {
       "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/content?browser=kitesurf",
       "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/screenshot?browser=kitesurf",
       "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/crawl?browser=kitesurf",
+      "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/crawl/crawl-1?limit=1&browser=kitesurf",
+      "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/crawl/crawl-1?browser=kitesurf",
       "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/pdf?browser=kitesurf",
       "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/links?browser=kitesurf",
       "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/json?browser=kitesurf",

@@ -9,6 +9,7 @@ import type {
   EvaluateResult,
   CrawlResult,
   CrawlOptions,
+  CrawlPage,
   WebSearchResult,
   WebSearchOptions,
   ExtractResult,
@@ -20,7 +21,7 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, BrowserError, InvalidInputError, normalizeError } from "../core/errors";
-import { isNotFoundError, notSupportedViaRest } from "../core/utils";
+import { CRAWL_JOB_TIMEOUT, isNotFoundError, notSupportedViaRest, waitForJob } from "../core/utils";
 
 interface HyperbrowserSessionResponse {
   readonly id: string;
@@ -92,6 +93,33 @@ function mapSession(response: HyperbrowserSessionResponse): BrowserSession {
     provider: "hyperbrowser",
     createdAt: response.createdAt ? new Date(response.createdAt).getTime() : Date.now(),
     metadata: response.status ? { status: response.status } : undefined,
+  };
+}
+
+interface HyperbrowserCrawlPage {
+  readonly url?: string;
+  readonly status?: string;
+  readonly markdown?: string;
+  readonly html?: string;
+  readonly metadata?: { readonly title?: string | readonly string[] };
+}
+
+interface HyperbrowserCrawlBatch {
+  readonly status?: string;
+  readonly totalPageBatches?: number;
+  readonly data?: readonly HyperbrowserCrawlPage[];
+}
+
+/** Job states after which Hyperbrowser adds no more pages. */
+const FINISHED_CRAWL_STATUSES = new Set(["completed", "failed", "stopped"]);
+
+function crawlPage(page: HyperbrowserCrawlPage): CrawlPage {
+  const title = page.metadata?.title;
+  return {
+    url: page.url ?? "",
+    title: typeof title === "string" ? title : title?.[0],
+    markdown: page.markdown,
+    html: page.html,
   };
 }
 
@@ -272,30 +300,57 @@ class HyperbrowserProvider implements BrowserProvider {
     _session?: BrowserSession,
   ): Promise<CrawlResult> {
     try {
-      const res = await this.client.postJSON<Record<string, unknown>>(
+      const { jobId } = await this.client.postJSON<{ jobId: string }>(
         `${this.baseURL}/api/web/crawl`,
         createCrawlBody(url, options),
         this.headers(),
       );
+      const job = await waitForJob(
+        () =>
+          this.client.getJSON<{ status?: string }>(this.crawlURL(jobId, "/status"), this.headers()),
+        (current) => FINISHED_CRAWL_STATUSES.has(current.status ?? ""),
+        options?.timeout ?? CRAWL_JOB_TIMEOUT,
+      );
+      if (!FINISHED_CRAWL_STATUSES.has(job.status ?? "")) {
+        return { pages: [], totalFound: 0, jobId, status: "running" };
+      }
 
-      const jobId = res.jobId as string;
-      const data = res.data as Record<string, unknown> | undefined;
-      const pages = (data?.pages ?? data?.results ?? []) as Array<Record<string, unknown>>;
-
+      const pages = (await this.crawlPages(jobId))
+        .filter((page) => page.status === "completed")
+        .map(crawlPage);
       return {
-        pages: pages.map((p) => ({
-          url: (p.url ?? p.sourceURL ?? "") as string,
-          title: p.title as string | undefined,
-          markdown: p.markdown as string | undefined,
-          html: p.html as string | undefined,
-        })),
+        pages,
         totalFound: pages.length,
         jobId,
-        status: res.status as "completed" | "running" | "failed",
+        status: job.status === "completed" ? "completed" : "failed",
       };
     } catch (error) {
       throw normalizeError(error, "hyperbrowser");
     }
+  }
+
+  private crawlURL(jobId: string, path = ""): string {
+    return `${this.baseURL}/api/web/crawl/${encodeURIComponent(jobId)}${path}`;
+  }
+
+  /**
+   * Reads every batch of a finished job. Batches count from 1; the API rejects 0.
+   *
+   * @param {string} jobId Job ID the crawl started.
+   * @returns {Promise<HyperbrowserCrawlPage[]>} Pages in batch order.
+   */
+  private async crawlPages(jobId: string): Promise<HyperbrowserCrawlPage[]> {
+    const pages: HyperbrowserCrawlPage[] = [];
+    let batches = 1;
+    for (let batch = 1; batch <= batches; batch += 1) {
+      const res = await this.client.getJSON<HyperbrowserCrawlBatch>(
+        `${this.crawlURL(jobId)}?page=${batch}`,
+        this.headers(),
+      );
+      pages.push(...(res.data ?? []));
+      batches = res.totalPageBatches ?? batch;
+    }
+    return pages;
   }
 
   async search(query: string, _options?: WebSearchOptions): Promise<WebSearchResult[]> {

@@ -19,9 +19,7 @@ function pageContent(page: PrintableCrawlPage): string {
 function printCrawlResult(result: PrintableCrawlResult): void {
   if (result.jobId) consola.info(`Job ID: ${result.jobId} (status: ${result.status})`);
   if (result.pages.length === 0) {
-    if (result.jobId) {
-      consola.info("Crawl is running asynchronously. Use the job ID to check status.");
-    }
+    if (result.status === "running") consola.info("The crawl job is still running.");
     return;
   }
 

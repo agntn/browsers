@@ -79,6 +79,21 @@ export function assertSessionId(
 }
 
 /**
+ * Rejects an element screenshot on a provider whose API would capture the whole page instead.
+ *
+ * @param {string | undefined} selector Requested element selector.
+ * @param {string} provider Provider name.
+ * @returns {void}
+ */
+export function assertNoSelector(selector: string | undefined, provider: string): void {
+  if (selector === undefined) return;
+  throw new UnsupportedOperationError(
+    `${provider} cannot screenshot a single element. Use cloudflare, browserless or playwright, or drop selector.`,
+    provider,
+  );
+}
+
+/**
  * Assert that either a URL or session is available.
  *
  * @param {string | undefined} url Target URL.
@@ -137,7 +152,11 @@ export async function screenshotWithSessionWhenNeeded(
   options: ScreenshotOptions,
   sessionOptions?: CreateSessionOptions,
 ): Promise<ScreenshotResult> {
+  if (options.selector === "") {
+    throw new InvalidInputError("selector is empty. Pass a CSS selector or leave it out.");
+  }
   const capabilities = provider.capabilities();
+  if (!capabilities.elementScreenshot) assertNoSelector(options.selector, provider.name());
   if (!capabilities.screenshot || capabilities.statelessScreenshot) {
     return provider.screenshot(options);
   }

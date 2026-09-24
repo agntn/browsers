@@ -156,6 +156,8 @@ export interface ProviderCapabilities {
   cdp: boolean;
   statelessScrape: boolean;
   statelessScreenshot: boolean;
+  /** Screenshot can capture the one element `selector` names. Missing means it cannot. */
+  elementScreenshot?: boolean;
   crawl: boolean;
   pdf: boolean;
   links: boolean;

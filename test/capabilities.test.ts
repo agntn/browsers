@@ -26,6 +26,7 @@ describe("provider capabilities", () => {
         expect(typeof caps).toBe("object");
         expect(typeof caps.scrape).toBe("boolean");
         expect(typeof caps.screenshot).toBe("boolean");
+        expect(typeof caps.elementScreenshot).toBe("boolean");
         expect(typeof caps.navigate).toBe("boolean");
         expect(typeof caps.evaluate).toBe("boolean");
         expect(typeof caps.sessions).toBe("boolean");

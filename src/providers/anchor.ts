@@ -16,6 +16,7 @@ import type { Client } from "../core/client";
 import { AuthError, BrowserError, normalizeError } from "../core/errors";
 import {
   isNotFoundError,
+  assertNoSelector,
   assertUrlOrSession,
   imageMimeType,
   notSupportedViaRest,
@@ -151,6 +152,7 @@ class AnchorProvider implements BrowserProvider {
       cdp: true,
       statelessScrape: false,
       statelessScreenshot: false,
+      elementScreenshot: false,
       crawl: false,
       pdf: false,
       links: false,
@@ -235,6 +237,7 @@ class AnchorProvider implements BrowserProvider {
   ): Promise<ScreenshotResult> {
     try {
       assertUrlOrSession(options.url, session, "anchor", "screenshot");
+      assertNoSelector(options.selector, "anchor");
       const body: Record<string, unknown> = { capture_full_height: options.fullPage ?? true };
       if (options.url) body.url = options.url;
       if (options.quality !== undefined) body.image_quality = options.quality;

@@ -47,6 +47,7 @@ function toolTestProvider(): BrowserProvider {
       cdp: true,
       statelessScrape,
       statelessScreenshot: true,
+      elementScreenshot: true,
       crawl: true,
       pdf: true,
       links: true,
@@ -302,6 +303,33 @@ describe("browser tool operations", () => {
       bytes: 6,
       saved: false,
     });
+  });
+
+  it("passes a selector to the provider", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    screenshot.mockResolvedValue({ data: PNG_BYTES.toString("base64"), mimeType: "image/png" });
+
+    await browserScreenshot({ provider: "tooltest", url: "https://example.test", selector: "h1" });
+
+    expect(screenshot).toHaveBeenCalledWith({
+      url: "https://example.test",
+      fullPage: undefined,
+      selector: "h1",
+      format: undefined,
+    });
+  });
+
+  it("rejects a selector together with a full page", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    await expect(
+      browserScreenshot({
+        provider: "tooltest",
+        url: "https://example.test",
+        selector: "h1",
+        fullPage: true,
+      }),
+    ).rejects.toThrow("Pass selector or fullPage, not both.");
+    expect(screenshot).not.toHaveBeenCalled();
   });
 
   it("writes the screenshot to path instead of returning it", async () => {

@@ -72,6 +72,7 @@ class BrowserlessProvider implements BrowserProvider {
       cdp: true,
       statelessScrape: true,
       statelessScreenshot: true,
+      elementScreenshot: true,
       crawl: false,
       pdf: true,
       links: false,
@@ -165,6 +166,7 @@ class BrowserlessProvider implements BrowserProvider {
 
       const body: Record<string, unknown> = {};
       if (options.url) body.url = options.url;
+      if (options.selector !== undefined) body.selector = options.selector;
 
       const png = await this.client.postRaw(
         `${this.baseURL}/screenshot?${this.tokenParam()}`,

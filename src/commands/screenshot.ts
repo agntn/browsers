@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { resolveAndCreate } from "./_helpers";
+import { resolveScreenshotProvider } from "./_helpers";
 import { screenshotWithSessionWhenNeeded } from "../core/utils";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -42,6 +42,11 @@ export default defineCommand({
       description: "Capture full page (default: true)",
       default: true,
     },
+    selector: {
+      type: "string",
+      alias: "s",
+      description: "CSS selector of one element to capture instead of the page",
+    },
     width: {
       type: "string",
       description: "Viewport width in pixels",
@@ -52,7 +57,11 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = await resolveAndCreate(args.provider, args.browser);
+    const { name: providerName, provider } = await resolveScreenshotProvider(
+      args.provider,
+      args.browser,
+      args.selector,
+    );
     consola.info(`Screenshot via ${providerName}...`);
     const viewport =
       args.width && args.height
@@ -65,7 +74,8 @@ export default defineCommand({
         {
           url: args.url,
           format: args.format as "png" | "jpeg" | "webp",
-          fullPage: args.fullPage,
+          fullPage: args.selector === undefined ? args.fullPage : undefined,
+          selector: args.selector,
           viewport,
         },
         { viewport },

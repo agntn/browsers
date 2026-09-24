@@ -64,6 +64,7 @@ class BrowserbaseProvider implements BrowserProvider {
       cdp: true,
       statelessScrape: true,
       statelessScreenshot: false,
+      elementScreenshot: false,
       crawl: false,
       pdf: false,
       links: false,

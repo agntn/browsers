@@ -142,4 +142,14 @@ describe("browserless current session API", () => {
       "/pdf?token=test",
     ]);
   });
+
+  it("asks for one element when given a selector", async () => {
+    const provider = await create("browserless", { apiKey: "test", baseURL });
+
+    await provider.screenshot({ url: "https://example.com", selector: "#price" });
+
+    expect(requests.map((request) => JSON.parse(request.body) as unknown)).toEqual([
+      { url: "https://example.com", selector: "#price" },
+    ]);
+  });
 });

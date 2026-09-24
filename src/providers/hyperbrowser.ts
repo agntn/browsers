@@ -21,7 +21,13 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, BrowserError, InvalidInputError, normalizeError } from "../core/errors";
-import { JOB_TIMEOUT, isNotFoundError, notSupportedViaRest, waitForJob } from "../core/utils";
+import {
+  JOB_TIMEOUT,
+  assertNoSelector,
+  isNotFoundError,
+  notSupportedViaRest,
+  waitForJob,
+} from "../core/utils";
 
 interface HyperbrowserSessionResponse {
   readonly id: string;
@@ -54,6 +60,7 @@ function createScreenshotBody(options: ScreenshotOptions): Record<string, unknow
   if (!options.url) {
     throw new InvalidInputError("hyperbrowser screenshot requires a URL");
   }
+  assertNoSelector(options.selector, "hyperbrowser");
   const body: Record<string, unknown> = {
     url: options.url,
     outputs: {
@@ -191,6 +198,7 @@ class HyperbrowserProvider implements BrowserProvider {
       cdp: true,
       statelessScrape: true,
       statelessScreenshot: true,
+      elementScreenshot: false,
       crawl: true,
       pdf: false,
       links: false,

@@ -78,25 +78,25 @@ function supports<O extends ProviderOperation>(
 }
 
 /**
- * Build the first configured provider, in registry order, that implements `operation`.
+ * Build the first configured provider, in registry order, that `accepts`.
  *
- * @param {ProviderOperation} operation Operation the provider has to implement.
- * @returns {Promise<{ name: string; provider: ProviderWith<O> }>} Resolved name and provider.
+ * @param {(provider: BrowserProvider) => provider is P} accepts Test the provider has to pass.
+ * @param {string} label What the provider has to support, for the error.
+ * @returns {Promise<{ name: string; provider: P }>} Resolved name and provider.
  */
-async function firstProviderWith<O extends ProviderOperation>(
-  operation: O,
-): Promise<{ name: string; provider: ProviderWith<O> }> {
+async function firstProvider<P extends BrowserProvider>(
+  accepts: (provider: Readonly<BrowserProvider>) => provider is P,
+  label: string,
+): Promise<{ name: string; provider: P }> {
   const checked: string[] = [];
   for (const name of listProviders()) {
     if (!_hasKey(name)) continue;
     const provider = await create(name);
-    if (supports(provider, operation)) return { name, provider };
+    if (accepts(provider)) return { name, provider };
     checked.push(name);
   }
   if (checked.length === 0) throw new NoProviderConfiguredError();
-  throw new Error(
-    `No configured provider supports ${operationLabels[operation]} (checked: ${checked.join(", ")}).`,
-  );
+  throw new Error(`No configured provider supports ${label} (checked: ${checked.join(", ")}).`);
 }
 
 /**
@@ -124,13 +124,41 @@ export async function createProvider(
   browser?: string,
   operation?: ProviderOperation,
 ): Promise<{ name: string; provider: BrowserProvider }> {
-  if (operation && !preferred && !browser) return firstProviderWith(operation);
+  if (operation && !preferred && !browser) {
+    return firstProvider(
+      (provider): provider is ProviderWith<typeof operation> => supports(provider, operation),
+      operationLabels[operation],
+    );
+  }
   const name = resolveProvider(browser && !preferred ? "cloudflare" : preferred);
   const provider = await create(name, { browser: resolveCloudflareBrowser(name, browser) });
   if (operation && !supports(provider, operation)) {
     throw new Error(`Provider ${name} does not support ${operationLabels[operation]}.`);
   }
   return { name, provider };
+}
+
+/**
+ * Resolve and build the provider for one screenshot.
+ *
+ * A `selector` without a provider or browser picks the first configured provider that can
+ * capture one element, instead of one that would refuse it.
+ *
+ * @param {string} [preferred] Preferred provider name.
+ * @param {string} [browser] Optional Cloudflare browser engine.
+ * @param {string} [selector] Element the screenshot is limited to.
+ * @returns {Promise<{ name: string; provider: BrowserProvider }>} Resolved name and provider.
+ */
+export async function createScreenshotProvider(
+  preferred?: string,
+  browser?: string,
+  selector?: string,
+): Promise<{ name: string; provider: BrowserProvider }> {
+  if (selector === undefined || preferred || browser) return createProvider(preferred, browser);
+  return firstProvider(
+    (provider): provider is BrowserProvider => provider.capabilities().elementScreenshot === true,
+    "element screenshots",
+  );
 }
 
 /**

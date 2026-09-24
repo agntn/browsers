@@ -34,6 +34,7 @@ function shotTestProvider(): BrowserProvider {
       cdp: false,
       statelessScrape: false,
       statelessScreenshot,
+      elementScreenshot: false,
       crawl: false,
       pdf: false,
       links: false,

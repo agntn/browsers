@@ -65,6 +65,13 @@ export const browserToolSchemas = {
         Type.String({ description: "Image format: png, jpeg, webp. Default: png." }),
       ),
       fullPage: Type.Optional(Type.Boolean({ description: "Capture full page. Default: true." })),
+      selector: Type.Optional(
+        Type.String({
+          minLength: 1,
+          description:
+            "CSS selector of the element to capture instead of the page; the first match wins. Cloudflare, Browserless and Playwright only.",
+        }),
+      ),
       path: Type.Optional(
         Type.String({
           description:

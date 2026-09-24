@@ -14,7 +14,7 @@ import type {
 import { defaultClient } from "../core/client";
 import type { Client } from "../core/client";
 import { AuthError, normalizeError } from "../core/errors";
-import { isNotFoundError, assertSessionId } from "../core/utils";
+import { isNotFoundError, assertNoSelector, assertSessionId } from "../core/utils";
 
 interface KernelSessionResponse {
   readonly session_id: string;
@@ -74,6 +74,7 @@ class KernelProvider implements BrowserProvider {
       cdp: true,
       statelessScrape: false,
       statelessScreenshot: false,
+      elementScreenshot: false,
       crawl: false,
       pdf: false,
       links: false,
@@ -160,11 +161,12 @@ class KernelProvider implements BrowserProvider {
   }
 
   async screenshot(
-    _options: ScreenshotOptions,
+    options: ScreenshotOptions,
     session?: BrowserSession,
   ): Promise<ScreenshotResult> {
     try {
       assertSessionId(session?.id, "kernel", "screenshot");
+      assertNoSelector(options.selector, "kernel");
       const png = await this.client.postRaw(
         `${this.baseURL}/browsers/${session.id}/computer/screenshot`,
         {},

@@ -4,6 +4,7 @@ import { _hasKey, providerEnvHint } from "../core/resolve";
 import type { ProviderCapabilities } from "../core/types";
 
 const simpleCapabilityLabels = [
+  ["elementScreenshot", "element"],
   ["navigate", "navigate"],
   ["evaluate", "evaluate"],
   ["sessions", "sessions"],

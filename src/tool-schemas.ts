@@ -69,7 +69,7 @@ export const browserToolSchemas = {
         Type.String({
           minLength: 1,
           description:
-            "CSS selector of one element to capture instead of the page. Cloudflare, Browserless and Playwright only.",
+            "CSS selector of the element to capture instead of the page; the first match wins. Cloudflare, Browserless and Playwright only.",
         }),
       ),
       path: Type.Optional(

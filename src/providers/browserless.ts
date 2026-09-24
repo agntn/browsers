@@ -166,7 +166,7 @@ class BrowserlessProvider implements BrowserProvider {
 
       const body: Record<string, unknown> = {};
       if (options.url) body.url = options.url;
-      if (options.selector) body.selector = options.selector;
+      if (options.selector !== undefined) body.selector = options.selector;
 
       const png = await this.client.postRaw(
         `${this.baseURL}/screenshot?${this.tokenParam()}`,

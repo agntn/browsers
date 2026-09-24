@@ -59,7 +59,7 @@ export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> 
   browsers_providers:
     "Read-only/idempotent local/env status: list browser-as-a-service providers and which ones are currently configured via environment variables.",
   browsers_screenshot:
-    "Take a screenshot of a URL using a cloud browser provider and return the image, or write it to `path` for captures too large to return. `selector` captures one element; Cloudflare, Browserless and Playwright support it. Cloudflare, Browserless and Hyperbrowser capture without passing a session. Other providers open a temporary session inside this tool. This tool does not accept a session ID.",
+    "Take a screenshot of a URL using a cloud browser provider and return the image, or write it to `path` for captures too large to return. `selector` captures one element; Cloudflare, Browserless and Playwright support it, and without `provider` the first configured one of them is used. Cloudflare, Browserless and Hyperbrowser capture without passing a session. Other providers open a temporary session inside this tool. This tool does not accept a session ID.",
   browsers_extract:
     "Extract structured data from a URL using AI. Cloudflare answers at once. Hyperbrowser waits up to two minutes for its extract job; one still running after that returns its job ID.",
   browsers_crawl:

@@ -90,7 +90,7 @@ function createScreenshotBody(
   const body: Record<string, unknown> = {};
   if (options.url) body.url = options.url;
   if (session?.id) body.sessionId = session.id;
-  if (options.selector) body.selector = options.selector;
+  if (options.selector !== undefined) body.selector = options.selector;
   if (options.fullPage !== undefined) body.fullPage = options.fullPage;
   return body;
 }

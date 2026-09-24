@@ -154,7 +154,7 @@ omp install @agntn/browsers
 }
 ```
 
-Eleven tools, `browsers_scrape` through `browsers_capabilities`, the same eleven on MCP, Pi and OMP. Cloudflare calls backed by Browser Run take `browser: "kitesurf"`. No `provider` needed then. They do not drive a session you already opened. `browsers_screenshot` hands the image back to the model. A full page too big for that goes to a file: pass `path`, and it refuses to overwrite one that exists. Pass `selector` and you get one element instead of the page. Cloudflare, Browserless and Playwright can do that; the others say so rather than hand back the whole page. `browsers_pdf` always writes to `path`, under the same rule, since a PDF cannot go back to the model.
+Eleven tools, `browsers_scrape` through `browsers_capabilities`, the same eleven on MCP, Pi and OMP. Cloudflare calls backed by Browser Run take `browser: "kitesurf"`. No `provider` needed then. They do not drive a session you already opened. `browsers_screenshot` hands the image back to the model. A full page too big for that goes to a file: pass `path`, and it refuses to overwrite one that exists. Pass `selector` and you get one element instead of the page. Cloudflare, Browserless and Playwright can do that. Leave `provider` out and one of them gets picked; name another and it says no rather than hand back the whole page. `browsers_pdf` always writes to `path`, under the same rule, since a PDF cannot go back to the model.
 
 ## 🚫 What this does not do
 

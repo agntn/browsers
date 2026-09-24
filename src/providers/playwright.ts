@@ -346,9 +346,10 @@ class PlaywrightProvider implements BrowserProvider {
         screenshotOptions.quality = options.quality;
       }
 
-      const buffer = options.selector
-        ? await page.locator(options.selector).screenshot(screenshotOptions)
-        : await page.screenshot({ ...screenshotOptions, fullPage: options.fullPage ?? false });
+      const buffer =
+        options.selector !== undefined
+          ? await page.locator(options.selector).screenshot(screenshotOptions)
+          : await page.screenshot({ ...screenshotOptions, fullPage: options.fullPage ?? false });
       return {
         data: buffer.toString("base64"),
         mimeType: `image/${type}`,

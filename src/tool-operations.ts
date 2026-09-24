@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS } from "./tool-contract";
 import { BrowserError, InvalidInputError } from "./core/errors";
 import { create, providers } from "./core/registry";
-import { createProvider } from "./core/resolve";
+import { createProvider, createScreenshotProvider } from "./core/resolve";
 import type { CrawlPage, ProviderCapabilities, ScreenshotResult } from "./core/types";
 import {
   imageMimeType,
@@ -292,10 +292,14 @@ const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 export async function browserScreenshot(
   params: Readonly<BrowserScreenshotParams>,
 ): Promise<ToolResult<BrowserScreenshotDetails>> {
-  if (params.selector && params.fullPage === true) {
+  if (params.selector !== undefined && params.fullPage === true) {
     throw new InvalidInputError("Pass selector or fullPage, not both.");
   }
-  const { name, provider } = await createProvider(params.provider, params.browser);
+  const { name, provider } = await createScreenshotProvider(
+    params.provider,
+    params.browser,
+    params.selector,
+  );
   const result = await screenshotWithSessionWhenNeeded(provider, {
     url: params.url,
     fullPage: params.fullPage,

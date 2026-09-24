@@ -86,7 +86,7 @@ export function assertSessionId(
  * @returns {void}
  */
 export function assertNoSelector(selector: string | undefined, provider: string): void {
-  if (!selector) return;
+  if (selector === undefined) return;
   throw new UnsupportedOperationError(
     `${provider} cannot screenshot a single element. Use cloudflare, browserless or playwright, or drop selector.`,
     provider,
@@ -152,6 +152,9 @@ export async function screenshotWithSessionWhenNeeded(
   options: ScreenshotOptions,
   sessionOptions?: CreateSessionOptions,
 ): Promise<ScreenshotResult> {
+  if (options.selector === "") {
+    throw new InvalidInputError("selector is empty. Pass a CSS selector or leave it out.");
+  }
   const capabilities = provider.capabilities();
   if (!capabilities.elementScreenshot) assertNoSelector(options.selector, provider.name());
   if (!capabilities.screenshot || capabilities.statelessScreenshot) {

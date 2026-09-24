@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS } from "./tool-contract";
-import { BrowserError } from "./core/errors";
+import { BrowserError, InvalidInputError } from "./core/errors";
 import { create, providers } from "./core/registry";
 import { createProvider } from "./core/resolve";
 import type { CrawlPage, ProviderCapabilities, ScreenshotResult } from "./core/types";
@@ -57,6 +57,7 @@ export interface BrowserScreenshotParams {
   browser?: string;
   format?: string;
   fullPage?: boolean;
+  selector?: string;
   path?: string;
 }
 
@@ -291,10 +292,14 @@ const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 export async function browserScreenshot(
   params: Readonly<BrowserScreenshotParams>,
 ): Promise<ToolResult<BrowserScreenshotDetails>> {
+  if (params.selector && params.fullPage === true) {
+    throw new InvalidInputError("Pass selector or fullPage, not both.");
+  }
   const { name, provider } = await createProvider(params.provider, params.browser);
   const result = await screenshotWithSessionWhenNeeded(provider, {
     url: params.url,
     fullPage: params.fullPage,
+    selector: params.selector,
     format: screenshotFormat(params.format),
   });
   const image = screenshotImage(result, name);

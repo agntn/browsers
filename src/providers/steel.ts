@@ -16,6 +16,7 @@ import type { Client } from "../core/client";
 import { AuthError, BrowserError, normalizeError } from "../core/errors";
 import {
   isNotFoundError,
+  assertNoSelector,
   assertSessionId,
   imageMimeType,
   notSupportedViaRest,
@@ -93,12 +94,12 @@ function createScreenshotBody(
   session?: BrowserSession,
 ): Record<string, unknown> {
   assertSessionId(session?.id, "steel", "screenshot");
+  assertNoSelector(options.selector, "steel");
   const body: Record<string, unknown> = {
     sessionId: session.id,
     fullPage: options.fullPage ?? true,
   };
   if (options.url) body.url = options.url;
-  if (options.selector) body.selector = options.selector;
   return body;
 }
 
@@ -130,6 +131,7 @@ class SteelProvider implements BrowserProvider {
       cdp: true,
       statelessScrape: true,
       statelessScreenshot: false,
+      elementScreenshot: false,
       crawl: false,
       pdf: false,
       links: false,

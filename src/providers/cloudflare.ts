@@ -170,6 +170,7 @@ class CloudflareProvider implements BrowserProvider {
       cdp: true,
       statelessScrape: true,
       statelessScreenshot: true,
+      elementScreenshot: true,
       crawl: true,
       pdf: true,
       links: true,

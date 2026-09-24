@@ -42,6 +42,11 @@ export default defineCommand({
       description: "Capture full page (default: true)",
       default: true,
     },
+    selector: {
+      type: "string",
+      alias: "s",
+      description: "CSS selector of one element to capture instead of the page",
+    },
     width: {
       type: "string",
       description: "Viewport width in pixels",
@@ -65,7 +70,8 @@ export default defineCommand({
         {
           url: args.url,
           format: args.format as "png" | "jpeg" | "webp",
-          fullPage: args.fullPage,
+          fullPage: args.selector ? undefined : args.fullPage,
+          selector: args.selector,
           viewport,
         },
         { viewport },

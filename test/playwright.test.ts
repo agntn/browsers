@@ -146,4 +146,22 @@ describe("playwright provider (local)", { timeout: 30_000 }, () => {
     await provider.releaseSession(session.id);
     sessions.pop();
   });
+
+  it("captures only the element a selector names", async () => {
+    const session = await provider.createSession({ headless: true });
+    sessions.push(session);
+
+    await provider.navigate(
+      'data:text/html,<body style="margin:0"><div id="box" style="width:120px;height:40px;background:red"></div></body>',
+      session,
+    );
+    const screenshot = await provider.screenshot({ selector: "#box" }, session);
+    const png = Buffer.from(screenshot.data, "base64");
+
+    // Width and height sit at bytes 16 and 20 of the PNG header chunk.
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([120, 40]);
+
+    await provider.releaseSession(session.id);
+    sessions.pop();
+  });
 });

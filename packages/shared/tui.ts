@@ -184,6 +184,7 @@ const CALL_DESCRIPTIONS: Readonly<Record<BrowserToolName, CallDescriber>> = {
       scalar(record, "format"),
       record.fullPage === true ? "full page" : undefined,
       record.fullPage === false ? "viewport" : undefined,
+      prefixedField(record, "selector", "selector"),
     ]),
   browsers_extract: (record) =>
     urlCall(record, [scalar(record, "browser"), prefixedField(record, "prompt", "prompt")]),

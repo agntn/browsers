@@ -231,6 +231,7 @@ class PlaywrightProvider implements BrowserProvider {
       cdp: false,
       statelessScrape: true,
       statelessScreenshot: false,
+      elementScreenshot: true,
       crawl: true,
       pdf: true,
       links: true,
@@ -340,15 +341,14 @@ class PlaywrightProvider implements BrowserProvider {
       }
 
       const type = options.format === "jpeg" ? "jpeg" : "png";
-      const screenshotOptions: { type: "png" | "jpeg"; fullPage?: boolean; quality?: number } = {
-        type,
-        fullPage: options.fullPage ?? false,
-      };
+      const screenshotOptions: { type: "png" | "jpeg"; quality?: number } = { type };
       if (type === "jpeg" && options.quality) {
         screenshotOptions.quality = options.quality;
       }
 
-      const buffer = await page.screenshot(screenshotOptions);
+      const buffer = options.selector
+        ? await page.locator(options.selector).screenshot(screenshotOptions)
+        : await page.screenshot({ ...screenshotOptions, fullPage: options.fullPage ?? false });
       return {
         data: buffer.toString("base64"),
         mimeType: `image/${type}`,

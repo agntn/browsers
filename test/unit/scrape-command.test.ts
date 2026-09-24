@@ -26,6 +26,7 @@ function cliTestProvider(): BrowserProvider {
       cdp: false,
       statelessScrape,
       statelessScreenshot: false,
+      elementScreenshot: false,
       crawl: false,
       pdf: false,
       links: false,

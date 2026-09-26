@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetDefaultClientForTests } from "../src/core/client";
 import { create } from "../src/core/registry";
 import { browserScrape } from "../src/tool-operations";
+import type { BrowserProvider } from "../src/core/types";
 
 const previousToken = process.env.CF_API_TOKEN;
 const previousAccountID = process.env.CF_ACCOUNT_ID;
@@ -153,5 +154,56 @@ describe("cloudflare browser selection", () => {
         browser: "firefox" as never,
       }),
     ).rejects.toThrow('Unsupported Cloudflare browser: "firefox"');
+  });
+});
+
+describe("cloudflare screenshot", () => {
+  async function screenshot(
+    options: Parameters<BrowserProvider["screenshot"]>[0],
+    contentType = "image/png",
+  ): Promise<{ body: unknown; mimeType: string; data: string }> {
+    let body: unknown;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        body = JSON.parse(init?.body as string);
+        return new Response(Uint8Array.from([1, 2, 3]), {
+          headers: { "Content-Type": contentType },
+        });
+      }),
+    );
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+    const result = await provider.screenshot(options);
+    return { body, mimeType: result.mimeType, data: result.data };
+  }
+
+  it("sends fullPage inside screenshotOptions", async () => {
+    const { body } = await screenshot({ url: "https://example.test", fullPage: true });
+
+    expect(body).toEqual({ url: "https://example.test", screenshotOptions: { fullPage: true } });
+  });
+
+  it("sends the requested format and labels the image with the type Cloudflare returned", async () => {
+    const { body, mimeType, data } = await screenshot(
+      { url: "https://example.test", format: "jpeg", quality: 80, fullPage: false },
+      "image/jpeg",
+    );
+
+    expect(body).toEqual({
+      url: "https://example.test",
+      screenshotOptions: { fullPage: false, type: "jpeg", quality: 80 },
+    });
+    expect(mimeType).toBe("image/jpeg");
+    expect(data.startsWith("data:image/jpeg;base64,")).toBe(true);
+  });
+
+  it("leaves quality out of a png, which Cloudflare refuses", async () => {
+    const { body } = await screenshot({ url: "https://example.test", quality: 80 });
+
+    expect(body).toEqual({ url: "https://example.test" });
   });
 });

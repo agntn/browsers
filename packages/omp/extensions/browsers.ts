@@ -7,7 +7,9 @@ import {
   type BrowserToolName,
   browserToolDescriptions,
   browserToolLabels,
+  DEFAULT_LINKS_LIMIT,
   DEFAULT_SCRAPE_MAX_CHARS,
+  MAX_LINKS_LIMIT,
   MAX_SCRAPE_MAX_CHARS,
 } from "../../../src/tool-contract.ts";
 import type * as BrowserTools from "../../../dist/tool-operations.d.mts";
@@ -175,6 +177,20 @@ function buildParameterSchemas(pi: ExtensionAPI) {
         url: Type.String({ description: "URL to extract links from" }),
         provider,
         browser,
+        limit: Type.Optional(
+          Type.Integer({
+            description: `Maximum links to return. Defaults to ${DEFAULT_LINKS_LIMIT}; accepted range: 1-${MAX_LINKS_LIMIT}.`,
+            minimum: 1,
+            maximum: MAX_LINKS_LIMIT,
+          }),
+        ),
+        offset: Type.Optional(
+          Type.Integer({
+            description:
+              "Number of links to skip, from the next offset a previous call reported. Default: 0.",
+            minimum: 0,
+          }),
+        ),
       },
       { additionalProperties: false },
     ),
@@ -330,7 +346,7 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     },
   });
 
-  pi.registerTool<typeof schemas.links, { url: string; links: string[] }>({
+  pi.registerTool<typeof schemas.links, BrowserTools.BrowserLinksDetails>({
     name: "browsers_links",
     label: browserToolLabels.browsers_links,
     description: browserToolDescriptions.browsers_links,

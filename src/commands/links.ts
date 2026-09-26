@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { browserLinks } from "../tool-operations.ts";
+import { readLinks } from "../tool-operations.ts";
 
 export default defineCommand({
   meta: {
@@ -25,12 +25,12 @@ export default defineCommand({
   },
   async run({ args }) {
     try {
-      const result = await browserLinks({
+      const result = await readLinks({
         url: args.url,
         provider: args.provider,
         browser: args.browser,
       });
-      for (const link of result.details.links) {
+      for (const link of result.links) {
         console.log(link);
       }
     } catch (error) {

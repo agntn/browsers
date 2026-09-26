@@ -33,6 +33,12 @@ export const DEFAULT_SCRAPE_MAX_CHARS = 20_000;
 /** Largest browser scrape output ceiling accepted by agent tools. */
 export const MAX_SCRAPE_MAX_CHARS = 200_000;
 
+/** Links returned by one browser links call unless the caller sets `limit`. */
+export const DEFAULT_LINKS_LIMIT = 500;
+
+/** Largest `limit` accepted by the browser links tool. */
+export const MAX_LINKS_LIMIT = 5_000;
+
 /** Human-facing labels for each browser tool. */
 export const browserToolLabels: Readonly<Record<BrowserToolName, string>> = {
   browsers_scrape: "Browser Scrape",
@@ -67,7 +73,7 @@ export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> 
   browsers_pdf:
     "Generate a PDF from a URL and write it to `path`. Cloudflare and Browserless support stateless PDF generation.",
   browsers_links:
-    "Extract all links from a webpage. Cloudflare and Playwright support stateless link extraction.",
+    "Extract the unique links of a webpage in page order. Returns up to `limit` links from `offset` with the total count; when links remain, call again with the next offset it reports. Each call reads the page again, so a changed total means the page changed between calls. Cloudflare and Playwright support stateless link extraction.",
   browsers_search: "Web search via browser provider. Hyperbrowser supports native web search.",
   browsers_capabilities:
     "Read-only: report which library operations a browser provider supports, including scrape, screenshot, element screenshot, navigate, evaluate, sessions, CDP, and stateless modes. Navigate and evaluate flags describe the provider API, not extra tools.",

@@ -96,6 +96,8 @@ export interface CrawlOptions {
   timeout?: number;
 }
 
+export type ResumeCrawlOptions = Pick<CrawlOptions, "timeout">;
+
 export interface PdfResult {
   data: string;
   mimeType: string;
@@ -182,6 +184,8 @@ export interface BrowserProvider {
   evaluate(script: string, session: BrowserSession): Promise<EvaluateResult>;
 
   crawl?(url: string, options?: CrawlOptions, session?: BrowserSession): Promise<CrawlResult>;
+  /** Wait for a crawl job an earlier `crawl` returned and read its pages, without starting another. */
+  resumeCrawl?(jobId: string, options?: ResumeCrawlOptions): Promise<CrawlResult>;
   pdf?(url: string, options?: PdfOptions, session?: BrowserSession): Promise<PdfResult>;
   search?(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]>;
   extract?(url: string, options?: ExtractOptions, session?: BrowserSession): Promise<ExtractResult>;

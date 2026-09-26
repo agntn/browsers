@@ -8,7 +8,7 @@ import {
 } from "./tool-contract.ts";
 import { BrowserError, InvalidInputError } from "./core/errors.ts";
 import { create, providers } from "./core/registry.ts";
-import { createProvider, createScreenshotProvider } from "./core/resolve.ts";
+import { createCrawl, createProvider, createScreenshotProvider } from "./core/resolve.ts";
 import type { CrawlPage, ProviderCapabilities, ScreenshotResult } from "./core/types.ts";
 import {
   imageMimeType,
@@ -77,7 +77,8 @@ export interface BrowserExtractParams {
 
 /** Arguments accepted by the browser crawl tool. */
 export interface BrowserCrawlParams {
-  url: string;
+  url?: string;
+  jobId?: string;
   provider?: string;
   browser?: string;
   maxPages?: number;
@@ -490,8 +491,10 @@ function crawlPageLines(pages: readonly CrawlPageContent[], maxChars: number): s
 /**
  * Crawls a site through a capable provider and returns each page it read.
  *
- * Every page gets a header with its URL and title. Page content shares one
- * `maxChars` budget in crawl order, so later pages may keep only the header.
+ * With `jobId` instead of `url` it waits for the crawl job an earlier call
+ * returned, without starting another. Every page gets a header with its URL and
+ * title. Page content shares one `maxChars` budget in crawl order, so later
+ * pages may keep only the header.
  *
  * @param params - Crawl arguments.
  * @returns {Promise<ToolResult<{ jobId?: string; pages: number }>>} Page content, crawl job identity and page count.
@@ -500,11 +503,19 @@ export async function browserCrawl(
   params: Readonly<BrowserCrawlParams>,
 ): Promise<ToolResult<{ jobId?: string; pages: number }>> {
   const maxChars = resolveMaxChars(params.maxChars);
-  const { name, provider } = await createProvider(params.provider, params.browser, "crawl");
-  const result = await provider.crawl(params.url, { maxPages: params.maxPages ?? 10 });
+  const { name, read } = await createCrawl(params, params.provider, params.browser);
+  const result = await read({ maxPages: params.maxPages ?? 10 });
   const lines = [`[provider=${name}] Crawled ${result.pages.length} pages.`];
   if (result.jobId) {
     lines.push(`Job ID: ${sanitizeField(result.jobId)} (status: ${result.status})`);
+    if (result.status === "running") {
+      const target = params.browser
+        ? `jobId, provider ${name} and browser ${sanitizeField(params.browser)}`
+        : `jobId and provider ${name}`;
+      lines.push(
+        `The job is still running. Call browsers_crawl with this ${target} to wait for it again.`,
+      );
+    }
   }
   lines.push(...crawlPageLines(result.pages, maxChars));
   return {

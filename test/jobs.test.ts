@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetDefaultClientForTests } from "../src/core/client";
 import { create } from "../src/core/registry";
 import { JOB_POLL_INTERVAL } from "../src/core/utils";
+import { browserCrawl } from "../src/tool-operations";
 
 interface Call {
   readonly method: string;
@@ -55,6 +56,7 @@ async function settle<T>(promise: Promise<T> | undefined): Promise<T | undefined
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   resetDefaultClientForTests();
 });
 
@@ -157,6 +159,84 @@ describe("cloudflare crawl job", () => {
     });
     expect(calls).toHaveLength(4);
   });
+
+  it("resumes a job by ID without starting another crawl", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    let statusReads = 0;
+    const calls = stubFetch(({ url }) => {
+      if (url.endsWith("?limit=1")) {
+        statusReads += 1;
+        return { success: true, result: { status: statusReads < 2 ? "running" : "errored" } };
+      }
+      return {
+        success: true,
+        result: {
+          status: "errored",
+          records: [{ url: "https://example.test/", status: "completed", markdown: "# A" }],
+        },
+      };
+    });
+    const provider = await create("cloudflare", { apiKey: "token", accountID: "test-account" });
+
+    const resumed = provider.resumeCrawl?.("job-2");
+
+    await expect(settle(resumed)).resolves.toEqual({
+      pages: [
+        {
+          url: "https://example.test/",
+          title: undefined,
+          markdown: "# A",
+          html: undefined,
+          statusCode: undefined,
+        },
+      ],
+      totalFound: 1,
+      jobId: "job-2",
+      status: "failed",
+    });
+    expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
+      `GET ${CF_CRAWL}/job-2?limit=1`,
+      `GET ${CF_CRAWL}/job-2?limit=1`,
+      `GET ${CF_CRAWL}/job-2`,
+    ]);
+  });
+});
+
+describe("kitesurf crawl job", () => {
+  const KITESURF_CRAWL =
+    "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/crawl";
+
+  it("names the browser the job has to be read with again", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    vi.stubEnv("CF_API_TOKEN", "token");
+    vi.stubEnv("CF_ACCOUNT_ID", "test-account");
+    const calls = stubFetch(({ method }) =>
+      method === "POST"
+        ? { success: true, result: "job-4" }
+        : { success: true, result: { status: "running" } },
+    );
+
+    const started = await settle(
+      browserCrawl({ provider: "cloudflare", browser: "kitesurf", url: "https://example.test/" }),
+    );
+    calls.length = 0;
+    await settle(browserCrawl({ provider: "cloudflare", browser: "kitesurf", jobId: "job-4" }));
+
+    expect(started?.content).toEqual([
+      {
+        type: "text",
+        text: [
+          "[provider=cloudflare] Crawled 0 pages.",
+          "Job ID: job-4 (status: running)",
+          "The job is still running. Call browsers_crawl with this jobId, provider cloudflare and browser kitesurf to wait for it again.",
+        ].join("\n"),
+      },
+    ]);
+    expect(`${calls[0]?.method} ${calls[0]?.url}`).toBe(
+      `GET ${KITESURF_CRAWL}/job-4?limit=1&browser=kitesurf`,
+    );
+    expect(calls.some(({ method }) => method === "POST")).toBe(false);
+  });
 });
 
 describe("hyperbrowser crawl job", () => {
@@ -206,6 +286,27 @@ describe("hyperbrowser crawl job", () => {
       "GET https://hyperbrowser.test/api/web/crawl/job-3?page=1",
       "GET https://hyperbrowser.test/api/web/crawl/job-3?page=2",
     ]);
+  });
+
+  it("resumes a job by ID and reports one still running", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    const calls = stubFetch(() => ({ status: "running" }));
+    const provider = await create("hyperbrowser", {
+      apiKey: "key",
+      baseURL: "https://hyperbrowser.test",
+    });
+
+    const resumed = provider.resumeCrawl?.("job-3", { timeout: 5_000 });
+
+    await expect(settle(resumed)).resolves.toEqual({
+      pages: [],
+      totalFound: 0,
+      jobId: "job-3",
+      status: "running",
+    });
+    expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual(
+      Array.from({ length: 3 }, () => "GET https://hyperbrowser.test/api/web/crawl/job-3/status"),
+    );
   });
 });
 

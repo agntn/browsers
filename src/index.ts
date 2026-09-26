@@ -14,6 +14,7 @@ export type {
   CrawlResult,
   CrawlPage,
   CrawlOptions,
+  ResumeCrawlOptions,
   PdfResult,
   PdfOptions,
   WebSearchResult,

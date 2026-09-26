@@ -190,6 +190,7 @@ const CALL_DESCRIPTIONS: Readonly<Record<BrowserToolName, CallDescriber>> = {
     urlCall(record, [scalar(record, "browser"), prefixedField(record, "prompt", "prompt")]),
   browsers_crawl: (record) =>
     urlCall(record, [
+      prefixedField(record, "jobId", "job"),
       scalar(record, "browser"),
       countedField(record, "maxPages", "page"),
       countedField(record, "maxChars", "char"),

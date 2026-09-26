@@ -83,6 +83,17 @@ function createScrapeBody(url: string, options?: ScrapeOptions): Record<string, 
   return body;
 }
 
+// Cloudflare rejects these at the top level of the body.
+function createScreenshotOptions(options: ScreenshotOptions): Record<string, unknown> {
+  const screenshotOptions: Record<string, unknown> = {};
+  if (options.fullPage !== undefined) screenshotOptions.fullPage = options.fullPage;
+  if (options.format !== undefined) screenshotOptions.type = options.format;
+  if (options.quality !== undefined && options.format !== undefined && options.format !== "png") {
+    screenshotOptions.quality = options.quality;
+  }
+  return screenshotOptions;
+}
+
 function createScreenshotBody(
   options: ScreenshotOptions,
   session?: BrowserSession,
@@ -91,7 +102,8 @@ function createScreenshotBody(
   if (options.url) body.url = options.url;
   if (session?.id) body.sessionId = session.id;
   if (options.selector !== undefined) body.selector = options.selector;
-  if (options.fullPage !== undefined) body.fullPage = options.fullPage;
+  const screenshotOptions = createScreenshotOptions(options);
+  if (Object.keys(screenshotOptions).length > 0) body.screenshotOptions = screenshotOptions;
   return body;
 }
 
@@ -323,10 +335,11 @@ class CloudflareProvider implements BrowserProvider {
 
       const contentType = res.headers.get("content-type") ?? "";
       if (contentType.includes("image")) {
+        const mimeType = contentType.split(";")[0]!.trim();
         const buf = await res.arrayBuffer();
         return {
-          data: `data:image/png;base64,${Buffer.from(buf).toString("base64")}`,
-          mimeType: "image/png",
+          data: `data:${mimeType};base64,${Buffer.from(buf).toString("base64")}`,
+          mimeType,
         };
       }
 

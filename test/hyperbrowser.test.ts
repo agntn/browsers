@@ -52,23 +52,30 @@ describe("hyperbrowser current session API", () => {
       switch (`${request.method} ${request.url}`) {
         case "POST /api/web/fetch": {
           const { url } = JSON.parse(captured.body) as { url: string };
-          response.end(
-            url === "https://down.example/"
-              ? JSON.stringify({
-                  jobId: "job-2",
-                  status: "failed",
-                  data: {},
-                  error: "net::ERR_TUNNEL_CONNECTION_FAILED at https://down.example",
-                })
-              : JSON.stringify({
-                  jobId: "job-1",
-                  status: "completed",
-                  data: {
-                    metadata: { title: "Example Domain" },
-                    screenshot: `${baseURL}/screenshots/shot-1.png`,
-                  },
-                }),
-          );
+          if (url === "https://down.example/") {
+            response.end(
+              JSON.stringify({
+                jobId: "job-2",
+                status: "failed",
+                data: {},
+                error: "net::ERR_TUNNEL_CONNECTION_FAILED at https://down.example",
+              }),
+            );
+          } else if (url === "https://slow.example/") {
+            response.end(JSON.stringify({ jobId: "job-3", status: "running" }));
+          } else {
+            response.end(
+              JSON.stringify({
+                jobId: "job-1",
+                status: "completed",
+                data: {
+                  metadata: { title: "Example Domain" },
+                  markdown: "# Example Domain",
+                  screenshot: `${baseURL}/screenshots/shot-1.png`,
+                },
+              }),
+            );
+          }
           return;
         }
         case "POST /api/session":
@@ -216,5 +223,23 @@ describe("hyperbrowser current session API", () => {
       "Hyperbrowser returned no screenshot: net::ERR_TUNNEL_CONNECTION_FAILED at https://down.example",
     );
     await expect(provider.screenshot({})).rejects.toThrow("hyperbrowser screenshot requires a URL");
+  });
+
+  it("reports a fetch that did not complete instead of an empty page", async () => {
+    const provider = await create("hyperbrowser", { apiKey: "test", baseURL });
+
+    await expect(provider.scrape("https://example.com/")).resolves.toEqual({
+      url: "https://example.com/",
+      title: "Example Domain",
+      markdown: "# Example Domain",
+      html: undefined,
+      statusCode: 200,
+    });
+    await expect(provider.scrape("https://down.example/")).rejects.toThrow(
+      "Hyperbrowser fetch job job-2 failed: net::ERR_TUNNEL_CONNECTION_FAILED at https://down.example",
+    );
+    await expect(provider.scrape("https://slow.example/")).rejects.toThrow(
+      "Hyperbrowser fetch job job-3 did not finish (status: running); try again",
+    );
   });
 });

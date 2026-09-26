@@ -305,6 +305,29 @@ describe("browser tool operations", () => {
     });
   });
 
+  it("asks for the full page when fullPage is left out", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    screenshot.mockResolvedValue({ data: PNG_BYTES.toString("base64"), mimeType: "image/png" });
+
+    await browserScreenshot({ provider: "tooltest", url: "https://example.test" });
+
+    expect(screenshot).toHaveBeenCalledWith({
+      url: "https://example.test",
+      fullPage: true,
+      selector: undefined,
+      format: undefined,
+    });
+  });
+
+  it("keeps an explicit viewport capture", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    screenshot.mockResolvedValue({ data: PNG_BYTES.toString("base64"), mimeType: "image/png" });
+
+    await browserScreenshot({ provider: "tooltest", url: "https://example.test", fullPage: false });
+
+    expect(screenshot).toHaveBeenCalledWith(expect.objectContaining({ fullPage: false }));
+  });
+
   it("passes a selector to the provider", async () => {
     process.env.TOOLTEST_API_KEY = "test";
     screenshot.mockResolvedValue({ data: PNG_BYTES.toString("base64"), mimeType: "image/png" });

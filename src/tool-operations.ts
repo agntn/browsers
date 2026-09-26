@@ -302,7 +302,7 @@ export async function browserScreenshot(
   );
   const result = await screenshotWithSessionWhenNeeded(provider, {
     url: params.url,
-    fullPage: params.fullPage,
+    fullPage: params.selector === undefined ? (params.fullPage ?? true) : params.fullPage,
     selector: params.selector,
     format: screenshotFormat(params.format),
   });

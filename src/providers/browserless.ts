@@ -15,6 +15,7 @@ import type {
 } from "../core/types.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
+import type { Browser, Page } from "playwright-core";
 import { AuthError, normalizeError, SessionNotFoundError } from "../core/errors.ts";
 import { assertUrlOrSession } from "../core/utils.ts";
 
@@ -24,12 +25,57 @@ interface BrowserlessSessionResponse {
   readonly stop?: string;
 }
 
+interface BrowserlessConnection {
+  readonly browser: Browser;
+  readonly page: Page;
+}
+
 interface BrowserlessSessionRecord {
   readonly session: BrowserSession;
   readonly stopUrl: string;
 }
 
 const browserlessSessionStores = new Map<string, Map<string, BrowserlessSessionRecord>>();
+
+/**
+ * The CDP connection navigate and evaluate share, per session. Browserless
+ * refuses a second client while it still counts the first, so one connection
+ * stays open until the session is released.
+ */
+const browserlessConnections = new WeakMap<
+  BrowserlessSessionRecord,
+  Promise<BrowserlessConnection>
+>();
+
+async function connect(cdpUrl: string): Promise<BrowserlessConnection> {
+  const { chromium } = await import("playwright-core");
+  const browser = await chromium.connectOverCDP(cdpUrl);
+  const context = browser.contexts()[0] ?? (await browser.newContext());
+  const page = context.pages()[0] ?? (await context.newPage());
+  return { browser, page };
+}
+
+function sessionPage(record: Readonly<BrowserlessSessionRecord>, cdpUrl: string): Promise<Page> {
+  let connection = browserlessConnections.get(record);
+  if (!connection) {
+    const opened = connect(cdpUrl);
+    const forget = (): void => {
+      if (browserlessConnections.get(record) === opened) browserlessConnections.delete(record);
+    };
+    opened.then(({ browser }) => browser.on("disconnected", forget), forget);
+    browserlessConnections.set(record, opened);
+    connection = opened;
+  }
+  return connection.then(({ page }) => page);
+}
+
+async function disconnect(record: Readonly<BrowserlessSessionRecord>): Promise<void> {
+  const connection = browserlessConnections.get(record);
+  browserlessConnections.delete(record);
+  if (!connection) return;
+  const { browser } = await connection.catch(() => ({ browser: undefined }));
+  await browser?.close().catch(() => {});
+}
 
 function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
   const body: Record<string, unknown> = { ttl: options?.timeout ?? 300_000 };
@@ -130,6 +176,7 @@ class BrowserlessProvider implements BrowserProvider {
     if (!record) throw new SessionNotFoundError(sessionId, "browserless");
 
     try {
+      await disconnect(record);
       await this.client.deleteJSON(record.stopUrl);
       sessionStore.delete(sessionId);
       if (sessionStore.size === 0) browserlessSessionStores.delete(this.sessionStoreKey);
@@ -183,18 +230,29 @@ class BrowserlessProvider implements BrowserProvider {
     }
   }
 
-  async navigate(url: string, session: BrowserSession): Promise<void> {
-    await this.evaluate(`await page.goto(${JSON.stringify(url)})`, session);
+  private async page(session: BrowserSession): Promise<Page> {
+    const record = browserlessSessionStores.get(this.sessionStoreKey)?.get(session.id);
+    if (!record?.session.cdpUrl) throw new SessionNotFoundError(session.id, "browserless");
+    return sessionPage(record, record.session.cdpUrl);
   }
 
-  async evaluate(script: string, _session: BrowserSession): Promise<EvaluateResult> {
+  async navigate(url: string, session: BrowserSession): Promise<void> {
     try {
-      const res = await this.client.postJSON<{ data?: unknown }>(
-        `${this.baseURL}/function?${this.tokenParam()}`,
-        { code: script },
-        { "Content-Type": "application/json" },
-      );
-      return { value: res.data };
+      const page = await this.page(session);
+      await page.goto(url, { waitUntil: "load" });
+    } catch (error) {
+      throw normalizeError(error, "browserless");
+    }
+  }
+
+  async evaluate(script: string, session: BrowserSession): Promise<EvaluateResult> {
+    try {
+      const page = await this.page(session);
+      const value: unknown = await page.evaluate((source): unknown => {
+        const result: unknown = globalThis.eval(source);
+        return result;
+      }, script);
+      return { value };
     } catch (error) {
       throw normalizeError(error, "browserless");
     }

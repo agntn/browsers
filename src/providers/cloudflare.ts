@@ -22,7 +22,7 @@ import type {
 } from "../core/types.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
-import { AuthError, normalizeError } from "../core/errors.ts";
+import { AuthError, BrowserError, HTTPError, normalizeError } from "../core/errors.ts";
 import {
   assertUrlOrSession,
   JOB_TIMEOUT,
@@ -202,6 +202,22 @@ class CloudflareProvider implements BrowserProvider {
     return `${this.base()}${path}${query ? `?${query}` : ""}`;
   }
 
+  /**
+   * Maps a failure for the caller without the account ID that every request path carries:
+   * the status, the path and Cloudflare's reason explain the failure, the account does not.
+   *
+   * @param {unknown} error Failure from a Cloudflare request.
+   * @returns {BrowserError} The normalized error.
+   */
+  private fail(error: unknown): BrowserError {
+    const account = `/accounts/${this.accountID}/`;
+    if (error instanceof HTTPError && error.url.includes(account)) {
+      const url = error.url.replace(account, "/accounts/[account]/");
+      return normalizeError(new HTTPError(error.statusCode, url, error.body), "cloudflare");
+    }
+    return normalizeError(error, "cloudflare");
+  }
+
   private headers(): Record<string, string> {
     return {
       Authorization: `Bearer ${this.apiToken}`,
@@ -245,7 +261,7 @@ class CloudflareProvider implements BrowserProvider {
         metadata: { connectionId: result.connectionId },
       };
     } catch (error) {
-      throw normalizeError(error, "cloudflare");
+      throw this.fail(error);
     }
   }
 
@@ -294,7 +310,7 @@ class CloudflareProvider implements BrowserProvider {
         this.headers(),
       );
     } catch (error) {
-      throw normalizeError(error, "cloudflare");
+      throw this.fail(error);
     }
   }
 
@@ -316,7 +332,7 @@ class CloudflareProvider implements BrowserProvider {
         html: typeof result === "string" ? result : result.content,
       };
     } catch (error) {
-      throw normalizeError(error, "cloudflare");
+      throw this.fail(error);
     }
   }
 
@@ -350,7 +366,7 @@ class CloudflareProvider implements BrowserProvider {
         mimeType: `image/${options.format ?? "png"}`,
       };
     } catch (error) {
-      throw normalizeError(error, "cloudflare");
+      throw this.fail(error);
     }
   }
 
@@ -396,7 +412,7 @@ class CloudflareProvider implements BrowserProvider {
         status: job.status === "completed" ? "completed" : "failed",
       };
     } catch (error) {
-      throw normalizeError(error, "cloudflare");
+      throw this.fail(error);
     }
   }
 
@@ -457,7 +473,7 @@ class CloudflareProvider implements BrowserProvider {
       const result = this.unwrap(data);
       return { data: (result.data ?? result.content ?? "") as string, mimeType: "application/pdf" };
     } catch (error) {
-      throw normalizeError(error, "cloudflare");
+      throw this.fail(error);
     }
   }
 
@@ -475,7 +491,7 @@ class CloudflareProvider implements BrowserProvider {
         links: rawLinks.map((href) => ({ href })),
       };
     } catch (error) {
-      throw normalizeError(error, "cloudflare");
+      throw this.fail(error);
     }
   }
 
@@ -502,7 +518,7 @@ class CloudflareProvider implements BrowserProvider {
         markdown: result.markdown as string | undefined,
       };
     } catch (error) {
-      throw normalizeError(error, "cloudflare");
+      throw this.fail(error);
     }
   }
 

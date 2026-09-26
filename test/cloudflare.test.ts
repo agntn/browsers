@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetDefaultClientForTests } from "../src/core/client";
 import { create } from "../src/core/registry";
-import { browserScrape } from "../src/tool-operations";
+import { browserScrape, browserScreenshot, errorMessage } from "../src/tool-operations";
 import type { BrowserProvider } from "../src/core/types";
 
 const previousToken = process.env.CF_API_TOKEN;
@@ -205,5 +205,46 @@ describe("cloudflare screenshot", () => {
     const { body } = await screenshot({ url: "https://example.test", quality: 80 });
 
     expect(body).toEqual({ url: "https://example.test" });
+  });
+});
+
+describe("cloudflare errors", () => {
+  const accountID = "account-8f3c2a";
+
+  function failWith(status: number, message: string): void {
+    process.env.CF_API_TOKEN = "cf-token";
+    process.env.CF_ACCOUNT_ID = accountID;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ success: false, errors: [{ code: 1000, message }] }), {
+            status,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ),
+    );
+  }
+
+  it.each([
+    ["scrape", 422, "Invalid URL", "/browser-rendering/content"],
+    ["screenshot", 400, "Bad viewport", "/browser-rendering/screenshot"],
+    ["scrape", 403, "Plan limit reached", "/browser-rendering/content"],
+  ])("keeps the account ID out of a failed %s (HTTP %i)", async (tool, status, reason, path) => {
+    failWith(status, reason);
+    const run =
+      tool === "scrape"
+        ? browserScrape({ url: "https://example.com", provider: "cloudflare" })
+        : browserScreenshot({ url: "https://example.com", provider: "cloudflare" });
+    const error = await run.then(
+      () => undefined,
+      (failure: unknown) => failure,
+    );
+
+    const text = errorMessage(error);
+    expect(text).toContain(`HTTP ${status}`);
+    expect(text).toContain(reason);
+    expect(text).toContain(path);
+    expect(text).not.toContain(accountID);
   });
 });

@@ -42,6 +42,7 @@ interface HyperbrowserSessionListResponse {
 }
 
 interface HyperbrowserFetchResponse {
+  readonly jobId?: string;
   readonly status?: string;
   readonly error?: string;
   readonly data?: {
@@ -71,6 +72,25 @@ function createScreenshotBody(options: ScreenshotOptions): Record<string, unknow
   };
   if (options.viewport) body.browser = { screen: options.viewport };
   return body;
+}
+
+/**
+ * Rejects a fetch that did not complete. The route answers HTTP 200 with `status: "failed"` for a
+ * page it could not load, and the empty `data` of that answer would pass for an empty page.
+ *
+ * @param {HyperbrowserFetchResponse} res Fetch response.
+ */
+function assertFetched(res: HyperbrowserFetchResponse): void {
+  if (res.status === "completed") return;
+  const job = res.jobId ? ` ${res.jobId}` : "";
+  if (res.status === "failed") {
+    throw new BrowserError(
+      `Hyperbrowser fetch job${job} failed${res.error ? `: ${res.error}` : ""}`,
+    );
+  }
+  throw new BrowserError(
+    `Hyperbrowser fetch job${job} did not finish (status: ${res.status ?? "unknown"}); try again`,
+  );
 }
 
 function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
@@ -272,11 +292,12 @@ class HyperbrowserProvider implements BrowserProvider {
         outputs: { formats: ["markdown"] },
       };
 
-      const res = await this.client.postJSON<Record<string, unknown>>(
+      const res = await this.client.postJSON<HyperbrowserFetchResponse>(
         `${this.baseURL}/api/web/fetch`,
         body,
         this.headers(),
       );
+      assertFetched(res);
 
       const data = res.data as Record<string, unknown> | undefined;
       return {

@@ -182,8 +182,11 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-// A cold Chrome launch on a CI runner takes longer than the 5 s vitest default.
-describe("browserless session page", { timeout: 30_000 }, () => {
+// A cold Chrome launch on a CI runner takes longer than the vitest defaults,
+// and a suite timeout does not reach its hooks, so beforeAll gets its own.
+const chromeTimeout = 30_000;
+
+describe("browserless session page", { timeout: chromeTimeout }, () => {
   let chrome: Browser;
   let server: Server;
   let baseURL: string;
@@ -223,11 +226,11 @@ describe("browserless session page", { timeout: 30_000 }, () => {
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     baseURL = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  });
+  }, chromeTimeout);
 
   afterAll(async () => {
     await chrome?.close();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
   it("evaluates in the page navigate opened", async () => {

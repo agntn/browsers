@@ -10,11 +10,11 @@ import type {
   ProviderConfig,
   BrowserProviderFactory,
   ProviderCapabilities,
-} from "../core/types";
-import { defaultClient } from "../core/client";
-import type { Client } from "../core/client";
-import { AuthError, normalizeError } from "../core/errors";
-import { isNotFoundError, notSupportedViaRest } from "../core/utils";
+} from "../core/types.ts";
+import { defaultClient } from "../core/client.ts";
+import type { Client } from "../core/client.ts";
+import { AuthError, normalizeError } from "../core/errors.ts";
+import { isNotFoundError, notSupportedViaRest } from "../core/utils.ts";
 
 interface BrowserbaseSessionResponse {
   id: string;

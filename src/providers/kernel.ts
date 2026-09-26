@@ -10,11 +10,11 @@ import type {
   ProviderConfig,
   BrowserProviderFactory,
   ProviderCapabilities,
-} from "../core/types";
-import { defaultClient } from "../core/client";
-import type { Client } from "../core/client";
-import { AuthError, normalizeError } from "../core/errors";
-import { isNotFoundError, assertNoSelector, assertSessionId } from "../core/utils";
+} from "../core/types.ts";
+import { defaultClient } from "../core/client.ts";
+import type { Client } from "../core/client.ts";
+import { AuthError, normalizeError } from "../core/errors.ts";
+import { isNotFoundError, assertNoSelector, assertSessionId } from "../core/utils.ts";
 
 interface KernelSessionResponse {
   readonly session_id: string;

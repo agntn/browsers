@@ -12,11 +12,11 @@ import type {
   ProviderConfig,
   BrowserProviderFactory,
   ProviderCapabilities,
-} from "../core/types";
-import { defaultClient } from "../core/client";
-import type { Client } from "../core/client";
-import { AuthError, normalizeError, SessionNotFoundError } from "../core/errors";
-import { assertUrlOrSession } from "../core/utils";
+} from "../core/types.ts";
+import { defaultClient } from "../core/client.ts";
+import type { Client } from "../core/client.ts";
+import { AuthError, normalizeError, SessionNotFoundError } from "../core/errors.ts";
+import { assertUrlOrSession } from "../core/utils.ts";
 
 interface BrowserlessSessionResponse {
   readonly id?: string;

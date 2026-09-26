@@ -1,8 +1,8 @@
 import type { $Fetch, FetchError, FetchOptions } from "ofetch";
-import type { ClientOptions } from "./types";
-import { HTTPError, RateLimitError, parseRetryAfter } from "./errors";
-import { lazy } from "./lazy";
-import { version } from "../version";
+import type { ClientOptions } from "./types.ts";
+import { HTTPError, RateLimitError, parseRetryAfter } from "./errors.ts";
+import { lazy } from "./lazy.ts";
+import { version } from "../version.ts";
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY = 100;

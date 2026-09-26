@@ -1,8 +1,8 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { resolveAndCreate } from "./_helpers";
-import type { ScrapeResult } from "../core/types";
-import { scrapeWithSessionWhenNeeded } from "../core/utils";
+import { resolveAndCreate } from "./_helpers.ts";
+import type { ScrapeResult } from "../core/types.ts";
+import { scrapeWithSessionWhenNeeded } from "../core/utils.ts";
 
 function printScrapeResult(
   format: string,

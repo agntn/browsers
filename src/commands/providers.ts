@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
-import { providers as listProviders, create } from "../core/registry";
-import { _hasKey, providerEnvHint } from "../core/resolve";
-import type { ProviderCapabilities } from "../core/types";
+import { providers as listProviders, create } from "../core/registry.ts";
+import { _hasKey, providerEnvHint } from "../core/resolve.ts";
+import type { ProviderCapabilities } from "../core/types.ts";
 
 const simpleCapabilityLabels = [
   ["elementScreenshot", "element"],

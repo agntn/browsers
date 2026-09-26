@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { resolveAndCreate } from "./_helpers";
-import type { CrawlPage, CrawlResult } from "../core/types";
+import { resolveAndCreate } from "./_helpers.ts";
+import type { CrawlPage, CrawlResult } from "../core/types.ts";
 
 type PrintableCrawlPage = Readonly<Pick<CrawlPage, "url" | "markdown" | "text" | "html">>;
 

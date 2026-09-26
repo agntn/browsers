@@ -1,4 +1,4 @@
-import type { ProviderEntry } from "../core/registry";
+import type { ProviderEntry } from "../core/registry.ts";
 
 /**
  * Every provider shipped with the package, in registry order.
@@ -12,41 +12,41 @@ export const builtins: readonly ProviderEntry[] = [
   {
     key: "steel",
     defaultURL: "https://api.steel.dev",
-    load: () => import("./steel").then((m) => m.factory),
+    load: () => import("./steel.ts").then((m) => m.factory),
   },
   {
     key: "browserbase",
     defaultURL: "https://api.browserbase.com",
-    load: () => import("./browserbase").then((m) => m.factory),
+    load: () => import("./browserbase.ts").then((m) => m.factory),
   },
   {
     key: "kernel",
     defaultURL: "https://api.onkernel.com",
-    load: () => import("./kernel").then((m) => m.factory),
+    load: () => import("./kernel.ts").then((m) => m.factory),
   },
   {
     key: "browserless",
     defaultURL: "https://chrome.browserless.io",
-    load: () => import("./browserless").then((m) => m.factory),
+    load: () => import("./browserless.ts").then((m) => m.factory),
   },
   {
     key: "hyperbrowser",
     defaultURL: "https://api.hyperbrowser.ai",
-    load: () => import("./hyperbrowser").then((m) => m.factory),
+    load: () => import("./hyperbrowser.ts").then((m) => m.factory),
   },
   {
     key: "anchor",
     defaultURL: "https://api.anchorbrowser.io",
-    load: () => import("./anchor").then((m) => m.factory),
+    load: () => import("./anchor.ts").then((m) => m.factory),
   },
   {
     key: "cloudflare",
     defaultURL: "https://api.cloudflare.com",
-    load: () => import("./cloudflare").then((m) => m.factory),
+    load: () => import("./cloudflare.ts").then((m) => m.factory),
   },
   {
     key: "playwright",
     defaultURL: "local",
-    load: () => import("./playwright").then((m) => m.factory),
+    load: () => import("./playwright.ts").then((m) => m.factory),
   },
 ];

@@ -1,17 +1,17 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS } from "./tool-contract";
-import { BrowserError, InvalidInputError } from "./core/errors";
-import { create, providers } from "./core/registry";
-import { createProvider, createScreenshotProvider } from "./core/resolve";
-import type { CrawlPage, ProviderCapabilities, ScreenshotResult } from "./core/types";
+import { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS } from "./tool-contract.ts";
+import { BrowserError, InvalidInputError } from "./core/errors.ts";
+import { create, providers } from "./core/registry.ts";
+import { createProvider, createScreenshotProvider } from "./core/resolve.ts";
+import type { CrawlPage, ProviderCapabilities, ScreenshotResult } from "./core/types.ts";
 import {
   imageMimeType,
   scrapeWithSessionWhenNeeded,
   screenshotWithSessionWhenNeeded,
-} from "./core/utils";
+} from "./core/utils.ts";
 
-export type { ProviderCapabilities } from "./core/types";
+export type { ProviderCapabilities } from "./core/types.ts";
 
 /** An image shown to the model, as base64 with its MIME type. */
 export interface ImageContent {

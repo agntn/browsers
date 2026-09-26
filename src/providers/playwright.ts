@@ -16,8 +16,8 @@ import type {
   PdfOptions,
   ProviderCapabilities,
   LinksResult,
-} from "../core/types";
-import { BrowserError, SessionNotFoundError, normalizeError } from "../core/errors";
+} from "../core/types.ts";
+import { BrowserError, SessionNotFoundError, normalizeError } from "../core/errors.ts";
 import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
 import type { Browser, Page } from "playwright-core";

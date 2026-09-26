@@ -1,10 +1,15 @@
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import {
+  getDefaultEnvironment,
+  StdioClientTransport,
+} from "@modelcontextprotocol/sdk/client/stdio.js";
 
+/** `BROWSERS_DIST=1` keeps the bundle; a checkout would otherwise serve the live source. */
 const transport = new StdioClientTransport({
   command: process.execPath,
   args: [fileURLToPath(new URL("../dist/cli.mjs", import.meta.url)), "mcp"],
+  env: { ...getDefaultEnvironment(), BROWSERS_DIST: "1" },
   stderr: "pipe",
 });
 const client = new Client({ name: "browsers-eval", version: "1.0.0" });

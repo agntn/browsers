@@ -1,6 +1,6 @@
-import type { BrowserProvider, ProviderConfig, BrowserProviderFactory } from "./types";
-import { UnknownProviderError } from "./errors";
-import { builtins } from "../providers/index";
+import type { BrowserProvider, ProviderConfig, BrowserProviderFactory } from "./types.ts";
+import { UnknownProviderError } from "./errors.ts";
+import { builtins } from "../providers/index.ts";
 
 /** One provider the registry knows: static metadata plus a loader for its factory. */
 export interface ProviderEntry {

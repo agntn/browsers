@@ -10,17 +10,17 @@ import type {
   ProviderConfig,
   BrowserProviderFactory,
   ProviderCapabilities,
-} from "../core/types";
-import { defaultClient } from "../core/client";
-import type { Client } from "../core/client";
-import { AuthError, BrowserError, normalizeError } from "../core/errors";
+} from "../core/types.ts";
+import { defaultClient } from "../core/client.ts";
+import type { Client } from "../core/client.ts";
+import { AuthError, BrowserError, normalizeError } from "../core/errors.ts";
 import {
   isNotFoundError,
   assertNoSelector,
   assertSessionId,
   imageMimeType,
   notSupportedViaRest,
-} from "../core/utils";
+} from "../core/utils.ts";
 
 interface SteelSessionResponse {
   readonly id: string;

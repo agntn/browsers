@@ -1,4 +1,4 @@
-import { browserProviderNames } from "../tool-contract";
+import { browserProviderNames } from "../tool-contract.ts";
 
 export { browserProviderNames as builtinProviders };
 

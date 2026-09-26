@@ -17,17 +17,17 @@ import type {
   ProviderConfig,
   BrowserProviderFactory,
   ProviderCapabilities,
-} from "../core/types";
-import { defaultClient } from "../core/client";
-import type { Client } from "../core/client";
-import { AuthError, BrowserError, InvalidInputError, normalizeError } from "../core/errors";
+} from "../core/types.ts";
+import { defaultClient } from "../core/client.ts";
+import type { Client } from "../core/client.ts";
+import { AuthError, BrowserError, InvalidInputError, normalizeError } from "../core/errors.ts";
 import {
   JOB_TIMEOUT,
   assertNoSelector,
   isNotFoundError,
   notSupportedViaRest,
   waitForJob,
-} from "../core/utils";
+} from "../core/utils.ts";
 
 interface HyperbrowserSessionResponse {
   readonly id: string;

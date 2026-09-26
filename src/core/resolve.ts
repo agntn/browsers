@@ -1,7 +1,7 @@
-import { create, providers as listProviders } from "./registry";
-import { UnknownProviderError, NoProviderConfiguredError, AuthError } from "./errors";
-import type { BrowserProvider } from "./types";
-import { resolveCloudflareBrowser } from "./utils";
+import { create, providers as listProviders } from "./registry.ts";
+import { UnknownProviderError, NoProviderConfiguredError, AuthError } from "./errors.ts";
+import type { BrowserProvider } from "./types.ts";
+import { resolveCloudflareBrowser } from "./utils.ts";
 
 type ProviderEnvRequirements = readonly (readonly [string, ...string[]])[];
 

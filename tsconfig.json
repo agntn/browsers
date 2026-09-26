@@ -5,6 +5,7 @@
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
+    "erasableSyntaxOnly": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

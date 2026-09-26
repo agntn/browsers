@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { browserLinks } from "../tool-operations";
+import { browserLinks } from "../tool-operations.ts";
 
 export default defineCommand({
   meta: {

@@ -1,5 +1,5 @@
-import type { HTTPError } from "./errors";
-import { InvalidInputError, UnsupportedOperationError } from "./errors";
+import type { HTTPError } from "./errors.ts";
+import { InvalidInputError, UnsupportedOperationError } from "./errors.ts";
 import type {
   BrowserProvider,
   CloudflareBrowser,
@@ -8,7 +8,7 @@ import type {
   ScrapeResult,
   ScreenshotOptions,
   ScreenshotResult,
-} from "./types";
+} from "./types.ts";
 
 const PNG_SIGNATURE = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const JPEG_SIGNATURE = new Uint8Array([0xff, 0xd8, 0xff]);

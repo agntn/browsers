@@ -19,17 +19,17 @@ import type {
   BrowserProviderFactory,
   ProviderCapabilities,
   CloudflareBrowser,
-} from "../core/types";
-import { defaultClient } from "../core/client";
-import type { Client } from "../core/client";
-import { AuthError, normalizeError } from "../core/errors";
+} from "../core/types.ts";
+import { defaultClient } from "../core/client.ts";
+import type { Client } from "../core/client.ts";
+import { AuthError, normalizeError } from "../core/errors.ts";
 import {
   assertUrlOrSession,
   JOB_TIMEOUT,
   notSupportedViaRest,
   resolveCloudflareBrowser,
   waitForJob,
-} from "../core/utils";
+} from "../core/utils.ts";
 
 interface CfEnvelope<T = unknown> {
   readonly success: boolean;

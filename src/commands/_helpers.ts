@@ -1,7 +1,7 @@
 import { consola } from "consola";
-import { createProvider, createScreenshotProvider } from "../core/resolve";
-import type { ProviderOperation, ProviderWith } from "../core/resolve";
-import type { BrowserProvider } from "../core/types";
+import { createProvider, createScreenshotProvider } from "../core/resolve.ts";
+import type { ProviderOperation, ProviderWith } from "../core/resolve.ts";
+import type { BrowserProvider } from "../core/types.ts";
 
 /**
  * Resolve and create a provider, or terminate with a readable error.

@@ -1,6 +1,6 @@
-export { version } from "./version";
+export { version } from "./version.ts";
 
-export { builtinProviders, type BrowserProviderName } from "./core/providers";
+export { builtinProviders, type BrowserProviderName } from "./core/providers.ts";
 
 export type {
   BrowserSession,
@@ -27,7 +27,7 @@ export type {
   ProviderConfig,
   BrowserProviderFactory,
   ClientOptions,
-} from "./core/types";
+} from "./core/types.ts";
 
 export {
   BrowserError,
@@ -46,14 +46,14 @@ export {
   UnsupportedOperationError,
   PaymentError,
   normalizeError,
-} from "./core/errors";
+} from "./core/errors.ts";
 
-export { Client, defaultClient } from "./core/client";
-export { register, create, providers, has, type ProviderEntry } from "./core/registry";
-export { resolveProvider, providerEnvKey } from "./core/resolve";
+export { Client, defaultClient } from "./core/client.ts";
+export { register, create, providers, has, type ProviderEntry } from "./core/registry.ts";
+export { resolveProvider, providerEnvKey } from "./core/resolve.ts";
 export {
   isNotFoundError,
   assertSessionId,
   assertUrlOrSession,
   notSupportedViaRest,
-} from "./core/utils";
+} from "./core/utils.ts";

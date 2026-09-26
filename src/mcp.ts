@@ -7,8 +7,12 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Static, TSchema } from "typebox";
 import type { Errors } from "typebox/value";
-import { lazy } from "./core/lazy";
-import { browserToolDescriptions, browserToolLabels, type BrowserToolName } from "./tool-contract";
+import { lazy } from "./core/lazy.ts";
+import {
+  browserToolDescriptions,
+  browserToolLabels,
+  type BrowserToolName,
+} from "./tool-contract.ts";
 import {
   browserCapabilities,
   browserCrawl,
@@ -23,8 +27,8 @@ import {
   listBrowserProviders,
   releaseBrowserSession,
   type ToolResult,
-} from "./tool-operations";
-import { version } from "./version";
+} from "./tool-operations.ts";
+import { version } from "./version.ts";
 
 interface ToolDefinition {
   name: BrowserToolName;
@@ -110,7 +114,7 @@ function defineTool<S extends TSchema>(
  * The schemas need TypeBox, so importing them here keeps it out of `initialize`.
  */
 const tools = /* @__PURE__ */ lazy(async () => {
-  const { browserToolSchemas: schemas } = await import("./tool-schemas");
+  const { browserToolSchemas: schemas } = await import("./tool-schemas.ts");
   const definitions: readonly ToolDefinition[] = [
     defineTool("browsers_scrape", schemas.browsers_scrape, LIVE_READ, browserScrape),
     defineTool("browsers_session", schemas.browsers_session, CREATE_SESSION, browserSession),

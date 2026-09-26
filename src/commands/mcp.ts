@@ -16,7 +16,7 @@ export default defineCommand({
   async run() {
     const [{ StdioServerTransport }, { createMcpServer }] = await Promise.all([
       import("@modelcontextprotocol/sdk/server/stdio.js"),
-      import("../mcp"),
+      import("../mcp.ts"),
     ]);
     consola.level = LogLevels.warn;
     await createMcpServer().connect(new StdioServerTransport());

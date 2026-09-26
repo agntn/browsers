@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { resolveAndCreate } from "./_helpers";
+import { resolveAndCreate } from "./_helpers.ts";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 

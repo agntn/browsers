@@ -289,7 +289,13 @@ const RESULT_META: Readonly<Record<BrowserToolName, ResultMetaRenderer>> = {
     compact([scalar(details, "provider"), countedField(details, "bytes", "byte")]),
   browsers_links: (details) => {
     const length = listLength(details, "links");
-    return length === undefined ? [] : [count(length, "link")];
+    if (length === undefined) return [];
+    const total = finiteNumber(details, "total");
+    return [
+      total === undefined || total === length
+        ? count(length, "link")
+        : `${length.toLocaleString("en-US")} of ${count(total, "link")}`,
+    ];
   },
   browsers_search: (details) => {
     const length = listLength(details, "results");

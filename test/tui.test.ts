@@ -105,8 +105,20 @@ describe("shared browser tool TUI", () => {
       plainTheme,
     );
 
+    const linksPage = renderToolResult(
+      "browsers_links",
+      {
+        content: [{ type: "text", text: "https://a.test\nhttps://b.test" }],
+        details: { links: ["https://a.test", "https://b.test"], total: 1200 },
+      },
+      false,
+      {},
+      plainTheme,
+    );
+
     expect(providers).toBe("✓ 2/3 configured (expand to view)");
     expect(links).toBe("✓ 2 links (expand to view)");
+    expect(linksPage).toBe("✓ 2 of 1,200 links (expand to view)");
   });
 
   it("uses structured browser facts instead of repeating the output", () => {

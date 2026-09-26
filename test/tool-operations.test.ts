@@ -276,6 +276,106 @@ describe("browser tool operations", () => {
     ]);
   });
 
+  it("bounds the default links answer and reports the total and next offset", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    const hrefs = Array.from({ length: 1200 }, (_, index) => `https://example.test/${index}`);
+    links.mockResolvedValue({
+      url: "https://example.test",
+      links: hrefs.map((href) => ({ href })),
+    });
+
+    const result = await browserLinks({ provider: "tooltest", url: "https://example.test" });
+    const [block] = result.content;
+
+    expect(result.details).toEqual({
+      url: "https://example.test",
+      links: hrefs.slice(0, 500),
+      total: 1200,
+      offset: 0,
+      nextOffset: 500,
+    });
+    expect(block?.type === "text" ? block.text.split("\n") : []).toEqual([
+      "[provider=tooltest] Links 1-500 of 1200:",
+      ...hrefs.slice(0, 500),
+      "",
+      "[700 more links; call again with offset 500]",
+    ]);
+  });
+
+  it("pages through every link in order without a gap or a repeat", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    const hrefs = Array.from({ length: 23 }, (_, index) => `https://example.test/${index}`);
+    links.mockResolvedValue({
+      url: "https://example.test",
+      links: [...hrefs, ...hrefs].map((href) => ({ href })),
+    });
+
+    const read: string[] = [];
+    let offset: number | undefined = 0;
+    while (offset !== undefined) {
+      const result = await browserLinks({
+        provider: "tooltest",
+        url: "https://example.test",
+        limit: 10,
+        offset,
+      });
+      expect(result.details).toMatchObject({ total: 23, offset });
+      read.push(...result.details.links);
+      offset = result.details.nextOffset;
+    }
+
+    expect(read).toEqual(hrefs);
+    expect(links).toHaveBeenCalledTimes(3);
+  });
+
+  it("names the last page and an offset past the end", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    links.mockResolvedValue({
+      url: "https://example.test",
+      links: ["a", "b", "c"].map((path) => ({ href: `https://example.test/${path}` })),
+    });
+
+    const last = await browserLinks({
+      provider: "tooltest",
+      url: "https://example.test",
+      offset: 2,
+    });
+    const past = await browserLinks({
+      provider: "tooltest",
+      url: "https://example.test",
+      offset: 3,
+    });
+
+    expect(last.content).toEqual([
+      { type: "text", text: "[provider=tooltest] Links 3-3 of 3:\nhttps://example.test/c" },
+    ]);
+    expect(last.details).toEqual({
+      url: "https://example.test",
+      links: ["https://example.test/c"],
+      total: 3,
+      offset: 2,
+    });
+    expect(past.content).toEqual([
+      { type: "text", text: "[provider=tooltest] No links at offset 3; the page has 3." },
+    ]);
+    expect(past.details.links).toEqual([]);
+  });
+
+  it.each([
+    [{ limit: 0 }, "limit must be an integer between 1 and 5000."],
+    [{ limit: 5001 }, "limit must be an integer between 1 and 5000."],
+    [{ limit: 1.5 }, "limit must be an integer between 1 and 5000."],
+    [{ offset: -1 }, "offset must be a non-negative integer."],
+    [{ offset: 0.5 }, "offset must be a non-negative integer."],
+  ])("rejects links bounds %j before reading the page", async (bounds, message) => {
+    process.env.TOOLTEST_API_KEY = "test";
+
+    await expect(
+      browserLinks({ provider: "tooltest", url: "https://example.test", ...bounds }),
+    ).rejects.toThrow(message);
+    expect(links).not.toHaveBeenCalled();
+  });
+
   it("returns the screenshot as an image block, typed by its bytes", async () => {
     process.env.TOOLTEST_API_KEY = "test";
     screenshot.mockResolvedValue({

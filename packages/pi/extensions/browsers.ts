@@ -223,12 +223,12 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     description: browserToolDescriptions.browsers_links,
     promptSnippet: "Extract links from a webpage.",
     promptGuidelines: [
-      "Use browsers_links when the user needs all links from a page.",
+      "Use browsers_links when the user needs the links of a page. It returns the first page of them with the total; pass the next offset it reports to read the rest.",
       "Cloudflare and Playwright support this currently.",
     ],
     parameters: browserToolSchemas.browsers_links,
     ...statusRenderers("browsers_links"),
-    async execute(_toolCallId, params): Promise<AgentToolResult<{ url: string; links: string[] }>> {
+    async execute(_toolCallId, params): Promise<AgentToolResult<BrowserTools.BrowserLinksDetails>> {
       return (await loadToolOperations()).browserLinks(params);
     },
   });

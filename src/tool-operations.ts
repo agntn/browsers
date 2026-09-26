@@ -1,6 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS } from "./tool-contract.ts";
+import {
+  DEFAULT_LINKS_LIMIT,
+  DEFAULT_SCRAPE_MAX_CHARS,
+  MAX_LINKS_LIMIT,
+  MAX_SCRAPE_MAX_CHARS,
+} from "./tool-contract.ts";
 import { BrowserError, InvalidInputError } from "./core/errors.ts";
 import { create, providers } from "./core/registry.ts";
 import { createProvider, createScreenshotProvider } from "./core/resolve.ts";
@@ -94,6 +99,12 @@ export interface BrowserUrlParams {
   browser?: string;
 }
 
+/** Arguments accepted by the browser links tool. */
+export interface BrowserLinksParams extends BrowserUrlParams {
+  limit?: number;
+  offset?: number;
+}
+
 /** Arguments accepted by the browser search tool. */
 export interface BrowserSearchParams {
   query: string;
@@ -158,6 +169,22 @@ function resolveMaxChars(value?: number): number {
     throw new RangeError(`maxChars must be an integer between 1 and ${MAX_SCRAPE_MAX_CHARS}.`);
   }
   return maxChars;
+}
+
+function resolveLinksLimit(value?: number): number {
+  const limit = value ?? DEFAULT_LINKS_LIMIT;
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LINKS_LIMIT) {
+    throw new RangeError(`limit must be an integer between 1 and ${MAX_LINKS_LIMIT}.`);
+  }
+  return limit;
+}
+
+function resolveLinksOffset(value?: number): number {
+  const offset = value ?? 0;
+  if (!Number.isSafeInteger(offset) || offset < 0) {
+    throw new RangeError("offset must be a non-negative integer.");
+  }
+  return offset;
 }
 
 /**
@@ -522,21 +549,71 @@ export async function browserPdf(
   };
 }
 
+/** One page of links kept by agent harnesses. */
+export interface BrowserLinksDetails {
+  url: string;
+  /** Links on this page of the result, in page order. */
+  links: string[];
+  /** Unique links the page has. */
+  total: number;
+  offset: number;
+  /** Offset of the next page, present while links remain. */
+  nextOffset?: number;
+}
+
 /**
- * Extracts links from one page through a capable provider.
+ * Reads the unique links of one page through a capable provider, in order of first appearance.
  *
  * @param params - Link extraction arguments.
- * @returns {Promise<ToolResult<{ url: string; links: string[] }>>} Extracted links.
+ * @returns {Promise<{ provider: string; links: string[] }>} The provider used and every unique link.
  */
-export async function browserLinks(
+export async function readLinks(
   params: Readonly<BrowserUrlParams>,
-): Promise<ToolResult<{ url: string; links: string[] }>> {
+): Promise<{ provider: string; links: string[] }> {
   const { name, provider } = await createProvider(params.provider, params.browser, "links");
   const result = await provider.links(params.url);
-  const links = [...new Set(result.links.map((link) => sanitizeField(link.href)))];
   return {
-    content: content(`[provider=${name}] ${links.length} links:\n${links.join("\n")}`),
-    details: { url: params.url, links },
+    provider: name,
+    links: [...new Set(result.links.map((link) => sanitizeField(link.href)))],
+  };
+}
+
+/**
+ * Extracts one bounded page of links from a page through a capable provider.
+ *
+ * @param params - Link extraction arguments with the page bounds.
+ * @returns {Promise<ToolResult<BrowserLinksDetails>>} Links from `offset`, the total and the next offset.
+ */
+export async function browserLinks(
+  params: Readonly<BrowserLinksParams>,
+): Promise<ToolResult<BrowserLinksDetails>> {
+  const limit = resolveLinksLimit(params.limit);
+  const offset = resolveLinksOffset(params.offset);
+  const { provider, links: all } = await readLinks(params);
+  const total = all.length;
+  const links = all.slice(offset, offset + limit);
+  const end = offset + links.length;
+  const nextOffset = end < total ? end : undefined;
+  let text: string;
+  if (offset === 0 && nextOffset === undefined) {
+    text = `[provider=${provider}] ${total} links:\n${links.join("\n")}`;
+  } else if (links.length === 0) {
+    text = `[provider=${provider}] No links at offset ${offset}; the page has ${total}.`;
+  } else {
+    text = `[provider=${provider}] Links ${offset + 1}-${end} of ${total}:\n${links.join("\n")}`;
+    if (nextOffset !== undefined) {
+      text += `\n\n[${total - end} more links; call again with offset ${nextOffset}]`;
+    }
+  }
+  return {
+    content: content(text),
+    details: {
+      url: params.url,
+      links,
+      total,
+      offset,
+      ...(nextOffset === undefined ? {} : { nextOffset }),
+    },
   };
 }
 

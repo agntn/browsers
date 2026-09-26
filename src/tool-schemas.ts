@@ -1,7 +1,9 @@
 import { Type } from "typebox";
 import {
   browserProviderNames,
+  DEFAULT_LINKS_LIMIT,
   DEFAULT_SCRAPE_MAX_CHARS,
+  MAX_LINKS_LIMIT,
   MAX_SCRAPE_MAX_CHARS,
 } from "./tool-contract.ts";
 
@@ -136,6 +138,20 @@ export const browserToolSchemas = {
       url: Type.String({ description: "URL to extract links from" }),
       provider,
       browser,
+      limit: Type.Optional(
+        Type.Integer({
+          description: `Maximum links to return. Defaults to ${DEFAULT_LINKS_LIMIT}; accepted range: 1-${MAX_LINKS_LIMIT}.`,
+          minimum: 1,
+          maximum: MAX_LINKS_LIMIT,
+        }),
+      ),
+      offset: Type.Optional(
+        Type.Integer({
+          description:
+            "Number of links to skip, from the next offset a previous call reported. Default: 0.",
+          minimum: 0,
+        }),
+      ),
     },
     { additionalProperties: false },
   ),

@@ -10,6 +10,7 @@ import type {
   CrawlResult,
   CrawlOptions,
   CrawlPage,
+  ResumeCrawlOptions,
   WebSearchResult,
   WebSearchOptions,
   ExtractResult,
@@ -363,28 +364,47 @@ class HyperbrowserProvider implements BrowserProvider {
         createCrawlBody(url, options),
         this.headers(),
       );
-      const job = await waitForJob(
-        () =>
-          this.client.getJSON<{ status?: string }>(this.crawlURL(jobId, "/status"), this.headers()),
-        (current) => FINISHED_CRAWL_STATUSES.has(current.status ?? ""),
-        options?.timeout ?? JOB_TIMEOUT,
-      );
-      if (!FINISHED_CRAWL_STATUSES.has(job.status ?? "")) {
-        return { pages: [], totalFound: 0, jobId, status: "running" };
-      }
-
-      const pages = (await this.crawlPages(jobId))
-        .filter((page) => page.status === "completed")
-        .map(crawlPage);
-      return {
-        pages,
-        totalFound: pages.length,
-        jobId,
-        status: job.status === "completed" ? "completed" : "failed",
-      };
+      return await this.finishCrawl(jobId, options?.timeout);
     } catch (error) {
       throw normalizeError(error, "hyperbrowser");
     }
+  }
+
+  async resumeCrawl(jobId: string, options?: ResumeCrawlOptions): Promise<CrawlResult> {
+    try {
+      return await this.finishCrawl(jobId, options?.timeout);
+    } catch (error) {
+      throw normalizeError(error, "hyperbrowser");
+    }
+  }
+
+  /**
+   * Waits for a crawl job and reads the pages it completed.
+   *
+   * @param {string} jobId Job ID the crawl started.
+   * @param {number} [timeout] Milliseconds to wait for the job.
+   * @returns {Promise<CrawlResult>} The pages, or none while the job still runs.
+   */
+  private async finishCrawl(jobId: string, timeout = JOB_TIMEOUT): Promise<CrawlResult> {
+    const job = await waitForJob(
+      () =>
+        this.client.getJSON<{ status?: string }>(this.crawlURL(jobId, "/status"), this.headers()),
+      (current) => FINISHED_CRAWL_STATUSES.has(current.status ?? ""),
+      timeout,
+    );
+    if (!FINISHED_CRAWL_STATUSES.has(job.status ?? "")) {
+      return { pages: [], totalFound: 0, jobId, status: "running" };
+    }
+
+    const pages = (await this.crawlPages(jobId))
+      .filter((page) => page.status === "completed")
+      .map(crawlPage);
+    return {
+      pages,
+      totalFound: pages.length,
+      jobId,
+      status: job.status === "completed" ? "completed" : "failed",
+    };
   }
 
   private crawlURL(jobId: string, path = ""): string {

@@ -34,6 +34,7 @@ const screenshot = vi.fn<BrowserProvider["screenshot"]>();
 const links = vi.fn<NonNullable<BrowserProvider["links"]>>();
 const pdf = vi.fn<NonNullable<BrowserProvider["pdf"]>>();
 const crawl = vi.fn<NonNullable<BrowserProvider["crawl"]>>();
+const resumeCrawl = vi.fn<NonNullable<BrowserProvider["resumeCrawl"]>>();
 
 function toolTestProvider(): BrowserProvider {
   return {
@@ -65,6 +66,7 @@ function toolTestProvider(): BrowserProvider {
     links,
     pdf,
     crawl,
+    resumeCrawl,
   };
 }
 
@@ -236,10 +238,66 @@ describe("browser tool operations", () => {
     expect(result.content).toEqual([
       {
         type: "text",
-        text: "[provider=tooltest] Crawled 0 pages.\nJob ID: job-1 (status: running)",
+        text: [
+          "[provider=tooltest] Crawled 0 pages.",
+          "Job ID: job-1 (status: running)",
+          "The job is still running. Call browsers_crawl with this jobId and provider tooltest to wait for it again.",
+        ].join("\n"),
       },
     ]);
     expect(result.details).toEqual({ jobId: "job-1", pages: 0 });
+  });
+
+  it("reads a crawl job by ID under the same budget without starting a crawl", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    resumeCrawl.mockResolvedValueOnce({
+      pages: [
+        { url: "https://example.test/", text: "abcdef" },
+        { url: "https://example.test/a", text: "ghij" },
+      ],
+      totalFound: 2,
+      jobId: "job-1",
+      status: "failed",
+    });
+
+    const result = await browserCrawl({ provider: "tooltest", jobId: "job-1", maxChars: 8 });
+
+    expect(crawl).not.toHaveBeenCalled();
+    expect(resumeCrawl).toHaveBeenCalledWith("job-1", { timeout: undefined });
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: [
+          "[provider=tooltest] Crawled 2 pages.",
+          "Job ID: job-1 (status: failed)",
+          "",
+          "--- https://example.test/",
+          "abcdef",
+          "",
+          "--- https://example.test/a",
+          "gh",
+          "",
+          "[truncated 2 of 10 page content characters]",
+        ].join("\n"),
+      },
+    ]);
+    expect(result.details).toEqual({ jobId: "job-1", pages: 2 });
+  });
+
+  it.each([
+    [{ provider: "tooltest" }, "Pass a URL to start a crawl or a job ID to read one."],
+    [
+      { provider: "tooltest", url: "https://example.test/", jobId: "job-1" },
+      "Pass a URL to start a crawl or a job ID to read one, not both.",
+    ],
+    [{ provider: "tooltest", jobId: "" }, "The job ID must not be empty."],
+    [{ jobId: "job-1" }, "Pass the provider whose crawl returned the job ID."],
+  ])("rejects crawl arguments %j before provider I/O", async (params, message) => {
+    process.env.TOOLTEST_API_KEY = "test";
+
+    await expect(browserCrawl(params)).rejects.toThrow(message);
+    expect(crawl).not.toHaveBeenCalled();
+    expect(resumeCrawl).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid crawl limit before provider I/O", async () => {

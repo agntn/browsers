@@ -230,6 +230,13 @@ describe("browsers OMP extension", () => {
     expect(accepts(tool, { url: "https://example.test", maxChars: 10.5 })).toBe(false);
   });
 
+  it("takes a crawl job ID in place of the starting URL", () => {
+    const tool = requireTool(registerExtension().tools, "browsers_crawl");
+
+    expect(accepts(tool, { jobId: "job-1", provider: "cloudflare" })).toBe(true);
+    expect(accepts(tool, { jobId: "", provider: "cloudflare" })).toBe(false);
+  });
+
   it("executes capability discovery through the shared operations module", async () => {
     const tool = requireTool(registerExtension().tools, "browsers_capabilities");
 

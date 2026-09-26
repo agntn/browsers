@@ -10,6 +10,7 @@ import type {
   CrawlResult,
   CrawlOptions,
   CrawlPage,
+  ResumeCrawlOptions,
   PdfResult,
   PdfOptions,
   LinksResult,
@@ -396,24 +397,43 @@ class CloudflareProvider implements BrowserProvider {
           this.headers(),
         ),
       );
-      const job = await waitForJob(
-        () => this.crawlJob(jobId, { limit: "1" }),
-        (current) => current.status !== "running",
-        options?.timeout ?? JOB_TIMEOUT,
-      );
-      if (job.status === "running") return { pages: [], totalFound: 0, jobId, status: "running" };
-
-      const records = await this.crawlRecords(jobId);
-      const pages = records.filter((record) => record.status === "completed").map(crawlPage);
-      return {
-        pages,
-        totalFound: pages.length,
-        jobId,
-        status: job.status === "completed" ? "completed" : "failed",
-      };
+      return await this.finishCrawl(jobId, options?.timeout);
     } catch (error) {
       throw this.fail(error);
     }
+  }
+
+  async resumeCrawl(jobId: string, options?: ResumeCrawlOptions): Promise<CrawlResult> {
+    try {
+      return await this.finishCrawl(jobId, options?.timeout);
+    } catch (error) {
+      throw this.fail(error);
+    }
+  }
+
+  /**
+   * Waits for a crawl job and reads the pages it completed.
+   *
+   * @param {string} jobId Job ID the crawl started.
+   * @param {number} [timeout] Milliseconds to wait for the job.
+   * @returns {Promise<CrawlResult>} The pages, or none while the job still runs.
+   */
+  private async finishCrawl(jobId: string, timeout = JOB_TIMEOUT): Promise<CrawlResult> {
+    const job = await waitForJob(
+      () => this.crawlJob(jobId, { limit: "1" }),
+      (current) => current.status !== "running",
+      timeout,
+    );
+    if (job.status === "running") return { pages: [], totalFound: 0, jobId, status: "running" };
+
+    const records = await this.crawlRecords(jobId);
+    const pages = records.filter((record) => record.status === "completed").map(crawlPage);
+    return {
+      pages,
+      totalFound: pages.length,
+      jobId,
+      status: job.status === "completed" ? "completed" : "failed",
+    };
   }
 
   /**

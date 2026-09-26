@@ -103,12 +103,23 @@ export const browserToolSchemas = {
   ),
   browsers_crawl: Type.Object(
     {
-      url: Type.String({ description: "Starting URL" }),
+      url: Type.Optional(
+        Type.String({ description: "Starting URL. Required unless jobId is passed." }),
+      ),
+      jobId: Type.Optional(
+        Type.String({
+          minLength: 1,
+          description:
+            "Job ID an earlier crawl returned. Waits for that job again instead of starting a crawl; pass it without url and with the provider that returned it.",
+        }),
+      ),
       provider: Type.Optional(
         Type.String({ description: "Provider. One of: cloudflare, hyperbrowser, playwright." }),
       ),
       browser,
-      maxPages: Type.Optional(Type.Number({ description: "Max pages to crawl. Default: 10." })),
+      maxPages: Type.Optional(
+        Type.Number({ description: "Max pages a new crawl reads. Default: 10." }),
+      ),
       maxChars: Type.Optional(
         Type.Integer({
           description: `Maximum page content characters to return across all pages. Defaults to ${DEFAULT_SCRAPE_MAX_CHARS}; accepted range: 1-${MAX_SCRAPE_MAX_CHARS}.`,

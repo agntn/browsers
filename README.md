@@ -20,6 +20,7 @@ Steel scrapes in one HTTP call. Kernel wants a live session first. Browserbase h
 - 🏷️ **`capabilities()` is the list.** Navigate is true on Kernel, Browserless and Playwright. False on Steel. Read the flag.
 - 🤖 **Five surfaces, eleven tools.** CLI, library, MCP, Pi, OMP. They share the executors.
 - 📏 **Agent scrape and crawl have a ceiling.** 20 000 characters unless you pass `maxChars`, 200 000 at most. A crawl shares it across pages.
+- ⏳ **A slow crawl keeps its job.** Cloudflare and Hyperbrowser wait two minutes, then hand back the job ID. Pass it as `jobId` with the same provider, or `--job` in the CLI, and you wait for that job again. No second crawl.
 - 🔗 **Agent links come in pages.** 500 per call unless you pass `limit`, 5 000 at most. The answer counts the rest and names the `offset` to ask for next. The CLI still prints them all.
 - 🔐 **Keys in a URL get scrubbed.** Query params named `token` or `api_key` land in errors as `[REDACTED]`.
 
@@ -85,6 +86,7 @@ browsers screenshot https://example.com -o page.png
 browsers screenshot https://example.com -o heading.png --selector h1 -p browserless
 browsers pdf https://example.com -o page.pdf --provider playwright
 browsers crawl https://example.com --maxPages 5 --provider playwright
+browsers crawl --job <job-id> --provider cloudflare
 browsers search "browser automation" --provider hyperbrowser
 browsers extract https://example.com --prompt "Extract the heading"
 browsers session create --provider kernel

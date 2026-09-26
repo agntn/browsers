@@ -1,6 +1,11 @@
 import { create, providers as listProviders } from "./registry.ts";
-import { UnknownProviderError, NoProviderConfiguredError, AuthError } from "./errors.ts";
-import type { BrowserProvider } from "./types.ts";
+import {
+  UnknownProviderError,
+  NoProviderConfiguredError,
+  AuthError,
+  InvalidInputError,
+} from "./errors.ts";
+import type { BrowserProvider, CrawlOptions, CrawlResult } from "./types.ts";
 import { resolveCloudflareBrowser } from "./utils.ts";
 
 type ProviderEnvRequirements = readonly (readonly [string, ...string[]])[];
@@ -56,7 +61,7 @@ export function resolveProvider(preferred?: string): string {
 }
 
 /** Optional operations a provider may leave unimplemented. */
-export type ProviderOperation = "crawl" | "pdf" | "search" | "extract" | "links";
+export type ProviderOperation = "crawl" | "resumeCrawl" | "pdf" | "search" | "extract" | "links";
 
 /** A provider known to implement `O`. */
 export type ProviderWith<O extends ProviderOperation> = BrowserProvider &
@@ -64,6 +69,7 @@ export type ProviderWith<O extends ProviderOperation> = BrowserProvider &
 
 const operationLabels: Readonly<Record<ProviderOperation, string>> = {
   crawl: "crawl",
+  resumeCrawl: "crawl jobs",
   pdf: "PDF generation",
   search: "web search",
   extract: "structured extraction",
@@ -182,4 +188,39 @@ export function providerEnvHint(provider: string): string {
   return requirements
     ? requirements.map(([primary]) => primary).join(" and ")
     : providerEnvKey(provider);
+}
+
+/**
+ * Resolve the provider for one crawl call: a new crawl from `url`, or the job `jobId` names.
+ *
+ * A job ID belongs to the provider whose crawl returned it, so reading one needs that provider
+ * named; auto-detection could pick another provider that has never seen the job.
+ *
+ * @param {Readonly<{ url?: string; jobId?: string }>} target Starting URL or job ID, not both.
+ * @param {string} [preferred] Preferred provider name, required with `jobId`.
+ * @param {string} [browser] Optional Cloudflare browser engine.
+ * @returns {Promise<{ name: string; read: (options?: CrawlOptions) => Promise<CrawlResult> }>} Resolved name and the call that crawls or reads the job.
+ */
+export async function createCrawl(
+  target: Readonly<{ url?: string; jobId?: string }>,
+  preferred?: string,
+  browser?: string,
+): Promise<{ name: string; read: (options?: CrawlOptions) => Promise<CrawlResult> }> {
+  const { url, jobId } = target;
+  if (jobId === undefined) {
+    if (url === undefined) {
+      throw new InvalidInputError("Pass a URL to start a crawl or a job ID to read one.");
+    }
+    const { name, provider } = await createProvider(preferred, browser, "crawl");
+    return { name, read: (options) => provider.crawl(url, options) };
+  }
+  if (url !== undefined) {
+    throw new InvalidInputError("Pass a URL to start a crawl or a job ID to read one, not both.");
+  }
+  if (jobId === "") throw new InvalidInputError("The job ID must not be empty.");
+  if (!preferred) {
+    throw new InvalidInputError("Pass the provider whose crawl returned the job ID.");
+  }
+  const { name, provider } = await createProvider(preferred, browser, "resumeCrawl");
+  return { name, read: (options) => provider.resumeCrawl(jobId, { timeout: options?.timeout }) };
 }

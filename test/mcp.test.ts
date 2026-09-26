@@ -110,6 +110,26 @@ describe("browsers MCP server", () => {
     expect(contentTexts(invalidBrowser.content)[0]).toContain("Invalid arguments");
   });
 
+  it("takes a crawl job ID in place of the starting URL", async () => {
+    const client = await connectTestClient();
+
+    const withoutProvider = await client.callTool({
+      name: "browsers_crawl",
+      arguments: { jobId: "job-1" },
+    });
+    const emptyJob = await client.callTool({
+      name: "browsers_crawl",
+      arguments: { jobId: "", provider: "cloudflare" },
+    });
+
+    expect(withoutProvider.isError).toBe(true);
+    expect(contentTexts(withoutProvider.content)[0]).toContain(
+      "Pass the provider whose crawl returned the job ID.",
+    );
+    expect(emptyJob.isError).toBe(true);
+    expect(contentTexts(emptyJob.content)[0]).toContain("Invalid arguments");
+  });
+
   it("rejects prototype property names as unknown tools", async () => {
     const client = await connectTestClient();
 

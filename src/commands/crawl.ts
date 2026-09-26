@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { resolveAndCreate } from "./_helpers.ts";
+import { createCrawl } from "../core/resolve.ts";
 import type { CrawlPage, CrawlResult } from "../core/types.ts";
 
 type PrintableCrawlPage = Readonly<Pick<CrawlPage, "url" | "markdown" | "text" | "html">>;
@@ -19,7 +19,9 @@ function pageContent(page: PrintableCrawlPage): string {
 function printCrawlResult(result: PrintableCrawlResult): void {
   if (result.jobId) consola.info(`Job ID: ${result.jobId} (status: ${result.status})`);
   if (result.pages.length === 0) {
-    if (result.status === "running") consola.info("The crawl job is still running.");
+    if (result.status === "running") {
+      consola.info("The crawl job is still running. Pass --job with this ID to wait for it again.");
+    }
     return;
   }
 
@@ -38,7 +40,11 @@ export default defineCommand({
     url: {
       type: "positional",
       description: "URL to start crawling from",
-      required: true,
+      required: false,
+    },
+    job: {
+      type: "string",
+      description: "Job ID an earlier crawl returned; waits for it instead of crawling again",
     },
     provider: {
       type: "string",
@@ -59,14 +65,18 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = await resolveAndCreate(
-      args.provider,
-      args.browser,
-      "crawl",
-    );
-    consola.info(`Crawling via ${providerName}...`);
     try {
-      const result = await provider.crawl(args.url, {
+      const { name: providerName, read } = await createCrawl(
+        { url: args.url, jobId: args.job },
+        args.provider,
+        args.browser,
+      );
+      consola.info(
+        args.job === undefined
+          ? `Crawling via ${providerName}...`
+          : `Waiting for crawl job ${args.job} via ${providerName}...`,
+      );
+      const result = await read({
         maxPages: args.maxPages ? Number(args.maxPages) : 10,
         maxDepth: args.maxDepth ? Number(args.maxDepth) : 1,
       });

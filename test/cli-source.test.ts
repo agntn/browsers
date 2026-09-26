@@ -10,6 +10,8 @@ const hook = fileURLToPath(new URL("./record-loads.mjs", import.meta.url));
 const sourceRoot = pathToFileURL(join(repoRoot, "src/")).href;
 /** The chunk `dist/cli.mjs` imports for `mcp` when it keeps the bundle. */
 const bundledCommand = pathToFileURL(join(repoRoot, "dist/_chunks/mcp.mjs")).href;
+/** Node 22 before 22.18 strips types only with a flag; the bin keeps the bundle there. */
+const stripsTypes = Boolean(process.features.typescript);
 
 interface Run {
   status: number | null;
@@ -43,7 +45,7 @@ function run(args: readonly string[], env: Record<string, string> = {}): Run {
 }
 
 describe("source under plain Node", () => {
-  it("every module in src imports without a loader", () => {
+  it.skipIf(!stripsTypes)("every module in src imports without a loader", () => {
     const modules = globSync("src/**/*.ts", { cwd: repoRoot }).filter(
       (file) => file !== join("src", "cli.ts"),
     );
@@ -59,7 +61,7 @@ describe("source under plain Node", () => {
 });
 
 describe("browsers mcp from the built bin", () => {
-  it("runs the live source in a checkout", () => {
+  it.skipIf(!stripsTypes)("runs the live source in a checkout", () => {
     const live = run([bin, "mcp"]);
 
     expect(live.status).toBe(0);

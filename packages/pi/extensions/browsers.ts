@@ -189,7 +189,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     promptGuidelines: [
       "Use browsers_crawl when the user needs content from multiple pages of a website.",
       "Cloudflare and Hyperbrowser wait up to two minutes for the crawl job; one still running after that returns its job ID and no pages.",
-      "When a crawl returns a running job ID, call browsers_crawl with that jobId and the same provider, without url, instead of starting the crawl again.",
+      "When a crawl returns a running job ID, call browsers_crawl with that jobId and the same provider and browser, without url, instead of starting the crawl again.",
       "Pass maxPages to limit the crawl scope and maxChars to bound the returned content.",
     ],
     parameters: browserToolSchemas.browsers_crawl,

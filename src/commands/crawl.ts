@@ -20,7 +20,9 @@ function printCrawlResult(result: PrintableCrawlResult): void {
   if (result.jobId) consola.info(`Job ID: ${result.jobId} (status: ${result.status})`);
   if (result.pages.length === 0) {
     if (result.status === "running") {
-      consola.info("The crawl job is still running. Pass --job with this ID to wait for it again.");
+      consola.info(
+        "The crawl job is still running. Pass --job with this ID and the same --provider and --browser to wait for it again.",
+      );
     }
     return;
   }

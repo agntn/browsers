@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetDefaultClientForTests } from "../src/core/client";
 import { create } from "../src/core/registry";
 import { JOB_POLL_INTERVAL } from "../src/core/utils";
+import { browserCrawl } from "../src/tool-operations";
 
 interface Call {
   readonly method: string;
@@ -55,6 +56,7 @@ async function settle<T>(promise: Promise<T> | undefined): Promise<T | undefined
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   resetDefaultClientForTests();
 });
 
@@ -197,6 +199,43 @@ describe("cloudflare crawl job", () => {
       `GET ${CF_CRAWL}/job-2?limit=1`,
       `GET ${CF_CRAWL}/job-2`,
     ]);
+  });
+});
+
+describe("kitesurf crawl job", () => {
+  const KITESURF_CRAWL =
+    "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/crawl";
+
+  it("names the browser the job has to be read with again", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    vi.stubEnv("CF_API_TOKEN", "token");
+    vi.stubEnv("CF_ACCOUNT_ID", "test-account");
+    const calls = stubFetch(({ method }) =>
+      method === "POST"
+        ? { success: true, result: "job-4" }
+        : { success: true, result: { status: "running" } },
+    );
+
+    const started = await settle(
+      browserCrawl({ provider: "cloudflare", browser: "kitesurf", url: "https://example.test/" }),
+    );
+    calls.length = 0;
+    await settle(browserCrawl({ provider: "cloudflare", browser: "kitesurf", jobId: "job-4" }));
+
+    expect(started?.content).toEqual([
+      {
+        type: "text",
+        text: [
+          "[provider=cloudflare] Crawled 0 pages.",
+          "Job ID: job-4 (status: running)",
+          "The job is still running. Call browsers_crawl with this jobId, provider cloudflare and browser kitesurf to wait for it again.",
+        ].join("\n"),
+      },
+    ]);
+    expect(`${calls[0]?.method} ${calls[0]?.url}`).toBe(
+      `GET ${KITESURF_CRAWL}/job-4?limit=1&browser=kitesurf`,
+    );
+    expect(calls.some(({ method }) => method === "POST")).toBe(false);
   });
 });
 

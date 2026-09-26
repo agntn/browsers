@@ -509,8 +509,11 @@ export async function browserCrawl(
   if (result.jobId) {
     lines.push(`Job ID: ${sanitizeField(result.jobId)} (status: ${result.status})`);
     if (result.status === "running") {
+      const target = params.browser
+        ? `jobId, provider ${name} and browser ${sanitizeField(params.browser)}`
+        : `jobId and provider ${name}`;
       lines.push(
-        `The job is still running. Call browsers_crawl with this jobId and provider ${name} to wait for it again.`,
+        `The job is still running. Call browsers_crawl with this ${target} to wait for it again.`,
       );
     }
   }

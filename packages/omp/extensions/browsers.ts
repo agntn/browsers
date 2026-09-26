@@ -149,7 +149,7 @@ function buildParameterSchemas(pi: ExtensionAPI) {
           Type.String({
             minLength: 1,
             description:
-              "Job ID an earlier crawl returned. Waits for that job again instead of starting a crawl; pass it without url and with the provider that returned it.",
+              "Job ID an earlier crawl returned. Waits for that job again instead of starting a crawl; pass it without url and with the provider and browser that returned it.",
           }),
         ),
         provider: Type.Optional(

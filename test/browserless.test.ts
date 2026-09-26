@@ -1,6 +1,11 @@
+import { execSync } from "node:child_process";
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
+import { chromium } from "playwright-core";
+import type { Browser } from "playwright-core";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { SessionNotFoundError } from "../src/core/errors";
 import { create } from "../src/core/registry";
 
 interface CapturedRequest {
@@ -151,5 +156,108 @@ describe("browserless current session API", () => {
     expect(requests.map((request) => JSON.parse(request.body) as unknown)).toEqual([
       { url: "https://example.com", selector: "#price" },
     ]);
+  });
+});
+
+function systemChromium(): string | undefined {
+  for (const name of ["google-chrome-stable", "google-chrome", "chromium", "chromium-browser"]) {
+    try {
+      const path = execSync(`which ${name}`, {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "ignore"],
+      }).trim();
+      if (path) return path;
+    } catch {
+      // not found
+    }
+  }
+  return undefined;
+}
+
+async function freePort(): Promise<number> {
+  const probe = createServer();
+  await new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", resolve));
+  const { port } = probe.address() as AddressInfo;
+  await new Promise<void>((resolve) => probe.close(() => resolve()));
+  return port;
+}
+
+// A cold Chrome launch on a CI runner takes longer than the 5 s vitest default.
+describe("browserless session page", { timeout: 30_000 }, () => {
+  let chrome: Browser;
+  let server: Server;
+  let baseURL: string;
+  const paths: string[] = [];
+
+  beforeAll(async () => {
+    const cdpPort = await freePort();
+    chrome = await chromium.launch({
+      executablePath: systemChromium(),
+      args: [`--remote-debugging-port=${cdpPort}`],
+    });
+    server = createServer((req, res) => {
+      paths.push(`${req.method} ${req.url}`);
+      if (req.method === "POST" && req.url === "/session?token=test") {
+        res.setHeader("Content-Type", "application/json");
+        res.end(
+          JSON.stringify({
+            id: "cdp-session",
+            connect: `http://127.0.0.1:${cdpPort}`,
+            stop: `${baseURL}/session/cdp-session?token=test`,
+          }),
+        );
+        return;
+      }
+      if (req.method === "DELETE" && req.url === "/session/cdp-session?token=test") {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method === "GET" && req.url === "/page") {
+        res.setHeader("Content-Type", "text/html");
+        res.end("<title>Session page</title><h1>kept</h1>");
+        return;
+      }
+      res.statusCode = 404;
+      res.end("not found");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    baseURL = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  });
+
+  afterAll(async () => {
+    await chrome?.close();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  it("evaluates in the page navigate opened", async () => {
+    const provider = await create("browserless", { apiKey: "test", baseURL });
+    const session = await provider.createSession();
+
+    await provider.navigate(`${baseURL}/page`, session);
+    const other = await create("browserless", { apiKey: "test", baseURL });
+    await expect(other.evaluate("document.title", session)).resolves.toEqual({
+      value: "Session page",
+    });
+    await expect(
+      provider.evaluate("document.querySelector('h1').textContent", session),
+    ).resolves.toEqual({ value: "kept" });
+
+    await provider.releaseSession(session.id);
+    await expect(provider.evaluate("1 + 1", session)).rejects.toBeInstanceOf(SessionNotFoundError);
+    expect(paths.filter((path) => !path.startsWith("GET "))).toEqual([
+      "POST /session?token=test",
+      "DELETE /session/cdp-session?token=test",
+    ]);
+  });
+
+  it("fails for a session it did not create", async () => {
+    const provider = await create("browserless", { apiKey: "test", baseURL });
+    const session = { id: "missing", provider: "browserless", createdAt: 0 };
+
+    await expect(provider.navigate(`${baseURL}/page`, session)).rejects.toBeInstanceOf(
+      SessionNotFoundError,
+    );
+    await expect(provider.evaluate("1 + 1", session)).rejects.toBeInstanceOf(SessionNotFoundError);
   });
 });

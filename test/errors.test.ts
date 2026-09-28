@@ -265,11 +265,21 @@ describe("Client errors", () => {
 
   it.each([
     ["postText", (url: string) => client.postText(url, {})],
+    ["postRaw", (url: string) => client.postRaw(url, {})],
+    ["getRaw", (url: string) => client.getRaw(url)],
     ["deleteJSON", (url: string) => client.deleteJSON(url)],
   ])("reads the reason of a 429 from %s", async (_method, request) => {
     await expect(request(`${origin}/content?token=secret`)).rejects.toMatchObject({
       name: "RateLimitError",
       message: `Rate limited by ${origin}/content?token=%5BREDACTED%5D, retry after 7s: Too many concurrent sessions`,
+    });
+  });
+
+  it("reads the reason of a failed binary request", async () => {
+    await expect(client.postRaw(`${origin}/broken`, {})).rejects.toMatchObject({
+      name: "HTTPError",
+      message: `HTTP 500 from ${origin}/broken: Too many concurrent sessions`,
+      body: '{"errors":[{"message":"Too many concurrent sessions"}]}',
     });
   });
 

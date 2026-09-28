@@ -228,7 +228,7 @@ export class Client {
 
   private mapError(error: unknown, url: string): Error {
     if (this.FetchError !== undefined && error instanceof this.FetchError) {
-      const body = typeof error.data === "string" ? error.data : JSON.stringify(error.data ?? "");
+      const body = responseText(error.data);
       if (error.statusCode === 429) {
         const retryAfter = parseRetryAfter(error.response?.headers.get("Retry-After"));
         return new RateLimitError(retryAfter, sanitizeUrl(url), body);
@@ -237,6 +237,21 @@ export class Client {
     }
     return error instanceof Error ? error : new Error(String(error));
   }
+}
+
+/**
+ * The body of a failed response as text: the byte routes (`getRaw`, `postRaw`) get an
+ * `ArrayBuffer` back from ofetch, which `JSON.stringify` would turn into `{}`.
+ *
+ * @param {unknown} data Parsed body from the ofetch error.
+ * @returns {string} The body as the provider sent it, or its JSON form.
+ */
+function responseText(data: unknown): string {
+  if (typeof data === "string") return data;
+  if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+    return new TextDecoder().decode(data);
+  }
+  return JSON.stringify(data ?? "");
 }
 
 /** Query parameters that carry a credential, compared in lower case. */

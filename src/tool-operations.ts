@@ -200,6 +200,7 @@ export async function browserScrape(
   const maxChars = resolveMaxChars(params.maxChars);
   const { name, provider } = await createProvider(params.provider, params.browser);
   const result = await scrapeWithSessionWhenNeeded(provider, params.url, {
+    formats: ["markdown"],
     waitFor: params.waitFor,
     maxChars,
   });

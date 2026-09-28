@@ -69,7 +69,7 @@ describe("scrape command", () => {
     expect(createSession).toHaveBeenCalledOnce();
     expect(providerScrape).toHaveBeenCalledWith(
       "https://example.test",
-      { waitFor: undefined, maxChars: undefined },
+      { formats: ["text"], waitFor: undefined, maxChars: undefined },
       expect.objectContaining({ id: "session-1" }),
     );
     expect(releaseSession).toHaveBeenCalledWith("session-1");
@@ -89,6 +89,7 @@ describe("scrape command", () => {
     expect(createSession).not.toHaveBeenCalled();
     expect(releaseSession).not.toHaveBeenCalled();
     expect(providerScrape).toHaveBeenCalledWith("https://example.test", {
+      formats: ["text"],
       waitFor: undefined,
       maxChars: undefined,
     });

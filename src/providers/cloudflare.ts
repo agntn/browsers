@@ -331,17 +331,17 @@ class CloudflareProvider implements BrowserProvider {
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
     try {
-      const res = await this.client.postJSON<CfEnvelope<CfContentResult>>(
-        this.browserEndpoint("/content"),
+      // `/markdown` gives the page's text in a fraction of the characters `/content` spends on markup.
+      const markdown = options?.formats?.includes("markdown") === true;
+      const res = await this.client.postJSON<CfEnvelope<CfContentResult | string>>(
+        this.browserEndpoint(markdown ? "/markdown" : "/content"),
         createScrapeBody(url, options),
         this.headers(),
       );
-      const result = this.unwrap(res) as CfContentResult | string;
+      const result = this.unwrap(res);
+      const page = typeof result === "string" ? result : result.content;
 
-      return {
-        url,
-        html: typeof result === "string" ? result : result.content,
-      };
+      return markdown ? { url, markdown: page } : { url, html: page };
     } catch (error) {
       throw this.fail(error);
     }

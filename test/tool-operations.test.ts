@@ -119,7 +119,7 @@ describe("browser tool operations", () => {
     expect(createSession).toHaveBeenCalledOnce();
     expect(scrape).toHaveBeenCalledWith(
       "https://example.test",
-      { waitFor: undefined, maxChars: 20_000 },
+      { formats: ["markdown"], waitFor: undefined, maxChars: 20_000 },
       expect.objectContaining({ id: "session-1" }),
     );
     expect(releaseSession).toHaveBeenCalledWith("session-1");

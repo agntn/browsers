@@ -80,13 +80,20 @@ interface CfScreenshotResult {
   readonly [key: string]: unknown;
 }
 
+/**
+ * Builds the scrape body. Browser Run takes Puppeteer's shapes, so network idle is `networkidle0`.
+ *
+ * @param {string} url Page to read.
+ * @param {ScrapeOptions} [options] Options from the caller.
+ * @returns {Record<string, unknown>} The request body.
+ */
 function createScrapeBody(url: string, options?: ScrapeOptions): Record<string, unknown> {
   const body: Record<string, unknown> = { url };
   if (!options) return body;
-  if (options.waitFor) body.waitForSelector = options.waitFor;
-  if (options.waitForNetworkIdle) body.waitUntil = "networkidle";
-  if (options.headers) body.headers = options.headers;
-  if (options.script) body.addScriptTag = { content: options.script };
+  if (options.waitFor) body.waitForSelector = { selector: options.waitFor };
+  if (options.waitForNetworkIdle) body.gotoOptions = { waitUntil: "networkidle0" };
+  if (options.headers) body.setExtraHTTPHeaders = options.headers;
+  if (options.script) body.addScriptTag = [{ content: options.script }];
   return body;
 }
 

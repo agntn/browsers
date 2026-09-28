@@ -205,6 +205,37 @@ describe("cloudflare scrape", () => {
     ]);
   });
 
+  it("sends scrape options in the shape Browser Run accepts", async () => {
+    let body: unknown;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        body = JSON.parse(init?.body as string);
+        return cloudflareResponse(input instanceof Request ? input.url : String(input));
+      }),
+    );
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+
+    await provider.scrape("https://example.test", {
+      waitFor: "h1",
+      waitForNetworkIdle: true,
+      script: "document.title = 'x'",
+      headers: { "X-Probe": "1" },
+    });
+
+    expect(body).toEqual({
+      url: "https://example.test",
+      waitForSelector: { selector: "h1" },
+      gotoOptions: { waitUntil: "networkidle0" },
+      addScriptTag: [{ content: "document.title = 'x'" }],
+      setExtraHTTPHeaders: { "X-Probe": "1" },
+    });
+  });
+
   it("gives the agent tool markdown", async () => {
     process.env.CF_API_TOKEN = "test-token";
     process.env.CF_ACCOUNT_ID = "test-account";

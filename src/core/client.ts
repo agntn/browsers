@@ -228,24 +228,62 @@ export class Client {
 
   private mapError(error: unknown, url: string): Error {
     if (this.FetchError !== undefined && error instanceof this.FetchError) {
+      const body = responseText(error.data);
       if (error.statusCode === 429) {
         const retryAfter = parseRetryAfter(error.response?.headers.get("Retry-After"));
-        return new RateLimitError(retryAfter);
+        return new RateLimitError(retryAfter, sanitizeUrl(url), body);
       }
-      const body = typeof error.data === "string" ? error.data : JSON.stringify(error.data ?? "");
       return new HTTPError(error.statusCode ?? 0, sanitizeUrl(url), body);
     }
     return error instanceof Error ? error : new Error(String(error));
   }
 }
 
-const SENSITIVE_PARAMS = ["api_key", "key", "token", "secret", "password", "apikey"];
+/**
+ * The body of a failed response as text: the byte routes (`getRaw`, `postRaw`) get an
+ * `ArrayBuffer` back from ofetch, which `JSON.stringify` would turn into `{}`.
+ *
+ * @param {unknown} data Parsed body from the ofetch error.
+ * @returns {string} The body as the provider sent it, or its JSON form.
+ */
+function responseText(data: unknown): string {
+  if (typeof data === "string") return data;
+  if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+    return new TextDecoder().decode(data);
+  }
+  return JSON.stringify(data ?? "");
+}
 
+/** Query parameters that carry a credential, compared in lower case. */
+const SENSITIVE_PARAMS = new Set([
+  "access_token",
+  "api_key",
+  "apikey",
+  "key",
+  "password",
+  "secret",
+  "sig",
+  "signature",
+  "token",
+  "x-amz-credential",
+  "x-amz-security-token",
+  "x-amz-signature",
+]);
+
+/**
+ * The request URL as an error may show it: credentials in the userinfo and in the query,
+ * signed stop URLs included, become `[REDACTED]`.
+ *
+ * @param {string} url Request URL.
+ * @returns {string} The URL without its credentials.
+ */
 function sanitizeUrl(url: string): string {
   try {
     const parsed = new URL(url);
-    for (const param of SENSITIVE_PARAMS) {
-      if (parsed.searchParams.has(param)) {
+    if (parsed.username) parsed.username = "[REDACTED]";
+    if (parsed.password) parsed.password = "[REDACTED]";
+    for (const param of new Set(parsed.searchParams.keys())) {
+      if (SENSITIVE_PARAMS.has(param.toLowerCase())) {
         parsed.searchParams.set(param, "[REDACTED]");
       }
     }

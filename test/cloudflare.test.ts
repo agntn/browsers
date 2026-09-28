@@ -247,4 +247,18 @@ describe("cloudflare errors", () => {
     expect(text).toContain(path);
     expect(text).not.toContain(accountID);
   });
+
+  it("keeps the account ID out of a rate limit", async () => {
+    failWith(429, "Rate limit exceeded");
+    const error = await browserScrape({ url: "https://example.com", provider: "cloudflare" }).then(
+      () => undefined,
+      (failure: unknown) => failure,
+    );
+
+    const text = errorMessage(error);
+    expect(text).toContain("Rate limited by");
+    expect(text).toContain("/accounts/[account]/browser-rendering/content");
+    expect(text).toContain("Rate limit exceeded");
+    expect(text).not.toContain(accountID);
+  });
 });

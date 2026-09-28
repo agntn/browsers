@@ -80,10 +80,27 @@ export class AuthError extends BrowserError {
 
 export class RateLimitError extends BrowserError {
   readonly retryAfter: number;
-  constructor(retryAfter: number) {
-    super(`Rate limited. Retry after ${retryAfter}s`);
+  readonly url: string;
+  readonly body: string;
+  readonly provider: string;
+
+  /**
+   * @param retryAfter - Seconds to wait, from `Retry-After` or `DEFAULT_RETRY_AFTER`.
+   * @param url - Sanitized request URL, so the agent can tell which provider refused.
+   * @param body - Response body; its reason tells a burst limit from a used-up quota.
+   * @param provider - Provider key, named in the message when there is no URL.
+   */
+  constructor(retryAfter: number, url = "", body = "", provider = "") {
+    const reason = responseReason(body);
+    const source = url || provider;
+    super(
+      `Rate limited${source ? ` by ${source}` : ""}, retry after ${retryAfter}s${reason ? `: ${reason}` : ""}`,
+    );
     this.name = "RateLimitError";
     this.retryAfter = retryAfter;
+    this.url = url;
+    this.body = body;
+    this.provider = provider;
   }
 }
 
@@ -236,7 +253,12 @@ function normalizeStatusError(error: StatusError, provider?: string): BrowserErr
         effectiveProvider(provider),
       );
     case 429:
-      return new RateLimitError(parseRetryAfter(error.response?.headers?.get("Retry-After")));
+      return new RateLimitError(
+        parseRetryAfter(error.response?.headers?.get("Retry-After")),
+        "",
+        error.message,
+        provider,
+      );
     default:
       return error.status >= 500
         ? new HTTPError(error.status, "", message)

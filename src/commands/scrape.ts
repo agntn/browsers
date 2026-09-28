@@ -61,6 +61,7 @@ export default defineCommand({
 
     try {
       const result = await scrapeWithSessionWhenNeeded(provider, args.url, {
+        formats: [args.format as "markdown" | "text" | "html"],
         waitFor: args.waitFor,
         maxChars: args.maxChars ? Number(args.maxChars) : undefined,
       });

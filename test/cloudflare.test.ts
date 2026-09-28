@@ -32,11 +32,14 @@ function cloudflareResponse(url: string): Response {
   }
   if (url.includes("/devtools/session")) return jsonResponse([]);
 
-  let result: unknown = {};
-  if (url.includes("/content")) result = "<html>Kitesurf</html>";
-  else if (url.includes("/crawl")) result = "crawl-1";
-  else if (url.includes("/links")) result = ["https://example.test/about"];
-  else if (url.includes("/json")) result = { title: "Example" };
+  const results: readonly (readonly [string, unknown])[] = [
+    ["/markdown", "# Kitesurf"],
+    ["/content", "<html>Kitesurf</html>"],
+    ["/crawl", "crawl-1"],
+    ["/links", ["https://example.test/about"]],
+    ["/json", { title: "Example" }],
+  ];
+  const result = results.find(([path]) => url.includes(path))?.[1] ?? {};
   return jsonResponse({ success: true, result });
 }
 
@@ -118,7 +121,7 @@ describe("cloudflare browser selection", () => {
 
     expect(result.details.provider).toBe("cloudflare");
     expect(urls).toEqual([
-      "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/content?browser=kitesurf",
+      "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/markdown?browser=kitesurf",
     ]);
   });
 
@@ -154,6 +157,64 @@ describe("cloudflare browser selection", () => {
         browser: "firefox" as never,
       }),
     ).rejects.toThrow('Unsupported Cloudflare browser: "firefox"');
+  });
+});
+
+describe("cloudflare scrape", () => {
+  function recordRequests(): string[] {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = input instanceof Request ? input.url : String(input);
+        urls.push(url);
+        return cloudflareResponse(url);
+      }),
+    );
+    resetDefaultClientForTests();
+    return urls;
+  }
+
+  it("reads markdown when the caller asks for it", async () => {
+    const urls = recordRequests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+
+    const page = await provider.scrape("https://example.test", { formats: ["markdown"] });
+
+    expect(page).toEqual({ url: "https://example.test", markdown: "# Kitesurf" });
+    expect(urls).toEqual([
+      "https://api.cloudflare.com/client/v4/accounts/test-account/browser-rendering/markdown",
+    ]);
+  });
+
+  it("keeps HTML as the default", async () => {
+    const urls = recordRequests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+
+    const page = await provider.scrape("https://example.test");
+
+    expect(page).toEqual({ url: "https://example.test", html: "<html>Kitesurf</html>" });
+    expect(urls).toEqual([
+      "https://api.cloudflare.com/client/v4/accounts/test-account/browser-rendering/content",
+    ]);
+  });
+
+  it("gives the agent tool markdown", async () => {
+    process.env.CF_API_TOKEN = "test-token";
+    process.env.CF_ACCOUNT_ID = "test-account";
+    recordRequests();
+
+    const result = await browserScrape({ url: "https://example.test", provider: "cloudflare" });
+
+    expect(result.content).toEqual([
+      { type: "text", text: "[provider=cloudflare] https://example.test\n\n# Kitesurf" },
+    ]);
   });
 });
 
@@ -227,9 +288,9 @@ describe("cloudflare errors", () => {
   }
 
   it.each([
-    ["scrape", 422, "Invalid URL", "/browser-rendering/content"],
+    ["scrape", 422, "Invalid URL", "/browser-rendering/markdown"],
     ["screenshot", 400, "Bad viewport", "/browser-rendering/screenshot"],
-    ["scrape", 403, "Plan limit reached", "/browser-rendering/content"],
+    ["scrape", 403, "Plan limit reached", "/browser-rendering/markdown"],
   ])("keeps the account ID out of a failed %s (HTTP %i)", async (tool, status, reason, path) => {
     failWith(status, reason);
     const run =
@@ -257,7 +318,7 @@ describe("cloudflare errors", () => {
 
     const text = errorMessage(error);
     expect(text).toContain("Rate limited by");
-    expect(text).toContain("/accounts/[account]/browser-rendering/content");
+    expect(text).toContain("/accounts/[account]/browser-rendering/markdown");
     expect(text).toContain("Rate limit exceeded");
     expect(text).not.toContain(accountID);
   });

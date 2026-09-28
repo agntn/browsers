@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
-import { describe, it, expect } from "vitest";
+import type { Server } from "node:http";
+import { afterAll, beforeAll, describe, it, expect } from "vitest";
 import { Client } from "../src/core/client";
 import {
   BrowserError,
@@ -238,23 +239,59 @@ describe("RateLimitError reason", () => {
     );
     expect(error).toMatchObject({ retryAfter: 120, url: "https://api.example.com/v1", body });
   });
+});
 
-  it("reads a 429 from the client", async () => {
-    const server = createServer((_request, response) => {
-      response.writeHead(429, { "Content-Type": "application/json", "Retry-After": "7" });
+describe("Client errors", () => {
+  let server: Server;
+  let origin: string;
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      const status = request.url?.startsWith("/broken") ? 500 : 429;
+      response.writeHead(status, { "Content-Type": "application/json", "Retry-After": "7" });
       response.end('{"errors":[{"message":"Too many concurrent sessions"}]}');
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Missing TCP address");
-    const url = `http://127.0.0.1:${address.port}/content?token=secret`;
-    try {
-      await expect(new Client({ maxRetries: 0 }).postText(url, {})).rejects.toMatchObject({
-        name: "RateLimitError",
-        message: `Rate limited by http://127.0.0.1:${address.port}/content?token=%5BREDACTED%5D, retry after 7s: Too many concurrent sessions`,
-      });
-    } finally {
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    }
+    origin = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  const client = new Client({ maxRetries: 0 });
+
+  it.each([
+    ["postText", (url: string) => client.postText(url, {})],
+    ["deleteJSON", (url: string) => client.deleteJSON(url)],
+  ])("reads the reason of a 429 from %s", async (_method, request) => {
+    await expect(request(`${origin}/content?token=secret`)).rejects.toMatchObject({
+      name: "RateLimitError",
+      message: `Rate limited by ${origin}/content?token=%5BREDACTED%5D, retry after 7s: Too many concurrent sessions`,
+    });
+  });
+
+  it("keeps signatures out of the URL", async () => {
+    const url = `${origin}/session/stop?Signature=s1&sig=s2&access_token=t3&page=2`;
+    await expect(client.deleteJSON(url)).rejects.toMatchObject({
+      name: "RateLimitError",
+      url: `${origin}/session/stop?Signature=%5BREDACTED%5D&sig=%5BREDACTED%5D&access_token=%5BREDACTED%5D&page=2`,
+    });
+  });
+
+  it("keeps credentials out of the URL", async () => {
+    const url = `http://user:pass@${origin.slice("http://".length)}/session/stop`;
+    const error: unknown = await client.deleteJSON(url).then(
+      () => undefined,
+      (failure: unknown) => failure,
+    );
+    expect(error).toBeInstanceOf(HTTPError);
+    const message = (error as HTTPError).message;
+    expect(message).toContain(
+      `from http://%5BREDACTED%5D:%5BREDACTED%5D@${origin.slice("http://".length)}/session/stop`,
+    );
+    expect(message).not.toMatch(/user|pass/);
   });
 });

@@ -239,13 +239,36 @@ export class Client {
   }
 }
 
-const SENSITIVE_PARAMS = ["api_key", "key", "token", "secret", "password", "apikey"];
+/** Query parameters that carry a credential, compared in lower case. */
+const SENSITIVE_PARAMS = new Set([
+  "access_token",
+  "api_key",
+  "apikey",
+  "key",
+  "password",
+  "secret",
+  "sig",
+  "signature",
+  "token",
+  "x-amz-credential",
+  "x-amz-security-token",
+  "x-amz-signature",
+]);
 
+/**
+ * The request URL as an error may show it: credentials in the userinfo and in the query,
+ * signed stop URLs included, become `[REDACTED]`.
+ *
+ * @param {string} url Request URL.
+ * @returns {string} The URL without its credentials.
+ */
 function sanitizeUrl(url: string): string {
   try {
     const parsed = new URL(url);
-    for (const param of SENSITIVE_PARAMS) {
-      if (parsed.searchParams.has(param)) {
+    if (parsed.username) parsed.username = "[REDACTED]";
+    if (parsed.password) parsed.password = "[REDACTED]";
+    for (const param of new Set(parsed.searchParams.keys())) {
+      if (SENSITIVE_PARAMS.has(param.toLowerCase())) {
         parsed.searchParams.set(param, "[REDACTED]");
       }
     }

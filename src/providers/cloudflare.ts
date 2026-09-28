@@ -23,7 +23,13 @@ import type {
 } from "../core/types.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
-import { AuthError, BrowserError, HTTPError, normalizeError } from "../core/errors.ts";
+import {
+  AuthError,
+  BrowserError,
+  HTTPError,
+  RateLimitError,
+  normalizeError,
+} from "../core/errors.ts";
 import {
   assertUrlOrSession,
   JOB_TIMEOUT,
@@ -215,6 +221,10 @@ class CloudflareProvider implements BrowserProvider {
     if (error instanceof HTTPError && error.url.includes(account)) {
       const url = error.url.replace(account, "/accounts/[account]/");
       return normalizeError(new HTTPError(error.statusCode, url, error.body), "cloudflare");
+    }
+    if (error instanceof RateLimitError && error.url.includes(account)) {
+      const url = error.url.replace(account, "/accounts/[account]/");
+      return new RateLimitError(error.retryAfter, url, error.body);
     }
     return normalizeError(error, "cloudflare");
   }

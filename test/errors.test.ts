@@ -1,4 +1,6 @@
+import { createServer } from "node:http";
 import { describe, it, expect } from "vitest";
+import { Client } from "../src/core/client";
 import {
   BrowserError,
   HTTPError,
@@ -224,5 +226,35 @@ describe("HTTPError reason", () => {
     expect(error.message).not.toContain("\n");
     expect(Array.from(error.message.slice("HTTP 400: ".length))).toHaveLength(300);
     expect(error.message.endsWith("…")).toBe(true);
+  });
+});
+
+describe("RateLimitError reason", () => {
+  it("keeps the URL and the provider's reason", () => {
+    const body = '{"message":"Daily unit quota exhausted"}';
+    const error = new RateLimitError(120, "https://api.example.com/v1", body);
+    expect(error.message).toBe(
+      "Rate limited by https://api.example.com/v1, retry after 120s: Daily unit quota exhausted",
+    );
+    expect(error).toMatchObject({ retryAfter: 120, url: "https://api.example.com/v1", body });
+  });
+
+  it("reads a 429 from the client", async () => {
+    const server = createServer((_request, response) => {
+      response.writeHead(429, { "Content-Type": "application/json", "Retry-After": "7" });
+      response.end('{"errors":[{"message":"Too many concurrent sessions"}]}');
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Missing TCP address");
+    const url = `http://127.0.0.1:${address.port}/content?token=secret`;
+    try {
+      await expect(new Client({ maxRetries: 0 }).postText(url, {})).rejects.toMatchObject({
+        name: "RateLimitError",
+        message: `Rate limited by http://127.0.0.1:${address.port}/content?token=%5BREDACTED%5D, retry after 7s: Too many concurrent sessions`,
+      });
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });

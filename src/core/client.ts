@@ -228,11 +228,11 @@ export class Client {
 
   private mapError(error: unknown, url: string): Error {
     if (this.FetchError !== undefined && error instanceof this.FetchError) {
+      const body = typeof error.data === "string" ? error.data : JSON.stringify(error.data ?? "");
       if (error.statusCode === 429) {
         const retryAfter = parseRetryAfter(error.response?.headers.get("Retry-After"));
-        return new RateLimitError(retryAfter);
+        return new RateLimitError(retryAfter, sanitizeUrl(url), body);
       }
-      const body = typeof error.data === "string" ? error.data : JSON.stringify(error.data ?? "");
       return new HTTPError(error.statusCode ?? 0, sanitizeUrl(url), body);
     }
     return error instanceof Error ? error : new Error(String(error));

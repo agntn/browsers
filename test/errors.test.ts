@@ -239,6 +239,15 @@ describe("RateLimitError reason", () => {
     );
     expect(error).toMatchObject({ retryAfter: 120, url: "https://api.example.com/v1", body });
   });
+
+  it("names the provider of a 429 that has no URL", () => {
+    const error = normalizeError({ status: 429, message: "quota exhausted" }, "steel");
+    expect(error).toBeInstanceOf(RateLimitError);
+    expect(error).toMatchObject({ provider: "steel", url: "" });
+    expect(error.message).toBe(
+      `Rate limited by steel, retry after ${DEFAULT_RETRY_AFTER}s: quota exhausted`,
+    );
+  });
 });
 
 describe("Client errors", () => {

@@ -224,7 +224,7 @@ class CloudflareProvider implements BrowserProvider {
     }
     if (error instanceof RateLimitError && error.url.includes(account)) {
       const url = error.url.replace(account, "/accounts/[account]/");
-      return new RateLimitError(error.retryAfter, url, error.body);
+      return new RateLimitError(error.retryAfter, url, error.body, error.provider);
     }
     return normalizeError(error, "cloudflare");
   }

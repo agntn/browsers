@@ -122,6 +122,7 @@ describe("browsers OMP extension", () => {
       "browsers_crawl",
       "browsers_pdf",
       "browsers_links",
+      "browsers_accessibility",
       "browsers_search",
       "browsers_capabilities",
     ]);
@@ -198,6 +199,16 @@ describe("browsers OMP extension", () => {
         browsers_links: {
           valid: { url: "https://example.test", browser: "kitesurf" },
           invalid: {},
+        },
+        browsers_accessibility: {
+          valid: {
+            url: "https://example.test",
+            browser: "kitesurf",
+            root: "form",
+            interestingOnly: false,
+            maxChars: 500,
+          },
+          invalid: { url: "https://example.test", root: "" },
         },
         browsers_search: { valid: { query: "browser agents" }, invalid: {} },
         browsers_capabilities: { valid: { provider: "playwright" }, invalid: {} },

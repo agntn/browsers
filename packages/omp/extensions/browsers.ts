@@ -205,6 +205,34 @@ function buildParameterSchemas(pi: ExtensionAPI) {
       },
       { additionalProperties: false },
     ),
+    accessibility: Type.Object(
+      {
+        url: Type.String({ description: "URL to read the accessibility tree of" }),
+        provider: Type.Optional(Type.String({ description: "Provider. One of: cloudflare." })),
+        browser,
+        root: Type.Optional(
+          Type.String({
+            minLength: 1,
+            description:
+              "CSS selector of the element whose subtree to read instead of the whole page; the first match wins.",
+          }),
+        ),
+        interestingOnly: Type.Optional(
+          Type.Boolean({
+            description:
+              "Drop generic and presentational nodes. Default: true for the whole page, false under root. True under root gives no tree when the root element is such a node itself, like a form.",
+          }),
+        ),
+        maxChars: Type.Optional(
+          Type.Integer({
+            description: `Maximum tree characters to return. Defaults to ${DEFAULT_SCRAPE_MAX_CHARS}; accepted range: 1-${MAX_SCRAPE_MAX_CHARS}.`,
+            minimum: 1,
+            maximum: MAX_SCRAPE_MAX_CHARS,
+          }),
+        ),
+      },
+      { additionalProperties: false },
+    ),
     search: Type.Object(
       { query: Type.String({ description: "Search query" }) },
       { additionalProperties: false },
@@ -226,6 +254,7 @@ type ExtractParams = Static<ParameterSchemas["extract"]>;
 type CrawlParams = Static<ParameterSchemas["crawl"]>;
 type PdfParams = Static<ParameterSchemas["pdf"]>;
 type LinksParams = Static<ParameterSchemas["links"]>;
+type AccessibilityParams = Static<ParameterSchemas["accessibility"]>;
 type SearchParams = Static<ParameterSchemas["search"]>;
 type CapabilitiesParams = Static<ParameterSchemas["capabilities"]>;
 
@@ -366,6 +395,18 @@ export default function browsersOmpExtension(pi: ExtensionAPI): void {
     ...statusRenderers("browsers_links"),
     async execute(_toolCallId, params: LinksParams) {
       return (await loadToolOperations()).browserLinks(params);
+    },
+  });
+
+  pi.registerTool<typeof schemas.accessibility, BrowserTools.BrowserAccessibilityDetails>({
+    name: "browsers_accessibility",
+    label: browserToolLabels.browsers_accessibility,
+    description: browserToolDescriptions.browsers_accessibility,
+    approval: "read",
+    parameters: schemas.accessibility,
+    ...statusRenderers("browsers_accessibility"),
+    async execute(_toolCallId, params: AccessibilityParams) {
+      return (await loadToolOperations()).browserAccessibility(params);
     },
   });
 

@@ -235,6 +235,25 @@ export default function browsersExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerTool({
+    name: "browsers_accessibility",
+    label: browserToolLabels.browsers_accessibility,
+    description: browserToolDescriptions.browsers_accessibility,
+    promptSnippet: "Read the accessibility tree of a webpage.",
+    promptGuidelines: [
+      "Use browsers_accessibility to see which headings, links, buttons and form fields a page has, with their states, before reading its full content with browsers_scrape.",
+      "Pass root with a CSS selector to read one form or region instead of the whole page.",
+    ],
+    parameters: browserToolSchemas.browsers_accessibility,
+    ...statusRenderers("browsers_accessibility"),
+    async execute(
+      _toolCallId,
+      params,
+    ): Promise<AgentToolResult<BrowserTools.BrowserAccessibilityDetails>> {
+      return (await loadToolOperations()).browserAccessibility(params);
+    },
+  });
+
+  pi.registerTool({
     name: "browsers_search",
     label: browserToolLabels.browsers_search,
     description: browserToolDescriptions.browsers_search,

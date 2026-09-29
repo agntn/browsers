@@ -1,4 +1,7 @@
 import type {
+  AccessibilityNode,
+  AccessibilityTreeOptions,
+  AccessibilityTreeResult,
   BrowserProvider,
   BrowserSession,
   CreateSessionOptions,
@@ -73,6 +76,12 @@ interface CfSessionResult {
 interface CfContentResult {
   readonly content?: string;
   readonly [key: string]: unknown;
+}
+
+interface CfAccessibilityTreeResponse extends CfEnvelope<{
+  readonly accessibilityTree?: AccessibilityNode | null;
+}> {
+  readonly meta?: { readonly status?: number; readonly title?: string };
 }
 
 interface CfScreenshotResult {
@@ -202,6 +211,7 @@ class CloudflareProvider implements BrowserProvider {
       links: true,
       search: false,
       extract: true,
+      accessibilityTree: true,
     };
   }
 
@@ -526,6 +536,30 @@ class CloudflareProvider implements BrowserProvider {
       return {
         url,
         links: rawLinks.map((href) => ({ href })),
+      };
+    } catch (error) {
+      throw this.fail(error);
+    }
+  }
+
+  async accessibilityTree(
+    url: string,
+    options?: Readonly<AccessibilityTreeOptions>,
+    _session?: BrowserSession,
+  ): Promise<AccessibilityTreeResult> {
+    try {
+      const res = await this.client.postJSON<CfAccessibilityTreeResponse>(
+        this.browserEndpoint("/accessibilityTree"),
+        // JSON drops the options left undefined, so Cloudflare applies its own defaults.
+        { url, root: options?.root, interestingOnly: options?.interestingOnly },
+        this.headers(),
+      );
+      const { title, status } = res.meta ?? {};
+      return {
+        url,
+        ...(title ? { title } : {}),
+        ...(status === undefined ? {} : { statusCode: status }),
+        tree: this.unwrap(res).accessibilityTree ?? null,
       };
     } catch (error) {
       throw this.fail(error);

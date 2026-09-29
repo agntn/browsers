@@ -58,6 +58,7 @@ const main = defineCommand({
     crawl: () => import("./commands/crawl.ts").then((m) => m.default),
     pdf: () => import("./commands/pdf.ts").then((m) => m.default),
     links: () => import("./commands/links.ts").then((m) => m.default),
+    accessibility: () => import("./commands/accessibility.ts").then((m) => m.default),
     search: () => import("./commands/search.ts").then((m) => m.default),
     extract: () => import("./commands/extract.ts").then((m) => m.default),
     session: () => import("./commands/session.ts").then((m) => m.default),

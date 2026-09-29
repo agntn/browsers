@@ -78,11 +78,24 @@ interface CfContentResult {
   readonly [key: string]: unknown;
 }
 
-interface CfAccessibilityTreeResponse extends CfEnvelope<{
-  readonly accessibilityTree?: AccessibilityNode | null;
-}> {
-  readonly meta?: { readonly status?: number; readonly title?: string };
+interface CfPageMeta {
+  readonly status?: number;
+  readonly title?: string;
 }
+
+/** Envelope of a quick action that loads one page and reports it in `meta`. */
+interface CfPageResponse<T> extends CfEnvelope<T> {
+  readonly meta?: CfPageMeta;
+}
+
+type CfAccessibilityTreeResponse = CfPageResponse<{
+  readonly accessibilityTree?: AccessibilityNode | null;
+}>;
+
+/** Outputs `/snapshot` renders, keyed by the format that asked for them. */
+type CfSnapshotFormat = "content" | "markdown" | "screenshot";
+
+type CfSnapshotResult = { readonly [F in CfSnapshotFormat]?: string };
 
 interface CfScreenshotResult {
   readonly image?: string;
@@ -104,6 +117,35 @@ function createScrapeBody(url: string, options?: ScrapeOptions): Record<string, 
   if (options.headers) body.setExtraHTTPHeaders = options.headers;
   if (options.script) body.addScriptTag = [{ content: options.script }];
   return body;
+}
+
+/**
+ * Picks the outputs a scrape asks for, HTML when none has a Cloudflare output.
+ *
+ * @param {ScrapeOptions} [options] Options from the caller.
+ * @returns {CfSnapshotFormat[]} The outputs, a page format first.
+ */
+function scrapeFormats(options: ScrapeOptions = {}): CfSnapshotFormat[] {
+  const requested = options.formats ?? [];
+  const formats: CfSnapshotFormat[] = [];
+  if (requested.includes("html")) formats.push("content");
+  if (requested.includes("markdown")) formats.push("markdown");
+  if (formats.length === 0) formats.push("content");
+  if (options.screenshot) formats.push("screenshot");
+  return formats;
+}
+
+/**
+ * Copies the status and title Browser Run reports for the loaded page.
+ *
+ * @param {CfPageMeta} [meta] The response's `meta`.
+ * @returns {Pick<ScrapeResult, "title" | "statusCode">} The fields Cloudflare filled.
+ */
+function pageMeta(meta?: CfPageMeta): Pick<ScrapeResult, "title" | "statusCode"> {
+  return {
+    ...(meta?.title ? { title: meta.title } : {}),
+    ...(meta?.status === undefined ? {} : { statusCode: meta.status }),
+  };
 }
 
 // Cloudflare rejects these at the top level of the body.
@@ -342,23 +384,43 @@ class CloudflareProvider implements BrowserProvider {
     }
   }
 
+  /**
+   * Several outputs share one `/snapshot` render. A single one goes to its own endpoint, which
+   * `/snapshot` refuses, and `/markdown` spends a fraction of the characters `/content` does.
+   *
+   * @param {string} url Page to read.
+   * @param {ScrapeOptions} [options] Formats, screenshot and wait options.
+   * @param {BrowserSession} [_session] Unused, scrape needs no session.
+   * @returns {Promise<ScrapeResult>} The outputs asked for, with the page's status and title.
+   */
   async scrape(
     url: string,
     options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
     try {
-      // `/markdown` gives the page's text in a fraction of the characters `/content` spends on markup.
-      const markdown = options?.formats?.includes("markdown") === true;
-      const res = await this.client.postJSON<CfEnvelope<CfContentResult | string>>(
-        this.browserEndpoint(markdown ? "/markdown" : "/content"),
-        createScrapeBody(url, options),
-        this.headers(),
-      );
+      const formats = scrapeFormats(options);
+      const format = formats[0]!;
+      const snapshot = formats.length > 1;
+      const body = createScrapeBody(url, options);
+      if (snapshot) body.formats = formats;
+      const res = await this.client.postJSON<
+        CfPageResponse<CfSnapshotResult | CfContentResult | string>
+      >(this.browserEndpoint(snapshot ? "/snapshot" : `/${format}`), body, this.headers());
       const result = this.unwrap(res);
-      const page = typeof result === "string" ? result : result.content;
+      const outputs: CfSnapshotResult = snapshot
+        ? (result as CfSnapshotResult)
+        : { [format]: typeof result === "string" ? result : result.content };
 
-      return markdown ? { url, markdown: page } : { url, html: page };
+      return {
+        url,
+        ...(outputs.content === undefined ? {} : { html: outputs.content }),
+        ...(outputs.markdown === undefined ? {} : { markdown: outputs.markdown }),
+        ...(outputs.screenshot === undefined
+          ? {}
+          : { screenshot: `data:image/png;base64,${outputs.screenshot}` }),
+        ...pageMeta(res.meta),
+      };
     } catch (error) {
       throw this.fail(error);
     }
@@ -562,11 +624,9 @@ class CloudflareProvider implements BrowserProvider {
         { url, root: options?.root, interestingOnly: options?.interestingOnly },
         this.headers(),
       );
-      const { title, status } = res.meta ?? {};
       return {
         url,
-        ...(title ? { title } : {}),
-        ...(status === undefined ? {} : { statusCode: status }),
+        ...pageMeta(res.meta),
         tree: this.unwrap(res).accessibilityTree ?? null,
       };
     } catch (error) {

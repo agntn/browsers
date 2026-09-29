@@ -1,5 +1,5 @@
 import { defineCommand } from "citty";
-import { consola } from "consola";
+import { consola } from "./_logger.ts";
 import { createCrawl } from "../core/resolve.ts";
 import type { CrawlPage, CrawlResult } from "../core/types.ts";
 

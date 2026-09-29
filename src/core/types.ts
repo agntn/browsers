@@ -148,6 +148,39 @@ export interface LinkItem {
   rel?: string;
 }
 
+/**
+ * One node of a page's accessibility tree, as Chromium serializes it. Besides the role and
+ * name a node carries only the states that apply to it, such as `checked`, `disabled`,
+ * `level` or `valuemax`.
+ */
+export interface AccessibilityNode {
+  readonly role: string;
+  readonly name?: string;
+  readonly value?: string | number;
+  readonly description?: string;
+  readonly children?: readonly AccessibilityNode[];
+  readonly [property: string]: unknown;
+}
+
+export interface AccessibilityTreeOptions {
+  /** CSS selector of the element whose subtree to read instead of the whole page. */
+  root?: string;
+  /**
+   * Drop generic and presentational nodes. Cloudflare drops them by default for the whole page
+   * and keeps them under `root`; with `root` and true it returns no tree for a root element
+   * that is such a node itself.
+   */
+  interestingOnly?: boolean;
+}
+
+export interface AccessibilityTreeResult {
+  url: string;
+  title?: string;
+  statusCode?: number;
+  /** The tree, or null when `root` gives none: it matches no element, or the options dropped it. */
+  tree: AccessibilityNode | null;
+}
+
 /** Declares which optional operations a provider supports. */
 export interface ProviderCapabilities {
   scrape: boolean;
@@ -165,6 +198,8 @@ export interface ProviderCapabilities {
   links: boolean;
   search: boolean;
   extract: boolean;
+  /** Reads a page's accessibility tree. Missing means it cannot. */
+  accessibilityTree?: boolean;
 }
 
 export interface BrowserProvider {
@@ -190,6 +225,11 @@ export interface BrowserProvider {
   search?(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]>;
   extract?(url: string, options?: ExtractOptions, session?: BrowserSession): Promise<ExtractResult>;
   links?(url: string, session?: BrowserSession): Promise<LinksResult>;
+  accessibilityTree?(
+    url: string,
+    options?: Readonly<AccessibilityTreeOptions>,
+    session?: BrowserSession,
+  ): Promise<AccessibilityTreeResult>;
 
   getCdpUrl?(session: BrowserSession): string | undefined;
   isAvailable?(): Promise<boolean>;

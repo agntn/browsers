@@ -14,6 +14,7 @@ const simpleCapabilityLabels = [
   ["links", "links"],
   ["search", "search"],
   ["extract", "extract"],
+  ["accessibilityTree", "accessibility"],
 ] as const satisfies readonly (readonly [keyof ProviderCapabilities, string])[];
 
 function scrapeCapability(capabilities: Readonly<ProviderCapabilities>): string | null {

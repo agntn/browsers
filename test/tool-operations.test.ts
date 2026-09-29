@@ -4,7 +4,10 @@ import { join } from "node:path";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 import type { BrowserProvider } from "../src/core/types";
 import { register } from "../src/core/registry";
+import { InvalidInputError } from "../src/core/errors";
 import {
+  accessibilityOutline,
+  browserAccessibility,
   browserCapabilities,
   browserCrawl,
   browserLinks,
@@ -35,6 +38,7 @@ const links = vi.fn<NonNullable<BrowserProvider["links"]>>();
 const pdf = vi.fn<NonNullable<BrowserProvider["pdf"]>>();
 const crawl = vi.fn<NonNullable<BrowserProvider["crawl"]>>();
 const resumeCrawl = vi.fn<NonNullable<BrowserProvider["resumeCrawl"]>>();
+const accessibilityTree = vi.fn<NonNullable<BrowserProvider["accessibilityTree"]>>();
 
 function toolTestProvider(): BrowserProvider {
   return {
@@ -54,6 +58,7 @@ function toolTestProvider(): BrowserProvider {
       links: true,
       search: false,
       extract: false,
+      accessibilityTree: true,
     }),
     createSession,
     getSession: vi.fn().mockResolvedValue(null),
@@ -67,6 +72,7 @@ function toolTestProvider(): BrowserProvider {
     pdf,
     crawl,
     resumeCrawl,
+    accessibilityTree,
   };
 }
 
@@ -653,5 +659,164 @@ describe("browser tool operations", () => {
       provider: "tooltest",
       capabilities: { scrape: true, statelessScrape: true },
     });
+  });
+
+  it("writes the accessibility tree as an outline with the page's states", () => {
+    // Chromium's tree of https://httpbin.org/forms/post, trimmed.
+    const lines = accessibilityOutline({
+      role: "RootWebArea",
+      name: "",
+      children: [
+        { role: "StaticText", name: "Customer name: " },
+        { role: "textbox", name: "Customer name: " },
+        { role: "StaticText", name: "Pizza Size" },
+        { role: "radio", name: " Small", checked: false },
+        {
+          role: "heading",
+          name: "Delivery",
+          level: 2,
+          children: [{ role: "StaticText", name: "Delivery" }],
+        },
+        { role: "button", name: "Submit order", focused: true, disabled: undefined },
+      ],
+    });
+
+    expect(lines).toEqual([
+      "- RootWebArea",
+      '  - StaticText "Customer name:"',
+      '  - textbox "Customer name:"',
+      '  - StaticText "Pizza Size"',
+      '  - radio "Small" checked=false',
+      '  - heading "Delivery" level=2',
+      '  - button "Submit order" focused',
+    ]);
+  });
+
+  it("joins text split into single characters without gluing separate texts", () => {
+    // Chromium's tree of https://example.com/ has one StaticText per character.
+    const lines = accessibilityOutline({
+      role: "RootWebArea",
+      name: "Example Domain",
+      children: [
+        ..."Use it.".split("").map((name) => ({ role: "StaticText", name })),
+        { role: "StaticText", name: "Login" },
+        { role: "StaticText", name: "username:" },
+        { role: "StaticText", name: " " },
+        {
+          role: "link",
+          name: "Learn more",
+          children: [{ role: "StaticText", name: "Learn more" }],
+        },
+      ],
+    });
+
+    expect(lines).toEqual([
+      '- RootWebArea "Example Domain"',
+      '  - StaticText "Use it.Login"',
+      '  - StaticText "username:"',
+      '  - link "Learn more"',
+    ]);
+  });
+
+  it("keeps terminal controls and quotes out of outline lines", () => {
+    const lines = accessibilityOutline({
+      role: "link",
+      name: 'Say "hi"\u001B[31m\nnow',
+      description: "\u0007bell",
+    });
+
+    expect(lines).toEqual(['- link "Say \\"hi\\" [31m now" description="bell"']);
+  });
+
+  it("returns the accessibility outline with page metadata and cuts it at a line", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    accessibilityTree.mockResolvedValue({
+      url: "https://example.test",
+      title: "Order",
+      statusCode: 200,
+      tree: {
+        role: "RootWebArea",
+        name: "Order",
+        children: [
+          { role: "textbox", name: "Name" },
+          { role: "button", name: "Submit" },
+        ],
+      },
+    });
+
+    const full = await browserAccessibility({ provider: "tooltest", url: "https://example.test" });
+    const cut = await browserAccessibility({
+      provider: "tooltest",
+      url: "https://example.test",
+      root: "form",
+      interestingOnly: false,
+      maxChars: 40,
+    });
+
+    expect(full.content).toEqual([
+      {
+        type: "text",
+        text: '[provider=tooltest] https://example.test (status 200, "Order"): 3 nodes\n\n- RootWebArea "Order"\n  - textbox "Name"\n  - button "Submit"',
+      },
+    ]);
+    expect(full.details).toEqual({
+      url: "https://example.test",
+      provider: "tooltest",
+      title: "Order",
+      statusCode: 200,
+      nodes: 3,
+      contentLength: 60,
+    });
+    expect(cut.content).toEqual([
+      {
+        type: "text",
+        text: '[provider=tooltest] https://example.test (status 200, "Order"): 3 nodes\n\n- RootWebArea "Order"\n  - textbox "Name"\n\n[truncated 20 of 60 characters]',
+      },
+    ]);
+    expect(accessibilityTree).toHaveBeenLastCalledWith("https://example.test", {
+      root: "form",
+      interestingOnly: false,
+    });
+  });
+
+  it("reports a root selector that matches nothing as an input error", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    accessibilityTree.mockResolvedValue({ url: "https://example.test", tree: null });
+
+    const call = browserAccessibility({
+      provider: "tooltest",
+      url: "https://example.test",
+      root: "#missing",
+    });
+
+    await expect(call).rejects.toBeInstanceOf(InvalidInputError);
+    await expect(call).rejects.toThrow(
+      'root "#missing" matches no element on https://example.test. Pass another selector or leave root out to read the whole page.',
+    );
+  });
+
+  it("does not blame the selector when interestingOnly may have dropped the root", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    accessibilityTree.mockResolvedValue({ url: "https://example.test", tree: null });
+
+    await expect(
+      browserAccessibility({
+        provider: "tooltest",
+        url: "https://example.test",
+        root: "form",
+        interestingOnly: true,
+      }),
+    ).rejects.toThrow(
+      'root "form" gave no tree on https://example.test: it matches no element, or interestingOnly dropped that element, as it does a form. Leave interestingOnly out to read the whole subtree.',
+    );
+  });
+
+  it("rejects an accessibility maxChars outside the accepted range", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+
+    await expect(
+      browserAccessibility({ provider: "tooltest", url: "https://example.test", maxChars: 0 }),
+    ).rejects.toThrow("maxChars must be an integer between 1 and 200000.");
+    expect(accessibilityTree).not.toHaveBeenCalled();
   });
 });

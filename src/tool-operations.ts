@@ -9,7 +9,13 @@ import {
 import { BrowserError, InvalidInputError } from "./core/errors.ts";
 import { create, providers } from "./core/registry.ts";
 import { createCrawl, createProvider, createScreenshotProvider } from "./core/resolve.ts";
-import type { CrawlPage, ProviderCapabilities, ScreenshotResult } from "./core/types.ts";
+import type {
+  AccessibilityNode,
+  AccessibilityTreeResult,
+  CrawlPage,
+  ProviderCapabilities,
+  ScreenshotResult,
+} from "./core/types.ts";
 import {
   imageMimeType,
   scrapeWithSessionWhenNeeded,
@@ -104,6 +110,13 @@ export interface BrowserUrlParams {
 export interface BrowserLinksParams extends BrowserUrlParams {
   limit?: number;
   offset?: number;
+}
+
+/** Arguments accepted by the browser accessibility tool. */
+export interface BrowserAccessibilityParams extends BrowserUrlParams {
+  root?: string;
+  interestingOnly?: boolean;
+  maxChars?: number;
 }
 
 /** Arguments accepted by the browser search tool. */
@@ -625,6 +638,211 @@ export async function browserLinks(
       total,
       offset,
       ...(nextOffset === undefined ? {} : { nextOffset }),
+    },
+  };
+}
+
+/** Accessibility tree metadata kept by agent harnesses; the tree itself stays in the text. */
+export interface BrowserAccessibilityDetails {
+  url: string;
+  provider: string;
+  title?: string;
+  statusCode?: number;
+  /** Lines of the whole outline, one per node. */
+  nodes: number;
+  /** Characters of the whole outline, before `maxChars` cut it. */
+  contentLength: number;
+}
+
+const TEXT_ROLE = "StaticText";
+
+let graphemes: Intl.Segmenter | undefined;
+
+/**
+ * Tells whether a node is bare text: a `StaticText` with nothing but its name.
+ *
+ * @param node - Tree node.
+ * @returns {boolean} Whether the node holds only text.
+ */
+function isBareText(node: AccessibilityNode): boolean {
+  return (
+    node.role === TEXT_ROLE && Object.keys(node).every((key) => key === "role" || key === "name")
+  );
+}
+
+/**
+ * Tells whether a node's name is at most one grapheme.
+ *
+ * @param node - Tree node, or none before the first child.
+ * @returns {boolean} Whether the name is empty or a single character.
+ */
+function isOneCharacter(node: AccessibilityNode | undefined): boolean {
+  const name = node?.name ?? "";
+  if (name.length <= 1) return true;
+  graphemes ??= new Intl.Segmenter();
+  const segments = graphemes.segment(name)[Symbol.iterator]();
+  segments.next();
+  return segments.next().done === true;
+}
+
+/**
+ * Joins runs of bare text split into single characters and drops bare text with nothing to
+ * read. Chromium splits some text into one node per character (example.com gives about 800),
+ * while text of separate elements stays apart, since joining it would glue words together.
+ *
+ * @param children - Child nodes in page order.
+ * @returns {AccessibilityNode[]} The children with those runs joined.
+ */
+function joinSplitText(children: readonly AccessibilityNode[]): AccessibilityNode[] {
+  const joined: AccessibilityNode[] = [];
+  let previous: AccessibilityNode | undefined;
+  for (const child of children) {
+    const last = joined.at(-1);
+    if (
+      last !== undefined &&
+      isBareText(last) &&
+      isBareText(child) &&
+      (isOneCharacter(previous) || isOneCharacter(child))
+    ) {
+      joined[joined.length - 1] = {
+        role: TEXT_ROLE,
+        name: `${last.name ?? ""}${child.name ?? ""}`,
+      };
+    } else {
+      joined.push(child);
+    }
+    previous = child;
+  }
+  return joined.filter((child) => !isBareText(child) || sanitizeField(child.name ?? "") !== "");
+}
+
+/**
+ * Lists the children an outline shows: split text joined, and a lone text child dropped when
+ * it only repeats its parent's name, as the text of a link or heading does.
+ *
+ * @param node - Parent node.
+ * @returns {AccessibilityNode[]} Children to write under the node.
+ */
+function outlineChildren(node: AccessibilityNode): AccessibilityNode[] {
+  const children = joinSplitText(node.children ?? []);
+  const [only] = children;
+  const repeatsName =
+    children.length === 1 &&
+    only !== undefined &&
+    isBareText(only) &&
+    sanitizeField(only.name ?? "") === sanitizeField(node.name ?? "");
+  return repeatsName ? [] : children;
+}
+
+function quoted(value: string): string {
+  return JSON.stringify(sanitizeField(value));
+}
+
+function outlineProperty(key: string, value: unknown): string {
+  const name = sanitizeField(key);
+  if (value === true) return name;
+  return `${name}=${typeof value === "string" ? quoted(value) : JSON.stringify(value)}`;
+}
+
+function outlineLine(node: AccessibilityNode, depth: number): string {
+  const parts = [`${"  ".repeat(depth)}- ${sanitizeField(node.role)}`];
+  if (node.name) parts.push(quoted(node.name));
+  for (const [key, value] of Object.entries(node)) {
+    if (key !== "role" && key !== "name" && key !== "children" && value !== undefined) {
+      parts.push(outlineProperty(key, value));
+    }
+  }
+  return parts.join(" ");
+}
+
+function outlineLines(node: AccessibilityNode, depth: number): string[] {
+  return [
+    outlineLine(node, depth),
+    ...outlineChildren(node).flatMap((child) => outlineLines(child, depth + 1)),
+  ];
+}
+
+/**
+ * Writes an accessibility tree as an indented outline, one node per line: role, quoted name,
+ * then the node's states (`checked=false`, `level=2`, `focused`). Text that only repeats its
+ * parent's name is left out, and text split into single characters is joined.
+ *
+ * @param tree - Root of the tree.
+ * @returns {string[]} Outline lines in page order.
+ */
+export function accessibilityOutline(tree: AccessibilityNode): string[] {
+  return outlineLines(tree, 0);
+}
+
+/**
+ * Reads the accessibility tree of one page through a capable provider.
+ *
+ * @param params - Page, subtree and provider arguments.
+ * @returns {Promise<{ provider: string; result: AccessibilityTreeResult; tree: AccessibilityNode }>} The provider used, its result and the tree.
+ * @throws {InvalidInputError} When `root` gives no tree.
+ */
+export async function readAccessibilityTree(
+  params: Readonly<Omit<BrowserAccessibilityParams, "maxChars">>,
+): Promise<{ provider: string; result: AccessibilityTreeResult; tree: AccessibilityNode }> {
+  const { name, provider } = await createProvider(
+    params.provider,
+    params.browser,
+    "accessibilityTree",
+  );
+  const result = await provider.accessibilityTree(params.url, {
+    root: params.root,
+    interestingOnly: params.interestingOnly,
+  });
+  if (result.tree === null) {
+    const url = sanitizeField(params.url);
+    if (params.root === undefined) {
+      throw new BrowserError(`${name} returned no accessibility tree for ${url}.`);
+    }
+    // Cloudflare answers null for a root that exists when interestingOnly drops the root itself.
+    throw new InvalidInputError(
+      params.interestingOnly === true
+        ? `root ${quoted(params.root)} gave no tree on ${url}: it matches no element, or interestingOnly dropped that element, as it does a form. Leave interestingOnly out to read the whole subtree.`
+        : `root ${quoted(params.root)} matches no element on ${url}. Pass another selector or leave root out to read the whole page.`,
+    );
+  }
+  return { provider: name, result, tree: result.tree };
+}
+
+/**
+ * Reads a page's accessibility tree and returns it as an outline bounded by `maxChars`, cut at
+ * a line break where one fits.
+ *
+ * @param params - Accessibility tree arguments.
+ * @returns {Promise<ToolResult<BrowserAccessibilityDetails>>} The outline and page metadata.
+ */
+export async function browserAccessibility(
+  params: Readonly<BrowserAccessibilityParams>,
+): Promise<ToolResult<BrowserAccessibilityDetails>> {
+  const maxChars = resolveMaxChars(params.maxChars);
+  const { provider, result, tree } = await readAccessibilityTree(params);
+  const lines = accessibilityOutline(tree);
+  const outline = lines.join("\n");
+  let body = outline;
+  let truncation = "";
+  if (outline.length > maxChars) {
+    const cut = outline.lastIndexOf("\n", maxChars);
+    body = outline.slice(0, cut > 0 ? cut : maxChars);
+    truncation = `\n\n[truncated ${outline.length - body.length} of ${outline.length} characters]`;
+  }
+  const page = [
+    result.statusCode === undefined ? undefined : `status ${result.statusCode}`,
+    result.title ? quoted(result.title) : undefined,
+  ].filter((part) => part !== undefined);
+  const header = `[provider=${provider}] ${sanitizeField(params.url)}${page.length > 0 ? ` (${page.join(", ")})` : ""}: ${lines.length} nodes`;
+  return {
+    content: content(`${header}\n\n${body}${truncation}`),
+    details: {
+      url: params.url,
+      provider,
+      ...(result.title ? { title: result.title } : {}),
+      ...(result.statusCode === undefined ? {} : { statusCode: result.statusCode }),
+      nodes: lines.length,
+      contentLength: outline.length,
     },
   };
 }

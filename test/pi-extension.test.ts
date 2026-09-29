@@ -114,6 +114,7 @@ describe("browsers Pi extension", () => {
       "browsers_crawl",
       "browsers_pdf",
       "browsers_links",
+      "browsers_accessibility",
       "browsers_search",
       "browsers_capabilities",
     ]);

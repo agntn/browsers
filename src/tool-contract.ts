@@ -21,6 +21,7 @@ export const browserToolNames = [
   "browsers_crawl",
   "browsers_pdf",
   "browsers_links",
+  "browsers_accessibility",
   "browsers_search",
   "browsers_capabilities",
 ] as const;
@@ -50,6 +51,7 @@ export const browserToolLabels: Readonly<Record<BrowserToolName, string>> = {
   browsers_crawl: "Browser Crawl",
   browsers_pdf: "Browser PDF",
   browsers_links: "Browser Links",
+  browsers_accessibility: "Browser Accessibility",
   browsers_search: "Browser Search",
   browsers_capabilities: "Browser Capabilities",
 };
@@ -74,6 +76,8 @@ export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> 
     "Generate a PDF from a URL and write it to `path`. Cloudflare and Browserless support stateless PDF generation.",
   browsers_links:
     "Extract the unique links of a webpage in page order. Returns up to `limit` links from `offset` with the total count; when links remain, call again with the next offset it reports. Each call reads the page again, so a changed total means the page changed between calls. Cloudflare and Playwright support stateless link extraction.",
+  browsers_accessibility:
+    "Read a webpage's accessibility tree: the roles, names, values and states (checked, disabled, expanded) of its headings, links, buttons and form fields, one node per indented line. Use it to find what a page offers or what a form asks for, which scraped markdown leaves out. `root` limits it to the subtree of one CSS selector, generic nodes included; a selector that matches nothing is an error. Cloudflare supports it.",
   browsers_search: "Web search via browser provider. Hyperbrowser supports native web search.",
   browsers_capabilities:
     "Read-only: report which library operations a browser provider supports, including scrape, screenshot, element screenshot, navigate, evaluate, sessions, CDP, and stateless modes. Navigate and evaluate flags describe the provider API, not extra tools.",

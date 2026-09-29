@@ -34,6 +34,7 @@ export const BROWSER_TOOL_SYMBOLS: Readonly<Record<BrowserToolName, string>> = {
   browsers_crawl: "🕸️",
   browsers_pdf: "📄",
   browsers_links: "🔗",
+  browsers_accessibility: "♿",
   browsers_search: "🔎",
   browsers_capabilities: "🧰",
 };
@@ -197,6 +198,13 @@ const CALL_DESCRIPTIONS: Readonly<Record<BrowserToolName, CallDescriber>> = {
     ]),
   browsers_pdf: (record) => urlCall(record, [scalar(record, "browser")]),
   browsers_links: (record) => urlCall(record, [scalar(record, "browser")]),
+  browsers_accessibility: (record) =>
+    urlCall(record, [
+      scalar(record, "browser"),
+      prefixedField(record, "root", "root"),
+      record.interestingOnly === false ? "all nodes" : undefined,
+      countedField(record, "maxChars", "char"),
+    ]),
   browsers_search: (record) => ({ subject: scalar(record, "query"), meta: [] }),
   browsers_capabilities: (record) => ({ subject: provider(record), meta: [] }),
 };
@@ -298,6 +306,8 @@ const RESULT_META: Readonly<Record<BrowserToolName, ResultMetaRenderer>> = {
         : `${length.toLocaleString("en-US")} of ${count(total, "link")}`,
     ];
   },
+  browsers_accessibility: (details) =>
+    compact([scalar(details, "provider"), countedField(details, "nodes", "node")]),
   browsers_search: (details) => {
     const length = listLength(details, "results");
     return length === undefined ? [] : [count(length, "result")];

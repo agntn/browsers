@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { resetDefaultClientForTests } from "../src/core/client";
 import { create } from "../src/core/registry";
-import { browserScrape, browserScreenshot, errorMessage } from "../src/tool-operations";
+import {
+  browserAccessibility,
+  browserScrape,
+  browserScreenshot,
+  errorMessage,
+} from "../src/tool-operations";
 import type { BrowserProvider } from "../src/core/types";
 
 const previousToken = process.env.CF_API_TOKEN;
@@ -352,5 +357,86 @@ describe("cloudflare errors", () => {
     expect(text).toContain("/accounts/[account]/browser-rendering/markdown");
     expect(text).toContain("Rate limit exceeded");
     expect(text).not.toContain(accountID);
+  });
+});
+
+describe("cloudflare accessibility tree", () => {
+  it("reads the tree with the page status and title from meta", async () => {
+    const requests: Array<{ url: string; body: unknown }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        requests.push({
+          url: input instanceof Request ? input.url : String(input),
+          body: JSON.parse(init?.body as string),
+        });
+        // Shape of a live /accessibilityTree answer for https://httpbin.org/forms/post, trimmed.
+        return jsonResponse({
+          success: true,
+          result: {
+            accessibilityTree: {
+              role: "RootWebArea",
+              name: "",
+              children: [{ role: "radio", name: " Small", checked: false }],
+            },
+          },
+          meta: { status: 200, title: "", finalUrl: "https://httpbin.org/forms/post" },
+        });
+      }),
+    );
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+      browser: "kitesurf",
+    });
+
+    const result = await provider.accessibilityTree?.("https://httpbin.org/forms/post", {
+      root: "form",
+      interestingOnly: false,
+    });
+
+    expect(provider.capabilities().accessibilityTree).toBe(true);
+    expect(requests).toEqual([
+      {
+        url: "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/accessibilityTree?browser=kitesurf",
+        body: { url: "https://httpbin.org/forms/post", root: "form", interestingOnly: false },
+      },
+    ]);
+    expect(result).toEqual({
+      url: "https://httpbin.org/forms/post",
+      statusCode: 200,
+      tree: {
+        role: "RootWebArea",
+        name: "",
+        children: [{ role: "radio", name: " Small", checked: false }],
+      },
+    });
+  });
+
+  it("tells the agent when root matches no element", async () => {
+    process.env.CF_API_TOKEN = "test-token";
+    process.env.CF_ACCOUNT_ID = "test-account";
+    const bodies: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        bodies.push(JSON.parse(init?.body as string));
+        // Cloudflare answers 200 with a null tree when root matches nothing.
+        return jsonResponse({
+          success: true,
+          result: { accessibilityTree: null },
+          meta: { status: 200, title: "Example Domain" },
+        });
+      }),
+    );
+    resetDefaultClientForTests();
+
+    const call = browserAccessibility({ url: "https://example.com/", root: "#nope" });
+
+    await expect(call).rejects.toThrow(
+      'root "#nope" matches no element on https://example.com/. Pass another selector or leave root out to read the whole page.',
+    );
+    expect(bodies).toEqual([{ url: "https://example.com/", root: "#nope" }]);
   });
 });

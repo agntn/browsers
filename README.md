@@ -18,10 +18,11 @@ Steel scrapes in one HTTP call. Kernel wants a live session first. Browserbase h
 - ⚡ **Stateless where the vendor is.** Steel, Browserbase, Browserless, Hyperbrowser, Cloudflare and Playwright scrape without you opening a session. Kernel will not.
 - 📸 **The extras follow the backend.** PDFs, crawls, links, AI extract, search. Anchor will not scrape. Hyperbrowser will search.
 - 🏷️ **`capabilities()` is the list.** Navigate is true on Kernel, Browserless and Playwright. False on Steel. Read the flag.
-- 🤖 **Five surfaces, eleven tools.** CLI, library, MCP, Pi, OMP. They share the executors.
+- 🤖 **Five surfaces, twelve tools.** CLI, library, MCP, Pi, OMP. They share the executors.
 - 📏 **Agent scrape and crawl have a ceiling.** 20 000 characters unless you pass `maxChars`, 200 000 at most. A crawl shares it across pages.
 - ⏳ **A slow crawl keeps its job.** Cloudflare and Hyperbrowser wait two minutes, then hand back the job ID. Pass it as `jobId` with the same provider and browser, or `--job` in the CLI, and you wait for that job again. No second crawl.
 - 🔗 **Agent links come in pages.** 500 per call unless you pass `limit`, 5 000 at most. The answer counts the rest and names the `offset` to ask for next. The CLI still prints them all.
+- ♿ **A form reads as its fields.** The accessibility tree gives one line per field, button or heading, with its state. The httpbin pizza form comes to about a thousand characters. Cloudflare only for now.
 - 🔐 **Keys in a URL get scrubbed.** Query params named `token` or `api_key` land in errors as `[REDACTED]`.
 
 ## 📦 Install
@@ -59,7 +60,34 @@ browsers links https://example.com --provider playwright
 https://iana.org/domains/example
 ```
 
-Same page, different door. Who is even configured?
+Same page, different door. A form wants a third one, the accessibility tree:
+
+```bash
+browsers accessibility https://httpbin.org/forms/post --root fieldset
+```
+
+```
+- group "Pizza Size"
+  - Legend
+    - StaticText "Pizza Size"
+      - InlineTextBox
+  - paragraph
+    - none
+      - radio "Small" checked=false
+      - none
+  - paragraph
+    - none
+      - radio "Medium" checked=false
+      - none
+  - paragraph
+    - none
+      - radio "Large" checked=false
+      - none
+```
+
+`--root` keeps every node of that subtree, the boring ones too. Leave it out and you get the whole page, trimmed. Cloudflare answers this one.
+
+Who is even configured?
 
 ```bash
 browsers providers
@@ -72,7 +100,7 @@ browsers providers
 ● browserless     scrape screenshot element navigate evaluate sessions cdp pdf
 ● hyperbrowser    scrape screenshot sessions cdp crawl search extract
 ● anchor          screenshot(sess) sessions cdp
-● cloudflare      scrape screenshot element sessions cdp crawl pdf links extract
+● cloudflare      scrape screenshot element sessions cdp crawl pdf links extract accessibility
 ● playwright      scrape screenshot(sess) element navigate evaluate sessions crawl pdf links
 ```
 
@@ -96,18 +124,19 @@ browsers session create --provider kernel
 
 ### Commands
 
-| Command      | What it does                         | Example                                               |
-| ------------ | ------------------------------------ | ----------------------------------------------------- |
-| `scrape`     | Rendered page, markdown if it exists | `browsers scrape https://example.com -p playwright`   |
-| `screenshot` | Image to a file                      | `browsers screenshot https://example.com -o page.png` |
-| `crawl`      | Follow links, cap with `--maxPages`  | `browsers crawl https://example.com --maxPages 5`     |
-| `pdf`        | URL to a PDF file                    | `browsers pdf https://example.com -o page.pdf`        |
-| `links`      | Unique hrefs                         | `browsers links https://example.com -p playwright`    |
-| `search`     | Hyperbrowser web search              | `browsers search "browser automation"`                |
-| `extract`    | Structured extract with a prompt     | `browsers extract https://example.com --prompt "..."` |
-| `session`    | `create`, `list`, `release`          | `browsers session create -p kernel`                   |
-| `providers`  | Who is configured, what they can do  | `browsers providers`                                  |
-| `mcp`        | MCP server on stdio                  | `browsers mcp`                                        |
+| Command         | What it does                          | Example                                               |
+| --------------- | ------------------------------------- | ----------------------------------------------------- |
+| `scrape`        | Rendered page, markdown if it exists  | `browsers scrape https://example.com -p playwright`   |
+| `screenshot`    | Image to a file                       | `browsers screenshot https://example.com -o page.png` |
+| `crawl`         | Follow links, cap with `--maxPages`   | `browsers crawl https://example.com --maxPages 5`     |
+| `pdf`           | URL to a PDF file                     | `browsers pdf https://example.com -o page.pdf`        |
+| `links`         | Unique hrefs                          | `browsers links https://example.com -p playwright`    |
+| `accessibility` | Roles, names and states, one per line | `browsers accessibility https://example.com`          |
+| `search`        | Hyperbrowser web search               | `browsers search "browser automation"`                |
+| `extract`       | Structured extract with a prompt      | `browsers extract https://example.com --prompt "..."` |
+| `session`       | `create`, `list`, `release`           | `browsers session create -p kernel`                   |
+| `providers`     | Who is configured, what they can do   | `browsers providers`                                  |
+| `mcp`           | MCP server on stdio                   | `browsers mcp`                                        |
 
 ## 🧠 Library
 
@@ -128,16 +157,16 @@ That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resol
 
 ## 🗺️ Providers
 
-| Provider         | Auth                             | Capabilities                                                                                      |
-| ---------------- | -------------------------------- | ------------------------------------------------------------------------------------------------- |
-| **steel**        | `STEEL_API_KEY`                  | scrape, screenshot (session), sessions, CDP                                                       |
-| **browserbase**  | `BROWSERBASE_API_KEY`            | scrape, sessions, CDP                                                                             |
-| **kernel**       | `KERNEL_API_KEY`                 | scrape (session), screenshot (session), navigate, evaluate, sessions, CDP                         |
-| **browserless**  | `BROWSERLESS_API_KEY`            | scrape, screenshot, element screenshot, navigate, evaluate, sessions, CDP, PDF                    |
-| **hyperbrowser** | `HYPERBROWSER_API_KEY`           | scrape, screenshot, sessions, CDP, crawl, search, extract                                         |
-| **anchor**       | `ANCHOR_API_KEY`                 | screenshot (session), sessions, CDP                                                               |
-| **cloudflare**   | `CF_API_TOKEN` + `CF_ACCOUNT_ID` | scrape, screenshot, element screenshot, sessions, CDP, crawl, PDF, links, extract                 |
-| **playwright**   | none, local                      | scrape, screenshot (session), element screenshot, navigate, evaluate, sessions, crawl, PDF, links |
+| Provider         | Auth                             | Capabilities                                                                                          |
+| ---------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **steel**        | `STEEL_API_KEY`                  | scrape, screenshot (session), sessions, CDP                                                           |
+| **browserbase**  | `BROWSERBASE_API_KEY`            | scrape, sessions, CDP                                                                                 |
+| **kernel**       | `KERNEL_API_KEY`                 | scrape (session), screenshot (session), navigate, evaluate, sessions, CDP                             |
+| **browserless**  | `BROWSERLESS_API_KEY`            | scrape, screenshot, element screenshot, navigate, evaluate, sessions, CDP, PDF                        |
+| **hyperbrowser** | `HYPERBROWSER_API_KEY`           | scrape, screenshot, sessions, CDP, crawl, search, extract                                             |
+| **anchor**       | `ANCHOR_API_KEY`                 | screenshot (session), sessions, CDP                                                                   |
+| **cloudflare**   | `CF_API_TOKEN` + `CF_ACCOUNT_ID` | scrape, screenshot, element screenshot, sessions, CDP, crawl, PDF, links, extract, accessibility tree |
+| **playwright**   | none, local                      | scrape, screenshot (session), element screenshot, navigate, evaluate, sessions, crawl, PDF, links     |
 
 Anchor does not scrape. The row stays, because someone will look for it. Cloudflare also accepts `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 
@@ -157,7 +186,7 @@ omp install @agntn/browsers
 }
 ```
 
-Eleven tools, `browsers_scrape` through `browsers_capabilities`, the same eleven on MCP, Pi and OMP. Cloudflare calls backed by Browser Run take `browser: "kitesurf"`. No `provider` needed then. They do not drive a session you already opened. `browsers_screenshot` hands the image back to the model. A full page too big for that goes to a file: pass `path`, and it refuses to overwrite one that exists. Pass `selector` and you get one element instead of the page. Cloudflare, Browserless and Playwright can do that. Leave `provider` out and one of them gets picked; name another and it says no rather than hand back the whole page. `browsers_pdf` always writes to `path`, under the same rule, since a PDF cannot go back to the model.
+Twelve tools, `browsers_scrape` through `browsers_capabilities`, the same twelve on MCP, Pi and OMP. Cloudflare calls backed by Browser Run take `browser: "kitesurf"`. No `provider` needed then. They do not drive a session you already opened. `browsers_screenshot` hands the image back to the model. A full page too big for that goes to a file: pass `path`, and it refuses to overwrite one that exists. Pass `selector` and you get one element instead of the page. Cloudflare, Browserless and Playwright can do that. Leave `provider` out and one of them gets picked; name another and it says no rather than hand back the whole page. `browsers_pdf` always writes to `path`, under the same rule, since a PDF cannot go back to the model.
 
 ## 🚫 What this does not do
 

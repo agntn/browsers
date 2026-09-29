@@ -61,7 +61,14 @@ export function resolveProvider(preferred?: string): string {
 }
 
 /** Optional operations a provider may leave unimplemented. */
-export type ProviderOperation = "crawl" | "resumeCrawl" | "pdf" | "search" | "extract" | "links";
+export type ProviderOperation =
+  | "crawl"
+  | "resumeCrawl"
+  | "pdf"
+  | "search"
+  | "extract"
+  | "links"
+  | "accessibilityTree";
 
 /** A provider known to implement `O`. */
 export type ProviderWith<O extends ProviderOperation> = BrowserProvider &
@@ -74,6 +81,7 @@ const operationLabels: Readonly<Record<ProviderOperation, string>> = {
   search: "web search",
   extract: "structured extraction",
   links: "link extraction",
+  accessibilityTree: "accessibility trees",
 };
 
 function supports<O extends ProviderOperation>(

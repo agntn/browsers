@@ -4,6 +4,7 @@ const passthroughFirstArgs = new Set([
   "crawl",
   "pdf",
   "links",
+  "accessibility",
   "search",
   "extract",
   "session",

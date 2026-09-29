@@ -151,7 +151,7 @@ const caps = provider.capabilities();
 console.log(caps.statelessScrape, caps.pdf, caps.cdp);
 ```
 
-That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resolveProvider()` picks the first one that does. Want Kitesurf on Cloudflare? Use `create("cloudflare", { browser: "kitesurf" })`. Without that option it stays on Chromium. Kernel scrape wants a session object. The agent tools and the CLI `scrape` command open one and close it.
+That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resolveProvider()` picks the first one that does. Want Kitesurf on Cloudflare? Use `create("cloudflare", { browser: "kitesurf" })`. Without that option it stays on Chromium. Cloudflare scrape also fills `title` and `statusCode`. Ask it for `html` and `markdown` together, or add `screenshot: true`, and all of them come from one render. Kernel scrape wants a session object. The agent tools and the CLI `scrape` command open one and close it.
 
 `create()` is async because that first call is where the provider module gets imported. Importing the package loads no provider and no HTTP client, `providers()` and `has()` answer from a manifest, and `@agntn/browsers/providers/steel` gives you one provider's `factory` directly.
 

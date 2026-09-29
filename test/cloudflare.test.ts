@@ -210,6 +210,105 @@ describe("cloudflare scrape", () => {
     ]);
   });
 
+  it("reads the status and title Browser Run reports", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({ success: true, result: "# Gone", meta: { status: 404, title: "Gone" } }),
+      ),
+    );
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+
+    const page = await provider.scrape("https://example.test", { formats: ["markdown"] });
+
+    expect(page).toEqual({
+      url: "https://example.test",
+      markdown: "# Gone",
+      title: "Gone",
+      statusCode: 404,
+    });
+  });
+
+  it("renders once for several outputs", async () => {
+    const requests: { url: string; body: unknown }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        requests.push({
+          url: input instanceof Request ? input.url : String(input),
+          body: JSON.parse(init?.body as string),
+        });
+        return jsonResponse({
+          success: true,
+          result: { content: "<h1>Hi</h1>", markdown: "# Hi", screenshot: "iVBORw0KGgo=" },
+          meta: { status: 200, title: "Hi" },
+        });
+      }),
+    );
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+
+    const page = await provider.scrape("https://example.test", {
+      formats: ["html", "markdown"],
+      screenshot: true,
+      waitFor: "h1",
+    });
+
+    expect(page).toEqual({
+      url: "https://example.test",
+      html: "<h1>Hi</h1>",
+      markdown: "# Hi",
+      screenshot: "data:image/png;base64,iVBORw0KGgo=",
+      title: "Hi",
+      statusCode: 200,
+    });
+    expect(requests).toEqual([
+      {
+        url: "https://api.cloudflare.com/client/v4/accounts/test-account/browser-rendering/snapshot",
+        body: {
+          url: "https://example.test",
+          waitForSelector: { selector: "h1" },
+          formats: ["content", "markdown", "screenshot"],
+        },
+      },
+    ]);
+  });
+
+  it("takes the screenshot in the same render as the markdown", async () => {
+    let body: unknown;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        body = JSON.parse(init?.body as string);
+        return jsonResponse({ success: true, result: { markdown: "# Hi", screenshot: "AAAA" } });
+      }),
+    );
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+
+    const page = await provider.scrape("https://example.test", {
+      formats: ["markdown"],
+      screenshot: true,
+    });
+
+    expect(page).toEqual({
+      url: "https://example.test",
+      markdown: "# Hi",
+      screenshot: "data:image/png;base64,AAAA",
+    });
+    expect(body).toEqual({ url: "https://example.test", formats: ["markdown", "screenshot"] });
+  });
+
   it("sends scrape options in the shape Browser Run accepts", async () => {
     let body: unknown;
     vi.stubGlobal(

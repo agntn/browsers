@@ -1,5 +1,5 @@
 import { defineCommand } from "citty";
-import { consola } from "consola";
+import { consola } from "./_logger.ts";
 import { resolveAndCreate } from "./_helpers.ts";
 import type { ScrapeResult } from "../core/types.ts";
 import { scrapeWithSessionWhenNeeded } from "../core/utils.ts";

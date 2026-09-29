@@ -1,4 +1,6 @@
 import { runCommand } from "citty";
+import { LogLevels } from "consola";
+import { consola } from "../../src/commands/_logger";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { BrowserProvider } from "../../src/core/types";
 import { register } from "../../src/core/registry";
@@ -93,5 +95,25 @@ describe("scrape command", () => {
       waitFor: undefined,
       maxChars: undefined,
     });
+  });
+
+  it("writes its status line to stderr, so stdout holds only the page", async () => {
+    process.env.CLITEST_API_KEY = "test";
+    statelessScrape = true;
+    providerScrape.mockResolvedValueOnce({ url: "https://example.test", text: "page text" });
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const level = consola.level;
+    consola.level = LogLevels.info;
+
+    await runCommand(scrape, {
+      rawArgs: ["https://example.test", "--provider", "clitest", "--format", "text"],
+    }).finally(() => {
+      consola.level = level;
+    });
+
+    expect(stdout).not.toHaveBeenCalled();
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining("Scraping via clitest"));
   });
 });

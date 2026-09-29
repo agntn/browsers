@@ -1,5 +1,5 @@
 import { defineCommand } from "citty";
-import { consola } from "consola";
+import { consola } from "./_logger.ts";
 import { createCrawl } from "../core/resolve.ts";
 import type { CrawlPage, CrawlResult } from "../core/types.ts";
 
@@ -17,15 +17,16 @@ function pageContent(page: PrintableCrawlPage): string {
 }
 
 function printCrawlResult(result: PrintableCrawlResult): void {
-  if (result.jobId) consola.info(`Job ID: ${result.jobId} (status: ${result.status})`);
-  if (result.pages.length === 0) {
-    if (result.status === "running") {
-      consola.info(
-        "The crawl job is still running. Pass --job with this ID and the same --provider and --browser to wait for it again.",
-      );
-    }
+  if (result.pages.length === 0 && result.status === "running" && result.jobId) {
+    // The ID is all this run produced and what `--job` takes, so it goes to stdout.
+    console.log(result.jobId);
+    consola.info(
+      "The crawl job is still running. Pass --job with this ID and the same --provider and --browser to wait for it again.",
+    );
     return;
   }
+  if (result.jobId) consola.info(`Job ID: ${result.jobId} (status: ${result.status})`);
+  if (result.pages.length === 0) return;
 
   for (const page of result.pages) {
     console.log(`\n--- ${page.url} ---`);

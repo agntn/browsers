@@ -1,5 +1,5 @@
 import { defineCommand } from "citty";
-import { consola } from "consola";
+import { consola } from "./_logger.ts";
 import { resolveScreenshotProvider } from "./_helpers.ts";
 import { screenshotWithSessionWhenNeeded } from "../core/utils.ts";
 import { writeFileSync } from "node:fs";

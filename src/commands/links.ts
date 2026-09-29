@@ -1,5 +1,5 @@
 import { defineCommand } from "citty";
-import { consola } from "consola";
+import { consola } from "./_logger.ts";
 import { readLinks } from "../tool-operations.ts";
 
 export default defineCommand({

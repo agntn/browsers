@@ -122,11 +122,16 @@ function stateful(
   };
 }
 
+/** One element's picture runs wherever the provider's screenshots run, with or without a session. */
+function element(capabilities: ProviderCapabilities): Support {
+  return capabilities.elementScreenshot ? stateful("screenshot", "statelessScreenshot")(capabilities) : "no";
+}
+
 /** The operations `capabilities()` reports, in the order the matrix and the dossier show them. */
 export const OPERATIONS: readonly Operation[] = [
   { key: "scrape", label: "scrape", about: "Rendered page as markdown, text or HTML", support: stateful("scrape", "statelessScrape") },
   { key: "screenshot", label: "screenshot", about: "Image of the page", support: stateful("screenshot", "statelessScreenshot") },
-  { key: "element", label: "element", about: "Image of the one element a selector names", support: flag("elementScreenshot") },
+  { key: "element", label: "element", about: "Image of the one element a selector names", support: element },
   { key: "pdf", label: "pdf", about: "The page printed to a PDF", support: flag("pdf") },
   { key: "crawl", label: "crawl", about: "Follow links from a start page", support: flag("crawl") },
   { key: "links", label: "links", about: "Unique hrefs in page order", support: flag("links") },

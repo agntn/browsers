@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import type { ServerResponse } from "node:http";
-import { describe, it, expect, afterAll, beforeAll } from "vitest";
+import { describe, it, expect, afterAll, beforeAll } from "vite-plus/test";
 import { create } from "../src/core/registry";
 import { SessionNotFoundError } from "../src/core/errors";
 import type { BrowserProvider, BrowserSession } from "../src/core/types";

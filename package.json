@@ -64,13 +64,13 @@
     "access": "public"
   },
   "scripts": {
-    "build": "obuild",
-    "dev": "obuild --stub",
-    "lint": "pnpm build && oxlint . && oxfmt --check .",
-    "lint:fix": "pnpm build && oxlint . --fix && oxfmt .",
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "lint": "pnpm build && vp lint && vp fmt --check",
+    "lint:fix": "pnpm build && vp lint --fix && vp fmt",
     "typecheck": "tsc --noEmit && pnpm build && tsc --noEmit -p tsconfig.extensions.json",
-    "test": "vitest",
-    "test:run": "vitest --run",
+    "test": "vp test watch",
+    "test:run": "vp test run",
     "test:mcp": "pnpm build && node test/eval-mcp.mjs",
     "prepack": "pnpm run build",
     "release": "pnpm test:run && pnpm build && changelogen --release --push"
@@ -93,13 +93,9 @@
     "@oh-my-pi/pi-coding-agent": "18.0.0",
     "@types/node": "latest",
     "changelogen": "latest",
-    "obuild": "latest",
-    "oxfmt": "0.63.0",
-    "oxlint": "1.78.0",
-    "oxlint-tsgolint": "^7.0.2001",
     "tsx": "4.22.5",
     "typescript": "latest",
-    "vitest": "latest"
+    "vite-plus": "catalog:"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": ">=0.76.0 <1",

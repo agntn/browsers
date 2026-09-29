@@ -372,6 +372,7 @@ class PlaywrightProvider implements BrowserProvider {
     try {
       const page = this.getPage(session);
       const value: unknown = await page.evaluate((source): unknown => {
+        /* oxlint-disable-next-line no-eval -- evaluating the caller's script in the page is the operation */
         const result: unknown = globalThis.eval(source);
         return result;
       }, script);

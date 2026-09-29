@@ -1,7 +1,7 @@
 import { runCommand } from "citty";
 import { LogLevels } from "consola";
 import { consola } from "../../src/commands/_logger";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 import type { BrowserProvider } from "../../src/core/types";
 import { register } from "../../src/core/registry";
 import scrape from "../../src/commands/scrape";

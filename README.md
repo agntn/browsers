@@ -171,11 +171,11 @@ Want a ninth? A class that implements `BrowserProvider`, an exported `factory`, 
 
 ```bash
 pnpm install
-pnpm lint         # builds first, then oxlint and oxfmt --check
+pnpm lint         # builds first, then vp lint and vp fmt --check
 pnpm lint:fix
 pnpm typecheck    # tsc, then a build, then the extensions
 pnpm test:run
-pnpm build        # obuild
+pnpm build        # vp pack
 ```
 
 ## 💛 Thanks

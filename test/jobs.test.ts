@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { resetDefaultClientForTests } from "../src/core/client";
 import { create } from "../src/core/registry";
 import { JOB_POLL_INTERVAL } from "../src/core/utils";

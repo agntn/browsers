@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { InvalidInputError, UnsupportedOperationError } from "../src/core/errors";
 import { create } from "../src/core/registry";
 import { createScreenshotProvider } from "../src/core/resolve";

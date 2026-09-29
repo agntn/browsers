@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { browserToolDescriptions, browserToolNames } from "../src/tool-contract";
 
 describe("browser tool advertising", () => {

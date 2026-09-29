@@ -19,7 +19,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 - `packages/pi/extensions/browsers.ts` - Pi agent tools
 - `packages/omp/extensions/browsers.ts` - OMP agent tools
 - `packages/shared/tui.ts` - terminal rendering shared by Pi and OMP
-- `oxlint.config.ts` / `oxfmt.config.ts` - repository-local consumers of the shared `@agntn/ox` policy
+- `vite.config.ts` - Vite+ config for `vp pack`, `vp test`, `vp lint` and `vp fmt`; lint and fmt spread the shared `@agntn/ox` policy
 
 ## Adding a provider
 
@@ -35,7 +35,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 ## Conventions
 
 - TypeScript, ESM, Node >= 22
-- Linting and formatting use oxlint + oxfmt through `@agntn/ox`; type-aware lint runs after `pnpm build`
+- Vite+ runs the toolchain: `vp pack` builds, `vp test` runs Vitest, `vp lint` and `vp fmt` run oxlint and oxfmt; type-aware lint runs after `pnpm build`
 - ofetch for HTTP, citty for CLI, consola for logging
 - API keys from env: `PROVIDERNAME_API_KEY`
 - Nothing runs at import: providers load on the first `create()`, ofetch on the first request, and the MCP server imports TypeBox on the first `tools/list`; `sideEffects: false` in `package.json` states that and has to stay true

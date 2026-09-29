@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
 import { resolveProvider, _hasKey, providerEnvKey, providerEnvHint } from "../src/core/resolve";
 
 describe("_hasKey", () => {

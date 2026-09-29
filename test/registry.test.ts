@@ -1,5 +1,5 @@
 import { readdirSync } from "node:fs";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vite-plus/test";
 import { create, providers, has } from "../src/core/registry";
 import { resetDefaultClientForTests } from "../src/core/client";
 import { builtins } from "../src/providers/index";

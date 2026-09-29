@@ -34,7 +34,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 
 ## Conventions
 
-- TypeScript, ESM, Node >= 22
+- TypeScript, ESM, Node >= 26
 - Vite+ runs the toolchain: `vp pack` builds, `vp test` runs Vitest, `vp lint` and `vp fmt` run oxlint and oxfmt; type-aware lint runs after `pnpm build`
 - ofetch for HTTP, citty for CLI, consola for logging
 - API keys from env: `PROVIDERNAME_API_KEY`

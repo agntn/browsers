@@ -25,8 +25,8 @@ function isCommandModule(value: unknown): value is { default: typeof McpCommand 
 /**
  * Loads the MCP command. A built bin inside a checkout runs the live source, as the Pi and
  * OMP extensions do, so a local server needs a restart after a change instead of `pnpm build`.
- * Node strips types by default only from 22.18 and never under `node_modules`, so an older
- * Node and a git install that ships `src` keep the bundle. `BROWSERS_DIST=1` keeps it
+ * Node never strips types under `node_modules` or with `--no-strip-types`, so a git install
+ * that ships `src` and a Node run with that flag keep the bundle. `BROWSERS_DIST=1` keeps it
  * everywhere, for tests of the built output.
  *
  * @returns {Promise<typeof McpCommand>} The citty command that starts the stdio server.

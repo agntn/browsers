@@ -28,7 +28,7 @@ export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
   },
-  fmt: { ...oxfmt, ignorePatterns: ["CHANGELOG.md"] },
+  fmt: { ...oxfmt, ignorePatterns: ["CHANGELOG.md", "docs"] },
   /** Keep mutable public request types source-compatible while applying the shared policy elsewhere. */
   lint: {
     ...oxlint,
@@ -76,7 +76,7 @@ export default defineConfig({
         },
       },
     ],
-    ignorePatterns: [],
+    ignorePatterns: ["docs"],
   },
   /**
    * One bundle for every entry, so the CLI, the MCP server and the providers share one copy of the

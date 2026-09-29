@@ -440,3 +440,38 @@ describe("cloudflare accessibility tree", () => {
     expect(bodies).toEqual([{ url: "https://example.com/", root: "#nope" }]);
   });
 });
+
+describe("cloudflare CDP URL", () => {
+  const session = { id: "abc", provider: "cloudflare", createdAt: 0 };
+
+  it("returns the URL Cloudflare gave the session", async () => {
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+
+    expect(provider.getCdpUrl?.({ ...session, cdpUrl: "wss://example.test/abc" })).toBe(
+      "wss://example.test/abc",
+    );
+  });
+
+  it("builds webSocketDebuggerUrl for a session without one", async () => {
+    const chromium = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+    const kitesurf = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+      browser: "kitesurf",
+    });
+
+    expect(chromium.getCdpUrl?.(session)).toBe(
+      "wss://api.cloudflare.com/client/v4/accounts/test-account/browser-rendering/devtools/browser/abc",
+    );
+    expect(kitesurf.getCdpUrl?.(session)).toBe(
+      "wss://api.cloudflare.com/client/v4/accounts/test-account/browser-run/devtools/browser/abc",
+    );
+    expect(kitesurf.getCdpUrl?.({ ...session, id: "" })).toBeUndefined();
+  });
+});

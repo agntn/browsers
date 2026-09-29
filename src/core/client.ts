@@ -1,6 +1,6 @@
 import type { $Fetch, FetchError, FetchOptions } from "ofetch";
 import type { ClientOptions } from "./types.ts";
-import { HTTPError, RateLimitError, parseRetryAfter } from "./errors.ts";
+import { HTTPError, RateLimitError, TimeoutError, parseRetryAfter } from "./errors.ts";
 import { lazy } from "./lazy.ts";
 import { version } from "../version.ts";
 
@@ -60,7 +60,7 @@ export class Client {
     try {
       return await fetch<T>(url, { headers, ...this.retryControl(signal) });
     } catch (error) {
-      throw this.mapError(error, url);
+      throw this.mapError(error, url, signal);
     }
   }
 
@@ -74,7 +74,7 @@ export class Client {
     try {
       return await fetch<T>(url, { method: "POST", body, headers, ...this.retryControl(signal) });
     } catch (error) {
-      throw this.mapError(error, url);
+      throw this.mapError(error, url, signal);
     }
   }
 
@@ -87,7 +87,7 @@ export class Client {
     try {
       return await fetch<T>(url, { method: "PUT", headers, ...this.retryControl(signal) });
     } catch (error) {
-      throw this.mapError(error, url);
+      throw this.mapError(error, url, signal);
     }
   }
 
@@ -107,7 +107,7 @@ export class Client {
       });
       return typeof res._data === "string" ? res._data : String(res._data);
     } catch (error) {
-      throw this.mapError(error, url);
+      throw this.mapError(error, url, signal);
     }
   }
 
@@ -133,7 +133,7 @@ export class Client {
       });
       return res._data as ArrayBuffer;
     } catch (error) {
-      throw this.mapError(error, url);
+      throw this.mapError(error, url, signal);
     }
   }
 
@@ -154,7 +154,7 @@ export class Client {
       });
       return res._data as ArrayBuffer;
     } catch (error) {
-      throw this.mapError(error, url);
+      throw this.mapError(error, url, signal);
     }
   }
 
@@ -167,7 +167,7 @@ export class Client {
     try {
       return await fetch<T>(url, { method: "DELETE", headers, ...this.retryControl(signal) });
     } catch (error) {
-      throw this.mapError(error, url);
+      throw this.mapError(error, url, signal);
     }
   }
 
@@ -202,7 +202,7 @@ export class Client {
         json: () => Promise.resolve(data as unknown),
       };
     } catch (error) {
-      throw this.mapError(error, url);
+      throw this.mapError(error, url, signal);
     }
   }
 
@@ -226,8 +226,18 @@ export class Client {
     };
   }
 
-  private mapError(error: unknown, url: string): Error {
+  /**
+   * Turns an ofetch failure into the error the caller sees.
+   *
+   * @param {unknown} error Failure from ofetch.
+   * @param {string} url Request URL, sanitized before it reaches a message.
+   * @param {AbortSignal} [signal] Caller cancellation: a timeout of its own is not the client's.
+   * @returns {Error} The mapped error.
+   */
+  private mapError(error: unknown, url: string, signal?: AbortSignal): Error {
     if (this.FetchError !== undefined && error instanceof this.FetchError) {
+      if (isClientTimeout(error.cause, signal))
+        return new TimeoutError(this.timeout, sanitizeUrl(url));
       const body = responseText(error.data);
       if (error.statusCode === 429) {
         const retryAfter = parseRetryAfter(error.response?.headers.get("Retry-After"));
@@ -237,6 +247,18 @@ export class Client {
     }
     return error instanceof Error ? error : new Error(String(error));
   }
+}
+
+/**
+ * Whether a request failed on the client's own timeout rather than on the caller's signal,
+ * which may carry a timeout of its own.
+ *
+ * @param {unknown} cause Cause of the ofetch failure.
+ * @param {AbortSignal} [signal] Caller cancellation.
+ * @returns {boolean} `true` for the client's timeout.
+ */
+function isClientTimeout(cause: unknown, signal?: AbortSignal): boolean {
+  return cause instanceof Error && cause.name === "TimeoutError" && !signal?.aborted;
 }
 
 /**

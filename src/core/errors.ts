@@ -104,6 +104,22 @@ export class RateLimitError extends BrowserError {
   }
 }
 
+export class TimeoutError extends BrowserError {
+  readonly timeout: number;
+  readonly url: string;
+
+  /**
+   * @param timeout - Milliseconds the client waited for each attempt.
+   * @param url - Sanitized request URL, so the agent can tell which provider stayed silent.
+   */
+  constructor(timeout: number, url = "") {
+    super(`Timed out after ${timeout / 1000}s with no response${url ? ` from ${url}` : ""}`);
+    this.name = "TimeoutError";
+    this.timeout = timeout;
+    this.url = url;
+  }
+}
+
 export class UnknownProviderError extends BrowserError {
   readonly provider: string;
   constructor(provider: string) {

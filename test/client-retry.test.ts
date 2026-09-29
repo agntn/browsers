@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { Client } from "../src/core/client";
+import { TimeoutError } from "../src/core/errors";
 
 const requests = [
   (client: Client, url: string) => client.getJSON(url),
@@ -111,14 +112,38 @@ describe("Client retry timeout", () => {
   it("stops after exhausting the retry budget", async () => {
     respond = () => {};
     const client = new Client({ timeout: 150, maxRetries: 1, baseDelay: 1 });
-    await expect(client.getJSON(url)).rejects.toThrow("HTTP 0");
+    await expect(client.getJSON(url)).rejects.toThrow(TimeoutError);
     expect(count).toBe(2);
   });
 
   it("respects a zero retry budget", async () => {
     const client = new Client({ timeout: 150, maxRetries: 0 });
-    await expect(client.getJSON(url)).rejects.toThrow("HTTP 0");
+    await expect(client.getJSON(url)).rejects.toThrow(TimeoutError);
     expect(count).toBe(1);
+  });
+
+  it.each(requests)("names a timeout and its length through request method %#", async (request) => {
+    respond = () => {};
+    const client = new Client({ timeout: 150, maxRetries: 0 });
+    const error = await request(client, `${url}/?token=secret`).then(
+      () => undefined,
+      (failure: unknown) => failure,
+    );
+    expect(error).toBeInstanceOf(TimeoutError);
+    expect((error as Error).message).toBe(
+      `Timed out after 0.15s with no response from ${url}/?token=%5BREDACTED%5D`,
+    );
+  });
+
+  it("leaves a timeout of the caller's own signal to the caller", async () => {
+    respond = () => {};
+    const client = new Client({ timeout: 5000, maxRetries: 0 });
+    const error = await client.getJSON(url, undefined, AbortSignal.timeout(100)).then(
+      () => undefined,
+      (failure: unknown) => failure,
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(TimeoutError);
   });
 
   it("does not retry a non-retryable status", async () => {

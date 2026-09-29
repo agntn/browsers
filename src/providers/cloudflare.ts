@@ -24,13 +24,13 @@ import type {
   ProviderCapabilities,
   CloudflareBrowser,
 } from "../core/types.ts";
-import { defaultClient } from "../core/client.ts";
-import type { Client } from "../core/client.ts";
+import { Client } from "../core/client.ts";
 import {
   AuthError,
   BrowserError,
   HTTPError,
   RateLimitError,
+  TimeoutError,
   normalizeError,
 } from "../core/errors.ts";
 import {
@@ -40,6 +40,12 @@ import {
   resolveCloudflareBrowser,
   waitForJob,
 } from "../core/utils.ts";
+
+/**
+ * Client timeout for Browser Run requests. The page load and a `waitForSelector` each get 30
+ * seconds there, so waiting only 30 seconds here hides the 422 that names the missing selector.
+ */
+const REQUEST_TIMEOUT = 90_000;
 
 interface CfEnvelope<T = unknown> {
   readonly success: boolean;
@@ -227,7 +233,7 @@ class CloudflareProvider implements BrowserProvider {
       );
     }
 
-    this.client = defaultClient();
+    this.client = new Client({ timeout: REQUEST_TIMEOUT });
     this.apiToken = apiToken;
     this.accountID = accountID;
     this.browser = resolveCloudflareBrowser("cloudflare", config.browser);
@@ -284,6 +290,9 @@ class CloudflareProvider implements BrowserProvider {
     if (error instanceof RateLimitError && error.url.includes(account)) {
       const url = error.url.replace(account, "/accounts/[account]/");
       return new RateLimitError(error.retryAfter, url, error.body, error.provider);
+    }
+    if (error instanceof TimeoutError && error.url.includes(account)) {
+      return new TimeoutError(error.timeout, error.url.replace(account, "/accounts/[account]/"));
     }
     return normalizeError(error, "cloudflare");
   }

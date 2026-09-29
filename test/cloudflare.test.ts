@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { resetDefaultClientForTests } from "../src/core/client";
+import { TimeoutError } from "../src/core/errors";
 import { create } from "../src/core/registry";
 import {
   browserAccessibility,
@@ -456,6 +457,30 @@ describe("cloudflare errors", () => {
     expect(text).toContain("/accounts/[account]/browser-rendering/markdown");
     expect(text).toContain("Rate limit exceeded");
     expect(text).not.toContain(accountID);
+  });
+
+  it("waits past Browser Run's own 30 second waits and names the timeout", async () => {
+    process.env.CF_API_TOKEN = "cf-token";
+    process.env.CF_ACCOUNT_ID = accountID;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+      }),
+    );
+    const error = await browserScrape({
+      url: "https://example.com",
+      provider: "cloudflare",
+      waitFor: "h1",
+    }).then(
+      () => undefined,
+      (failure: unknown) => failure,
+    );
+
+    expect(error).toBeInstanceOf(TimeoutError);
+    expect(errorMessage(error)).toBe(
+      "Timed out after 90s with no response from https://api.cloudflare.com/client/v4/accounts/[account]/browser-rendering/markdown",
+    );
   });
 });
 

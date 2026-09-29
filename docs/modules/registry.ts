@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { addTemplate, defineNuxtModule } from "nuxt/kit";
 import { create } from "../../src/core/registry.ts";
 import { _hasKey, providerEnvHint } from "../../src/core/resolve.ts";
@@ -45,7 +46,8 @@ async function withProviderEnv<T>(value: string | undefined, callback: () => T |
 }
 
 /**
- * Ships the registry as `#browsers-registry`, one typed template Nuxt bundles. The provider
+ * Ships the registry as `#browsers-registry`, one template Nuxt bundles. The template is plain
+ * JavaScript: a production build keeps it under `node_modules/.cache`, where Nitro strips no types. The provider
  * modules import `node:child_process` (Playwright) and would each pull an HTTP client into the
  * page, so they run once here, in Node, when Nuxt starts. Nothing under `src/core`,
  * `src/providers` or `src/tool-operations.ts` imports an npm package at module scope, which is
@@ -79,12 +81,18 @@ export default defineNuxtModule({
 
     const registry: BrowsersRegistry = { version, providers };
     const template = addTemplate({
-      filename: "browsers-registry.ts",
+      filename: "browsers-registry.mjs",
+      write: true,
+      getContents: () => `export default ${JSON.stringify(registry)};\n`,
+    });
+    /** Types for the template, beside it, where TypeScript looks for an `.mjs` file's declaration. */
+    addTemplate({
+      filename: "browsers-registry.d.mts",
       write: true,
       getContents: () =>
         [
-          `import type { BrowsersRegistry } from "#shared/types/registry";`,
-          `const registry: BrowsersRegistry = ${JSON.stringify(registry)};`,
+          `import type { BrowsersRegistry } from "${resolve(import.meta.dirname, "../shared/types/registry.ts")}";`,
+          "declare const registry: BrowsersRegistry;",
           "export default registry;",
           "",
         ].join("\n"),

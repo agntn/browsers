@@ -39,6 +39,8 @@ Deployment: Workers Builds with root directory `docs`. It installs `docs/` and n
 
 `modules/registry.ts` imports `../src/core/registry.ts`, `../src/core/resolve.ts`, `../src/providers/index.ts` and `../src/tool-operations.ts` under Nuxt's jiti when Nuxt starts. That works without the root `node_modules` because nothing in that graph imports an npm package at module scope: `ofetch` and `playwright-core` load on the first request or launch, which the module never makes. A new top-level npm import anywhere under `src/core`, `src/providers` or `src/tool-operations.ts` breaks the deploy. Add the package to `docs/package.json` at the root's version, or keep the import lazy.
 
+The template is plain JavaScript with a `.d.mts` beside it for the types. `nuxt build` keeps its build directory under `node_modules/.cache`, where Nitro strips no TypeScript, so a `.ts` template passed the first build of a checkout and broke every one after it.
+
 The page itself imports only `src/tool-contract.ts` (through `#tool-contract`), which imports nothing. The provider modules stay out of the browser: `playwright.ts` imports `node:child_process`.
 
 Two resolution traps, both because the repo root is its own pnpm workspace:

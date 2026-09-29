@@ -1,5 +1,13 @@
-import registry from "#browsers-registry";
-import type { BrowserProviderName, ProviderCapabilities, ProviderRecord } from "#shared/types/registry";
+import built from "#browsers-registry";
+import type {
+  BrowserProviderName,
+  BrowsersRegistry,
+  ProviderCapabilities,
+  ProviderRecord,
+} from "#shared/types/registry";
+
+/** What `modules/registry.ts` wrote at build time, checked against the shape the pages read. */
+const registry: BrowsersRegistry = built;
 
 /** A display name, a glyph and one line per provider. Everything else comes from the library. */
 const PRESENTATION: Record<BrowserProviderName, { name: string; icon: string; blurb: string }> = {

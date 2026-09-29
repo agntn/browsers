@@ -58,8 +58,8 @@ const NOTES = [
         <h2 class="start-title">Start with the one that needs no key</h2>
         <p class="start-lead">
           One install gives you the library, the <code>browsers</code> CLI and the MCP server.
-          Playwright runs on your machine, so the first scrape costs nothing. Add a vendor key
-          later and the same call goes to the cloud instead.
+          Playwright runs on your machine, so the first scrape costs nothing. Later, set a vendor
+          key and swap the name for <code>resolveProvider()</code>, and the call goes to the cloud.
         </p>
         <ul class="start-notes">
           <li v-for="note in NOTES" :key="note.tag">

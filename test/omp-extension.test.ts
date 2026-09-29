@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import * as TypeBox from "@oh-my-pi/omptype/typebox";
 import { Value } from "typebox/value";
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@oh-my-pi/pi-coding-agent";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import browsersOmpExtension from "../packages/omp/extensions/browsers";
 import { browserToolNames } from "../src/tool-contract";
 import { browserToolSchemas } from "../src/tool-schemas";

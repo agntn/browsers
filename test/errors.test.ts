@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import type { Server } from "node:http";
-import { afterAll, beforeAll, describe, it, expect } from "vitest";
+import { afterAll, beforeAll, describe, it, expect } from "vite-plus/test";
 import { Client } from "../src/core/client";
 import {
   BrowserError,

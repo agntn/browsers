@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { BrowserProvider } from "../src/core/types";
 import { browserExtract, browserLinks, browserScrape } from "../src/tool-operations";
 

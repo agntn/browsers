@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runCommand } from "citty";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 import type { BrowserProvider } from "../../src/core/types";
 import { UnsupportedOperationError } from "../../src/core/errors";
 import { register } from "../../src/core/registry";

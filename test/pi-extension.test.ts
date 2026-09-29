@@ -5,7 +5,7 @@ import type {
   ExtensionContext,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import browsersExtension, { resolveBrowsersModuleUrl } from "../packages/pi/extensions/browsers";
 
 const browserToolsMock = vi.hoisted(() => ({

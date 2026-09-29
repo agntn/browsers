@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server } from "node:http";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { create } from "../src/core/registry";
 
 async function readBody(request: IncomingMessage): Promise<string> {

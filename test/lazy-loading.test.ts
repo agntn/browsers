@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { create, has, providers, register } from "../src/core/registry";
 import { resolveProvider } from "../src/core/resolve";
 import type { BrowserProvider, BrowserProviderFactory } from "../src/core/types";

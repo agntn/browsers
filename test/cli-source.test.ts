@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { cpSync, globSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const bin = join(repoRoot, "dist/cli.mjs");

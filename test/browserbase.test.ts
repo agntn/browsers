@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import type { Server } from "node:http";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vite-plus/test";
 import { create } from "../src/core/registry";
 import { UnsupportedOperationError } from "../src/core/errors";
 

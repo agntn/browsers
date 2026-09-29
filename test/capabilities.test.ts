@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { create, providers } from "../src/core/registry";
 import type { BrowserProvider, ProviderConfig } from "../src/core/types";
 

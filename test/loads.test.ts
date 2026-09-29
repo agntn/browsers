@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import pkg from "../package.json" with { type: "json" };
 import { browserProviderNames } from "../src/tool-contract";
 

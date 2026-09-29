@@ -4,7 +4,7 @@ import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { chromium } from "playwright-core";
 import type { Browser } from "playwright-core";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import { SessionNotFoundError } from "../src/core/errors";
 import { create } from "../src/core/registry";
 

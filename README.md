@@ -30,7 +30,7 @@ Steel scrapes in one HTTP call. Kernel wants a live session first. Browserbase h
 pnpm add @agntn/browsers
 ```
 
-Node.js 22 or newer.
+Node.js 26 or newer.
 
 ## 🚀 First call
 

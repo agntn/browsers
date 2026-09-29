@@ -10,7 +10,7 @@ const hook = fileURLToPath(new URL("./record-loads.mjs", import.meta.url));
 const sourceRoot = pathToFileURL(join(repoRoot, "src/")).href;
 /** The chunk `dist/cli.mjs` imports for `mcp` when it keeps the bundle. */
 const bundledCommand = pathToFileURL(join(repoRoot, "dist/_chunks/mcp.mjs")).href;
-/** Node 22 before 22.18 strips types only with a flag; the bin keeps the bundle there. */
+/** `--no-strip-types` turns stripping off, in `NODE_OPTIONS` too; the bin keeps the bundle there. */
 const stripsTypes = Boolean(process.features.typescript);
 
 interface Run {

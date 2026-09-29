@@ -406,9 +406,17 @@ class CloudflareProvider implements BrowserProvider {
     notSupportedViaRest("cloudflare", "evaluate");
   }
 
+  /**
+   * The session's CDP WebSocket, built from the account when Cloudflare didn't send one.
+   * Connecting needs the `Authorization: Bearer` header with the API token.
+   *
+   * @param {BrowserSession} session Session to connect to.
+   * @returns {string | undefined} The WebSocket URL, or undefined without a session ID.
+   */
   getCdpUrl(session: BrowserSession): string | undefined {
+    if (session.cdpUrl) return session.cdpUrl;
     if (!session.id) return undefined;
-    return `wss://cloudflare.com/browser-run/devtools/browser/${session.id}`;
+    return `${this.base().replace(/^https:/, "wss:")}/devtools/browser/${session.id}`;
   }
 
   async crawl(

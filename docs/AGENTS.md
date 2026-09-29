@@ -35,7 +35,7 @@ pnpm build            # Cloudflare Workers output in .output/, content routes pr
 pnpm deploy           # build, then wrangler deploy to browsers.agntn.dev
 ```
 
-Deployment: Workers Builds with root directory `docs`. It installs `docs/` and nothing else, and that's enough. Nitro preset `cloudflare_module`. Nuxt Content wants a D1 binding named `DB`. `wrangler.jsonc` carries it plus the `NUXT_SITE_URL` var. The `database_id` there is zeros until the database `agntn-browsers` exists; create it, put its id in, and add the Workers Builds project. No KV binding.
+Deployment: Workers Builds with root directory `docs`. It installs `docs/` and nothing else, and that's enough. Nitro preset `cloudflare_module`. Nuxt Content wants a D1 binding named `DB`. `wrangler.jsonc` carries it plus the `NUXT_SITE_URL` var. The database `agntn-browsers` lives in the EU jurisdiction, which is set at creation; the binding names it by id alone. No KV binding.
 
 `modules/registry.ts` imports `../src/core/registry.ts`, `../src/core/resolve.ts`, `../src/providers/index.ts` and `../src/tool-operations.ts` under Nuxt's jiti when Nuxt starts. That works without the root `node_modules` because nothing in that graph imports an npm package at module scope: `ofetch` and `playwright-core` load on the first request or launch, which the module never makes. A new top-level npm import anywhere under `src/core`, `src/providers` or `src/tool-operations.ts` breaks the deploy. Add the package to `docs/package.json` at the root's version, or keep the import lazy.
 

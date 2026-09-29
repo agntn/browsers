@@ -712,9 +712,68 @@ describe("browser tool operations", () => {
 
     expect(lines).toEqual([
       '- RootWebArea "Example Domain"',
-      '  - StaticText "Use it.Login"',
+      '  - StaticText "Use it."',
+      '  - StaticText "Login"',
       '  - StaticText "username:"',
       '  - link "Learn more"',
+    ]);
+  });
+
+  it("keeps a paragraph apart from the split run before and after it", () => {
+    // Chromium's tree of https://example.com/: the Arabic paragraph comes split into words
+    // between the English and Chinese ones, which come split into characters.
+    const lines = accessibilityOutline({
+      role: "RootWebArea",
+      children: [
+        ..."purposes.".split("").map((name) => ({ role: "StaticText", name })),
+        { role: "StaticText", name: "هذا" },
+        { role: "StaticText", name: " النطاق" },
+        { role: "StaticText", name: " والمراقبة." },
+        ..."该域名".split("").map((name) => ({ role: "StaticText", name })),
+      ],
+    });
+
+    expect(lines).toEqual([
+      "- RootWebArea",
+      '  - StaticText "purposes."',
+      '  - StaticText "هذا النطاق والمراقبة."',
+      '  - StaticText "该域名"',
+    ]);
+  });
+
+  it("joins text split into words and punctuation that ends longer text", () => {
+    // Chromium's tree of https://en.wikipedia.org/wiki/Accessibility, trimmed.
+    const lines = accessibilityOutline({
+      role: "RootWebArea",
+      children: [
+        { role: "StaticText", name: "about 30" },
+        { role: "StaticText", name: " " },
+        { role: "StaticText", name: "dB for a single frequency" },
+        { role: "StaticText", name: "November 12," },
+        { role: "StaticText", name: " 2012" },
+        { role: "StaticText", name: "." },
+        { role: "link", name: "Retrieved" },
+        { role: "StaticText", name: "2018-07-02" },
+        { role: "StaticText", name: "." },
+        { role: "link", name: "hatnote" },
+        { role: "StaticText", name: "." },
+        { role: "StaticText", name: "For the guideline, see" },
+        { role: "StaticText", name: "Rights, law, support" },
+        { role: "StaticText", name: "Rights" },
+      ],
+    });
+
+    expect(lines).toEqual([
+      "- RootWebArea",
+      '  - StaticText "about 30 dB for a single frequency"',
+      '  - StaticText "November 12, 2012."',
+      '  - link "Retrieved"',
+      '  - StaticText "2018-07-02."',
+      '  - link "hatnote"',
+      '  - StaticText "."',
+      '  - StaticText "For the guideline, see"',
+      '  - StaticText "Rights, law, support"',
+      '  - StaticText "Rights"',
     ]);
   });
 

@@ -686,9 +686,27 @@ function isOneCharacter(node: AccessibilityNode | undefined): boolean {
 }
 
 /**
- * Joins runs of bare text split into single characters and drops bare text with nothing to
- * read. Chromium splits some text into one node per character (example.com gives about 800),
- * while text of separate elements stays apart, since joining it would glue words together.
+ * Tells whether bare text continues the bare text before it on one line. The tree marks no
+ * element boundary, so this goes by shape: a single character continues a run of them,
+ * punctuation or a space continues any text, and longer text continues after a lone space or
+ * when it starts with one, as Chromium splits some sentences into words. A word right after a
+ * run stays apart, since example.com starts its next paragraph there.
+ *
+ * @param previous - Bare text node before, as the tree gives it.
+ * @param child - Bare text node that follows.
+ * @returns {boolean} Whether the two belong on one line.
+ */
+function continuesText(previous: AccessibilityNode | undefined, child: AccessibilityNode): boolean {
+  if (isOneCharacter(child)) {
+    return isOneCharacter(previous) || !/[\p{L}\p{N}]/u.test(child.name ?? "");
+  }
+  return /^\s?$/u.test(previous?.name ?? "") || /^\s/u.test(child.name ?? "");
+}
+
+/**
+ * Joins bare text that Chromium split apart and drops bare text with nothing to read. Chromium
+ * splits some text into one node per character (example.com gives about 800) and some into
+ * words, while text of separate elements stays apart, since joining it would glue words together.
  *
  * @param children - Child nodes in page order.
  * @returns {AccessibilityNode[]} The children with those runs joined.
@@ -702,7 +720,7 @@ function joinSplitText(children: readonly AccessibilityNode[]): AccessibilityNod
       last !== undefined &&
       isBareText(last) &&
       isBareText(child) &&
-      (isOneCharacter(previous) || isOneCharacter(child))
+      continuesText(previous, child)
     ) {
       joined[joined.length - 1] = {
         role: TEXT_ROLE,
@@ -765,7 +783,7 @@ function outlineLines(node: AccessibilityNode, depth: number): string[] {
 /**
  * Writes an accessibility tree as an indented outline, one node per line: role, quoted name,
  * then the node's states (`checked=false`, `level=2`, `focused`). Text that only repeats its
- * parent's name is left out, and text split into single characters is joined.
+ * parent's name is left out, and text split into characters or words is joined.
  *
  * @param tree - Root of the tree.
  * @returns {string[]} Outline lines in page order.

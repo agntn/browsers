@@ -107,6 +107,11 @@ function flag(name: keyof ProviderCapabilities): (capabilities: ProviderCapabili
   return (capabilities) => (capabilities[name] === true ? "direct" : "no");
 }
 
+/** An operation that only ever runs on a session the caller opened, like `navigate` and `evaluate`. */
+function sessionOnly(name: keyof ProviderCapabilities): (capabilities: ProviderCapabilities) => Support {
+  return (capabilities) => (capabilities[name] === true ? "session" : "no");
+}
+
 function stateful(
   name: "scrape" | "screenshot",
   stateless: "statelessScrape" | "statelessScreenshot",
@@ -130,8 +135,8 @@ export const OPERATIONS: readonly Operation[] = [
   { key: "search", label: "search", about: "Web search", support: flag("search") },
   { key: "sessions", label: "sessions", about: "Create, list and release a browser", support: flag("sessions") },
   { key: "cdp", label: "cdp", about: "A DevTools URL for your own Playwright or Puppeteer", support: flag("cdp") },
-  { key: "navigate", label: "navigate", about: "Drive a session to a URL (library only)", support: flag("navigate") },
-  { key: "evaluate", label: "evaluate", about: "Run a script in a session (library only)", support: flag("evaluate") },
+  { key: "navigate", label: "navigate", about: "Drive a session to a URL (library only)", support: sessionOnly("navigate") },
+  { key: "evaluate", label: "evaluate", about: "Run a script in a session (library only)", support: sessionOnly("evaluate") },
 ];
 
 /**

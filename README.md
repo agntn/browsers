@@ -7,6 +7,8 @@
 
 🌐 Eight vendors. One scrape call. JavaScript already ran.
 
+Docs, a page per provider and one real scrape through each of them: [browsers.agntn.dev](https://browsers.agntn.dev).
+
 ## Why?
 
 Steel scrapes in one HTTP call. Kernel wants a live session first. Browserbase hands you CDP. A model will mix those three up, so this is one `scrape()` over eight backends.

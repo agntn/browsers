@@ -19,6 +19,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 - `packages/pi/extensions/browsers.ts` - Pi agent tools
 - `packages/omp/extensions/browsers.ts` - OMP agent tools
 - `packages/shared/tui.ts` - terminal rendering shared by Pi and OMP
+- `docs/` - the browsers.agntn.dev site, its own pnpm project, outside the root lint; `docs/AGENTS.md` has its rules
 - `vite.config.ts` - Vite+ config for `vp pack`, `vp test`, `vp lint` and `vp fmt`; lint and fmt spread the shared `@agntn/ox` policy
 
 ## Adding a provider
@@ -29,8 +30,9 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 4. Add a manifest entry (key, default URL, `load: () => import("./yourprovider.ts").then((m) => m.factory)`) to `src/providers/index.ts`
 5. Add the key to `browserProviderNames` in `src/tool-contract.ts`
 6. Add any nonstandard environment key to `src/core/resolve.ts`
+7. Add its page as `docs/content/2.providers/<position>.<name>.md` with `::provider-facts{name="<name>"}`, its name, glyph and blurb to `PRESENTATION` in `docs/app/utils/providers.ts`, and a recorded scrape to `docs/app/data/scrape-sample.json`
 
-`test/registry.test.ts` fails when the manifest, the provider files and `browserProviderNames` disagree; `test/loads.test.ts` fails when an entry or a CLI usage path starts loading a provider, ofetch, TypeBox or the MCP SDK.
+`test/registry.test.ts` fails when the manifest, the provider files and `browserProviderNames` disagree; `test/docs.test.ts` fails when a provider has no page or no recording; `test/loads.test.ts` fails when an entry or a CLI usage path starts loading a provider, ofetch, TypeBox or the MCP SDK.
 
 ## Conventions
 

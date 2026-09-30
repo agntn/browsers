@@ -78,6 +78,14 @@ describe("provider choice for element screenshots", () => {
     await expect(createScreenshotProvider()).resolves.toMatchObject({ name: "steel" });
   });
 
+  it("skips a provider with no screenshot for a plain one", async () => {
+    onlySteelConfigured();
+    vi.stubEnv("STEEL_API_KEY", "");
+    vi.stubEnv("BROWSERBASE_API_KEY", "test");
+
+    await expect(createScreenshotProvider()).resolves.toMatchObject({ name: "playwright" });
+  });
+
   it("keeps a provider the caller named", async () => {
     onlySteelConfigured();
 

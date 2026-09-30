@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "./_logger.ts";
-import { resolveAndCreate } from "./_helpers.ts";
+import { resolveAndCreate, resolveCapableProvider } from "./_helpers.ts";
 
 export default defineCommand({
   meta: {
@@ -27,7 +27,7 @@ export default defineCommand({
         },
       },
       async run({ args }) {
-        const { provider } = await resolveAndCreate(args.provider, args.browser);
+        const { provider } = await resolveCapableProvider(args.provider, args.browser, "sessions");
         try {
           const session = await provider.createSession({ region: args.region });
           consola.success(`Session created: ${session.id}`);

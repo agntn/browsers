@@ -152,11 +152,38 @@ export async function createProvider(
   return { name, provider };
 }
 
+/** Capability flags that pick the provider for a call that names none. */
+export type ProviderCapability = "scrape" | "screenshot" | "elementScreenshot" | "sessions";
+
+const capabilityLabels: Readonly<Record<ProviderCapability, string>> = {
+  scrape: "scrape",
+  screenshot: "screenshots",
+  elementScreenshot: "element screenshots",
+  sessions: "sessions",
+};
+
 /**
- * Resolve and build the provider for one screenshot.
+ * Without a provider or browser, pick the first configured one whose `capability` is set.
  *
- * A `selector` without a provider or browser picks the first configured provider that can
- * capture one element, instead of one that would refuse it.
+ * @param {string | undefined} preferred Preferred provider name.
+ * @param {string | undefined} browser Optional Cloudflare browser engine.
+ * @param {ProviderCapability} capability Flag the provider has to set in `capabilities()`.
+ * @returns {Promise<{ name: string; provider: BrowserProvider }>} Resolved name and provider.
+ */
+export async function createCapableProvider(
+  preferred: string | undefined,
+  browser: string | undefined,
+  capability: ProviderCapability,
+): Promise<{ name: string; provider: BrowserProvider }> {
+  if (preferred || browser) return createProvider(preferred, browser);
+  return firstProvider(
+    (provider): provider is BrowserProvider => provider.capabilities()[capability] === true,
+    capabilityLabels[capability],
+  );
+}
+
+/**
+ * Resolve and build the provider for a page screenshot, or for the `selector` element alone.
  *
  * @param {string} [preferred] Preferred provider name.
  * @param {string} [browser] Optional Cloudflare browser engine.
@@ -168,10 +195,10 @@ export async function createScreenshotProvider(
   browser?: string,
   selector?: string,
 ): Promise<{ name: string; provider: BrowserProvider }> {
-  if (selector === undefined || preferred || browser) return createProvider(preferred, browser);
-  return firstProvider(
-    (provider): provider is BrowserProvider => provider.capabilities().elementScreenshot === true,
-    "element screenshots",
+  return createCapableProvider(
+    preferred,
+    browser,
+    selector === undefined ? "screenshot" : "elementScreenshot",
   );
 }
 

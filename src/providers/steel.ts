@@ -11,6 +11,7 @@ import type {
   BrowserProviderFactory,
   ProviderCapabilities,
 } from "../core/types.ts";
+import { rejectBlockPage } from "../core/block-page.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
 import { AuthError, BrowserError, normalizeError } from "../core/errors.ts";
@@ -66,27 +67,20 @@ function createScrapeBody(url: string, options?: ScrapeOptions): Record<string, 
   return body;
 }
 
-function isCloudflareChallenge(response: SteelScrapeResponse): boolean {
-  return (
-    response.metadata?.title?.trim().toLowerCase() === "just a moment..." &&
-    response.content?.html?.includes("challenges.cloudflare.com") === true
-  );
-}
-
 function toScrapeResult(url: string, response: SteelScrapeResponse): ScrapeResult {
-  if (isCloudflareChallenge(response)) {
-    throw new BrowserError("Steel returned a Cloudflare challenge instead of page content");
-  }
-  return {
-    url,
-    title: response.metadata?.title,
-    html: response.content?.html,
-    cleanedHtml: response.content?.cleaned_html,
-    markdown: response.content?.markdown,
-    text: response.content?.readability,
-    statusCode: response.metadata?.status_code,
-    links: response.links ? [...response.links] : undefined,
-  };
+  return rejectBlockPage(
+    {
+      url,
+      title: response.metadata?.title,
+      html: response.content?.html,
+      cleanedHtml: response.content?.cleaned_html,
+      markdown: response.content?.markdown,
+      text: response.content?.readability,
+      statusCode: response.metadata?.status_code,
+      links: response.links ? [...response.links] : undefined,
+    },
+    "steel",
+  );
 }
 
 function createScreenshotBody(

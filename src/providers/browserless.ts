@@ -13,6 +13,7 @@ import type {
   BrowserProviderFactory,
   ProviderCapabilities,
 } from "../core/types.ts";
+import { rejectBlockPage } from "../core/block-page.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
 import type { Browser, Page } from "playwright-core";
@@ -196,7 +197,7 @@ class BrowserlessProvider implements BrowserProvider {
         { url },
         { "Content-Type": "application/json" },
       );
-      return { url, html };
+      return rejectBlockPage({ url, html }, "browserless");
     } catch (error) {
       throw normalizeError(error, "browserless");
     }

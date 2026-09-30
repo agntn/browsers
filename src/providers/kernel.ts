@@ -11,6 +11,7 @@ import type {
   BrowserProviderFactory,
   ProviderCapabilities,
 } from "../core/types.ts";
+import { rejectBlockPage } from "../core/block-page.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
 import { AuthError, BrowserError, normalizeError } from "../core/errors.ts";
@@ -150,11 +151,7 @@ class KernelProvider implements BrowserProvider {
       );
 
       const data = result.value as { html?: string; title?: string } | undefined;
-      return {
-        url,
-        title: data?.title,
-        html: data?.html,
-      };
+      return rejectBlockPage({ url, title: data?.title, html: data?.html }, "kernel");
     } catch (error) {
       throw normalizeError(error, "kernel");
     }

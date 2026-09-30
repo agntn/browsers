@@ -203,6 +203,23 @@ export class UnsupportedOperationError extends BrowserError {
   }
 }
 
+export class BlockedPageError extends BrowserError {
+  readonly provider: string;
+  readonly page: string;
+
+  /**
+   * @param provider - Provider key, like `steel`.
+   * @param page - What came back instead of content, like `a Reddit captcha`.
+   */
+  constructor(provider: string, page: string) {
+    const label = provider.charAt(0).toUpperCase() + provider.slice(1);
+    super(`${label} returned ${page} instead of page content`);
+    this.name = "BlockedPageError";
+    this.provider = provider;
+    this.page = page;
+  }
+}
+
 export class PaymentError extends BrowserError {
   readonly statusCode: number;
   readonly provider: string;

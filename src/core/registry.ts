@@ -1,5 +1,6 @@
 import type { BrowserProvider, ProviderConfig, BrowserProviderFactory } from "./types.ts";
 import { UnknownProviderError } from "./errors.ts";
+import { lazy } from "./lazy.ts";
 import { builtins } from "../providers/index.ts";
 
 /** One provider the registry knows: static metadata plus a loader for its factory. */
@@ -19,11 +20,17 @@ let entries: Map<string, ProviderEntry> | undefined;
  *
  * Seeding on first use rather than at module scope keeps this module free of calls a
  * bundler would have to keep, so a consumer that never resolves a provider drops the table too.
+ * Loaders are memoized: under jiti (Pi, OMP) an overlapping `import()` sees no exports.
  *
  * @returns {Map<string, ProviderEntry>} The seeded table.
  */
 function table(): Map<string, ProviderEntry> {
-  entries ??= new Map(builtins.map((entry): [string, ProviderEntry] => [entry.key, entry]));
+  entries ??= new Map(
+    builtins.map((entry): [string, ProviderEntry] => [
+      entry.key,
+      { ...entry, load: lazy(entry.load) },
+    ]),
+  );
   return entries;
 }
 
@@ -44,8 +51,8 @@ export function register(name: string, defaultURL: string, factory: BrowserProvi
 /**
  * Create a provider by name.
  *
- * A built-in provider's module is imported here, on the first call for its name; the module
- * map shares one import between parallel callers and answers later calls from cache.
+ * A built-in provider's module is imported here, on the first call for its name; parallel
+ * callers share that import and later calls reuse it. A failed import is retried on the next call.
  *
  * @param name - Provider name.
  * @param config - Optional configuration; the API key falls back to `<NAME>_API_KEY`.

@@ -8,7 +8,12 @@ import {
 } from "./tool-contract.ts";
 import { BrowserError, InvalidInputError } from "./core/errors.ts";
 import { create, providers } from "./core/registry.ts";
-import { createCrawl, createProvider, createScreenshotProvider } from "./core/resolve.ts";
+import {
+  createCapableProvider,
+  createCrawl,
+  createProvider,
+  createScreenshotProvider,
+} from "./core/resolve.ts";
 import type {
   AccessibilityNode,
   AccessibilityTreeResult,
@@ -211,7 +216,7 @@ export async function browserScrape(
   params: Readonly<BrowserScrapeParams>,
 ): Promise<ToolResult<BrowserScrapeDetails>> {
   const maxChars = resolveMaxChars(params.maxChars);
-  const { name, provider } = await createProvider(params.provider, params.browser);
+  const { name, provider } = await createCapableProvider(params.provider, params.browser, "scrape");
   const result = await scrapeWithSessionWhenNeeded(provider, params.url, {
     formats: ["markdown"],
     waitFor: params.waitFor,
@@ -239,7 +244,11 @@ export async function browserScrape(
 export async function browserSession(
   params: Readonly<BrowserSessionParams>,
 ): Promise<ToolResult<BrowserSessionDetails>> {
-  const { name, provider } = await createProvider(params.provider, params.browser);
+  const { name, provider } = await createCapableProvider(
+    params.provider,
+    params.browser,
+    "sessions",
+  );
   const session = await provider.createSession({ region: params.region });
   return {
     content: content(`[provider=${name}] Session created: ${sanitizeField(session.id)}`),

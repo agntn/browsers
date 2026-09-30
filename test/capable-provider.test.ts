@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { BrowserProvider } from "../src/core/types";
-import { browserExtract, browserLinks, browserScrape } from "../src/tool-operations";
+import {
+  browserExtract,
+  browserLinks,
+  browserScrape,
+  browserSession,
+} from "../src/tool-operations";
 
 const envKeys = [
   "STEEL_API_KEY",
@@ -33,10 +38,15 @@ const stub = vi.hoisted(
 );
 
 vi.mock("../src/providers/steel", () => ({ factory: () => stub("steel", {}) }));
+vi.mock("../src/providers/anchor", () => ({
+  factory: () => stub("anchor", { capabilities: () => ({ scrape: false, sessions: false }) }),
+}));
 vi.mock("../src/providers/playwright", () => ({
   factory: () =>
     stub("playwright", {
+      capabilities: () => ({ scrape: true, statelessScrape: true, sessions: true }),
       links: async (url: string) => ({ url, links: [{ href: "https://example.test/a" }] }),
+      createSession: async () => ({ id: "session-1", provider: "playwright", createdAt: 0 }),
     }),
 }));
 
@@ -68,6 +78,24 @@ describe("provider selection by operation", () => {
     const result = await browserScrape({ url: "https://example.test" });
 
     expect(result.details.provider).toBe("steel");
+  });
+
+  it("skips a configured provider that cannot scrape", async () => {
+    delete process.env.STEEL_API_KEY;
+    process.env.ANCHOR_API_KEY = "test";
+
+    const result = await browserScrape({ url: "https://example.test" });
+
+    expect(result.details.provider).toBe("playwright");
+  });
+
+  it("skips a configured provider without sessions", async () => {
+    delete process.env.STEEL_API_KEY;
+    process.env.ANCHOR_API_KEY = "test";
+
+    const result = await browserSession({});
+
+    expect(result.details.session.provider).toBe("playwright");
   });
 
   it("fails loudly when the named provider lacks the operation", async () => {

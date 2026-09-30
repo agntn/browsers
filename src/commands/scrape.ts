@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "./_logger.ts";
-import { resolveAndCreate } from "./_helpers.ts";
+import { resolveCapableProvider } from "./_helpers.ts";
 import type { ScrapeResult } from "../core/types.ts";
 import { scrapeWithSessionWhenNeeded } from "../core/utils.ts";
 
@@ -56,7 +56,11 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const { name: providerName, provider } = await resolveAndCreate(args.provider, args.browser);
+    const { name: providerName, provider } = await resolveCapableProvider(
+      args.provider,
+      args.browser,
+      "scrape",
+    );
     consola.info(`Scraping via ${providerName}...`);
 
     try {

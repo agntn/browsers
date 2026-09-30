@@ -185,7 +185,9 @@ export function errorMessage(error: unknown): string {
 function resolveMaxChars(value?: number): number {
   const maxChars = value ?? DEFAULT_SCRAPE_MAX_CHARS;
   if (!Number.isInteger(maxChars) || maxChars < 1 || maxChars > MAX_SCRAPE_MAX_CHARS) {
-    throw new RangeError(`maxChars must be an integer between 1 and ${MAX_SCRAPE_MAX_CHARS}.`);
+    throw new InvalidInputError(
+      `maxChars must be an integer between 1 and ${MAX_SCRAPE_MAX_CHARS}.`,
+    );
   }
   return maxChars;
 }
@@ -193,7 +195,7 @@ function resolveMaxChars(value?: number): number {
 function resolveLinksLimit(value?: number): number {
   const limit = value ?? DEFAULT_LINKS_LIMIT;
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LINKS_LIMIT) {
-    throw new RangeError(`limit must be an integer between 1 and ${MAX_LINKS_LIMIT}.`);
+    throw new InvalidInputError(`limit must be an integer between 1 and ${MAX_LINKS_LIMIT}.`);
   }
   return limit;
 }
@@ -201,7 +203,7 @@ function resolveLinksLimit(value?: number): number {
 function resolveLinksOffset(value?: number): number {
   const offset = value ?? 0;
   if (!Number.isSafeInteger(offset) || offset < 0) {
-    throw new RangeError("offset must be a non-negative integer.");
+    throw new InvalidInputError("offset must be a non-negative integer.");
   }
   return offset;
 }
@@ -393,7 +395,7 @@ function screenshotFormat(format?: string): "png" | "jpeg" | "webp" | undefined 
   if (format === undefined || format === "png" || format === "jpeg" || format === "webp") {
     return format;
   }
-  throw new Error(`Unsupported screenshot format: ${JSON.stringify(format)}`);
+  throw new InvalidInputError(`Unsupported screenshot format: ${JSON.stringify(format)}`);
 }
 
 /**

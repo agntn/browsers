@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { UnsupportedOperationError } from "../src/core/errors";
 import type { BrowserProvider } from "../src/core/types";
 import {
   browserExtract,
@@ -99,13 +100,20 @@ describe("provider selection by operation", () => {
   });
 
   it("fails loudly when the named provider lacks the operation", async () => {
-    await expect(browserLinks({ url: "https://example.test", provider: "steel" })).rejects.toThrow(
-      "Provider steel does not support link extraction.",
-    );
+    const call = browserLinks({ url: "https://example.test", provider: "steel" });
+
+    await expect(call).rejects.toBeInstanceOf(UnsupportedOperationError);
+    await expect(call).rejects.toMatchObject({
+      message: "Provider steel does not support link extraction.",
+      provider: "steel",
+    });
   });
 
   it("names the operation and the checked providers when none can do it", async () => {
-    await expect(browserExtract({ url: "https://example.test", prompt: "title" })).rejects.toThrow(
+    const call = browserExtract({ url: "https://example.test", prompt: "title" });
+
+    await expect(call).rejects.toBeInstanceOf(UnsupportedOperationError);
+    await expect(call).rejects.toThrow(
       "No configured provider supports structured extraction (checked: steel, playwright).",
     );
   });

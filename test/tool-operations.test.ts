@@ -146,13 +146,14 @@ describe("browser tool operations", () => {
   it("rejects an invalid scrape limit before provider I/O", async () => {
     process.env.TOOLTEST_API_KEY = "test";
 
-    await expect(
-      browserScrape({
-        provider: "tooltest",
-        url: "https://example.test",
-        maxChars: 200_001,
-      }),
-    ).rejects.toThrow("maxChars must be an integer between 1 and 200000");
+    const call = browserScrape({
+      provider: "tooltest",
+      url: "https://example.test",
+      maxChars: 200_001,
+    });
+
+    await expect(call).rejects.toBeInstanceOf(InvalidInputError);
+    await expect(call).rejects.toThrow("maxChars must be an integer between 1 and 200000");
     expect(scrape).not.toHaveBeenCalled();
   });
 
@@ -434,9 +435,10 @@ describe("browser tool operations", () => {
   ])("rejects links bounds %j before reading the page", async (bounds, message) => {
     process.env.TOOLTEST_API_KEY = "test";
 
-    await expect(
-      browserLinks({ provider: "tooltest", url: "https://example.test", ...bounds }),
-    ).rejects.toThrow(message);
+    const call = browserLinks({ provider: "tooltest", url: "https://example.test", ...bounds });
+
+    await expect(call).rejects.toBeInstanceOf(InvalidInputError);
+    await expect(call).rejects.toThrow(message);
     expect(links).not.toHaveBeenCalled();
   });
 
@@ -836,6 +838,19 @@ describe("browser tool operations", () => {
       root: "form",
       interestingOnly: false,
     });
+  });
+
+  it("reports an unknown screenshot format as an input error", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    const call = browserScreenshot({
+      provider: "tooltest",
+      url: "https://example.test",
+      format: "gif",
+    });
+
+    await expect(call).rejects.toBeInstanceOf(InvalidInputError);
+    await expect(call).rejects.toThrow('Unsupported screenshot format: "gif"');
+    expect(screenshot).not.toHaveBeenCalled();
   });
 
   it("reports a root selector that matches nothing as an input error", async () => {

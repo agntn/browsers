@@ -13,7 +13,7 @@ import type {
 } from "../core/types.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
-import { AuthError, normalizeError } from "../core/errors.ts";
+import { AuthError, BrowserError, normalizeError } from "../core/errors.ts";
 import { isNotFoundError, assertNoSelector, assertSessionId } from "../core/utils.ts";
 
 interface KernelSessionResponse {
@@ -199,7 +199,7 @@ class KernelProvider implements BrowserProvider {
         { code: script },
         this.headers(),
       );
-      if (!res.success) throw new Error(res.error ?? "Kernel Playwright execution failed");
+      if (!res.success) throw new BrowserError(res.error ?? "Kernel Playwright execution failed");
       const logs = [res.stdout, res.stderr].filter((line): line is string => Boolean(line));
       return logs.length > 0 ? { value: res.result, logs } : { value: res.result };
     } catch (error) {

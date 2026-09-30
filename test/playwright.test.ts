@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import type { ServerResponse } from "node:http";
 import { describe, it, expect, afterAll, beforeAll } from "vite-plus/test";
 import { create } from "../src/core/registry";
-import { SessionNotFoundError } from "../src/core/errors";
+import { InvalidInputError, SessionNotFoundError } from "../src/core/errors";
 import type { BrowserProvider, BrowserSession } from "../src/core/types";
 
 // A cold Chrome launch on a CI runner takes longer than the 5 s vitest default.
@@ -132,6 +132,12 @@ describe("playwright provider (local)", { timeout: 30_000 }, () => {
 
     await provider.releaseSession(session.id);
     sessions.pop();
+  });
+
+  it("reports a screenshot without a session as an input error", async () => {
+    await expect(provider.screenshot({ url: "https://example.test" })).rejects.toBeInstanceOf(
+      InvalidInputError,
+    );
   });
 
   it("takes screenshot in a session", async () => {

@@ -4,6 +4,7 @@ import {
   NoProviderConfiguredError,
   AuthError,
   InvalidInputError,
+  UnsupportedOperationError,
 } from "./errors.ts";
 import type { BrowserProvider, CrawlOptions, CrawlResult } from "./types.ts";
 import { resolveCloudflareBrowser } from "./utils.ts";
@@ -110,7 +111,10 @@ async function firstProvider<P extends BrowserProvider>(
     checked.push(name);
   }
   if (checked.length === 0) throw new NoProviderConfiguredError();
-  throw new Error(`No configured provider supports ${label} (checked: ${checked.join(", ")}).`);
+  throw new UnsupportedOperationError(
+    `No configured provider supports ${label} (checked: ${checked.join(", ")}).`,
+    "",
+  );
 }
 
 /**
@@ -147,7 +151,10 @@ export async function createProvider(
   const name = resolveProvider(browser && !preferred ? "cloudflare" : preferred);
   const provider = await create(name, { browser: resolveCloudflareBrowser(name, browser) });
   if (operation && !supports(provider, operation)) {
-    throw new Error(`Provider ${name} does not support ${operationLabels[operation]}.`);
+    throw new UnsupportedOperationError(
+      `Provider ${name} does not support ${operationLabels[operation]}.`,
+      name,
+    );
   }
   return { name, provider };
 }

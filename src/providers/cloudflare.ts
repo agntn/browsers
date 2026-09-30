@@ -316,7 +316,7 @@ class CloudflareProvider implements BrowserProvider {
     const envelope = response as CfEnvelope<T>;
     if (!envelope.success) {
       const msg = envelope.errors?.map((e) => e.message).join("; ") ?? "Unknown Cloudflare error";
-      throw new Error(msg);
+      throw new BrowserError(msg);
     }
     return envelope.result;
   }

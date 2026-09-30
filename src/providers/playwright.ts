@@ -17,7 +17,12 @@ import type {
   ProviderCapabilities,
   LinksResult,
 } from "../core/types.ts";
-import { BrowserError, SessionNotFoundError, normalizeError } from "../core/errors.ts";
+import {
+  BrowserError,
+  InvalidInputError,
+  SessionNotFoundError,
+  normalizeError,
+} from "../core/errors.ts";
 import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
 import type { Browser, Page } from "playwright-core";
@@ -328,7 +333,7 @@ class PlaywrightProvider implements BrowserProvider {
     session?: BrowserSession,
   ): Promise<ScreenshotResult> {
     if (!session) {
-      throw new Error(
+      throw new InvalidInputError(
         "Playwright screenshot requires a session. Create one first with createSession().",
       );
     }

@@ -16,7 +16,7 @@ import type {
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
 import type { Browser, Page } from "playwright-core";
-import { AuthError, normalizeError, SessionNotFoundError } from "../core/errors.ts";
+import { AuthError, BrowserError, normalizeError, SessionNotFoundError } from "../core/errors.ts";
 import { assertUrlOrSession } from "../core/utils.ts";
 
 interface BrowserlessSessionResponse {
@@ -139,7 +139,7 @@ class BrowserlessProvider implements BrowserProvider {
         { "Content-Type": "application/json" },
       );
       if (!res.id || !res.connect || !res.stop) {
-        throw new Error("Browserless session response is missing lifecycle URLs");
+        throw new BrowserError("Browserless session response is missing lifecycle URLs");
       }
 
       const session: BrowserSession = {

@@ -9,7 +9,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 - `src/core/types.ts` — interfaces: BrowserSession, ScrapeResult, ScreenshotResult, EvaluateResult, BrowserProvider
 - `src/core/registry.ts` - provider table seeded from the manifest (register/create/providers/has); `create()` is async and imports one provider module
 - `src/core/client.ts` - HTTP client with retry, error mapping, URL sanitization; ofetch loads on the first request
-- `src/core/lazy.ts` - one-shot async memo used by the client and the MCP server
+- `src/core/lazy.ts` - one-shot async memo used by the client, the registry and the MCP server
 - `src/core/errors.ts` - typed error hierarchy (BrowserError, HTTPError, AuthError, SessionError, etc.)
 - `src/tool-operations.ts` - executors shared by MCP, Pi, and OMP
 - `src/mcp.ts` - MCP stdio server surface; schemas load on the first `tools/list`, the validator on the first `tools/call`

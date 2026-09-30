@@ -19,6 +19,7 @@ import type {
   BrowserProviderFactory,
   ProviderCapabilities,
 } from "../core/types.ts";
+import { rejectBlockPage } from "../core/block-page.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
 import { AuthError, BrowserError, InvalidInputError, normalizeError } from "../core/errors.ts";
@@ -301,13 +302,16 @@ class HyperbrowserProvider implements BrowserProvider {
       assertFetched(res);
 
       const data = res.data as Record<string, unknown> | undefined;
-      return {
-        url,
-        title: data?.metadata ? (data.metadata as Record<string, string>).title : undefined,
-        markdown: data?.markdown as string | undefined,
-        html: data?.html as string | undefined,
-        statusCode: res.status === "completed" ? 200 : undefined,
-      };
+      return rejectBlockPage(
+        {
+          url,
+          title: data?.metadata ? (data.metadata as Record<string, string>).title : undefined,
+          markdown: data?.markdown as string | undefined,
+          html: data?.html as string | undefined,
+          statusCode: res.status === "completed" ? 200 : undefined,
+        },
+        "hyperbrowser",
+      );
     } catch (error) {
       throw normalizeError(error, "hyperbrowser");
     }

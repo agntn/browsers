@@ -11,6 +11,7 @@ import type {
   BrowserProviderFactory,
   ProviderCapabilities,
 } from "../core/types.ts";
+import { rejectBlockPage } from "../core/block-page.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
 import { AuthError, normalizeError } from "../core/errors.ts";
@@ -164,12 +165,15 @@ class BrowserbaseProvider implements BrowserProvider {
         this.headers(),
       );
 
-      return {
-        url,
-        html: res.content as string | undefined,
-        markdown: typeof res.content === "string" ? res.content : undefined,
-        statusCode: res.statusCode as number | undefined,
-      };
+      return rejectBlockPage(
+        {
+          url,
+          html: res.content as string | undefined,
+          markdown: typeof res.content === "string" ? res.content : undefined,
+          statusCode: res.statusCode as number | undefined,
+        },
+        "browserbase",
+      );
     } catch (error) {
       throw normalizeError(error, "browserbase");
     }

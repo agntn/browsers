@@ -17,6 +17,7 @@ import type {
   ProviderCapabilities,
   LinksResult,
 } from "../core/types.ts";
+import { rejectBlockPage } from "../core/block-page.ts";
 import {
   BrowserError,
   InvalidInputError,
@@ -325,7 +326,9 @@ class PlaywrightProvider implements BrowserProvider {
     options?: ScrapeOptions,
     session?: BrowserSession,
   ): Promise<ScrapeResult> {
-    return this.withPage(session, (page) => scrapePage(page, url, options));
+    return this.withPage(session, async (page) =>
+      rejectBlockPage(await scrapePage(page, url, options), "playwright"),
+    );
   }
 
   async screenshot(

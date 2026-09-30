@@ -49,6 +49,7 @@ export {
   ScrapeNotSupportedError,
   InvalidInputError,
   UnsupportedOperationError,
+  BlockedPageError,
   PaymentError,
   normalizeError,
 } from "./core/errors.ts";

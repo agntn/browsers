@@ -24,6 +24,7 @@ import type {
   ProviderCapabilities,
   CloudflareBrowser,
 } from "../core/types.ts";
+import { rejectBlockPage } from "../core/block-page.ts";
 import { Client } from "../core/client.ts";
 import {
   AuthError,
@@ -421,15 +422,18 @@ class CloudflareProvider implements BrowserProvider {
         ? (result as CfSnapshotResult)
         : { [format]: typeof result === "string" ? result : result.content };
 
-      return {
-        url,
-        ...(outputs.content === undefined ? {} : { html: outputs.content }),
-        ...(outputs.markdown === undefined ? {} : { markdown: outputs.markdown }),
-        ...(outputs.screenshot === undefined
-          ? {}
-          : { screenshot: `data:image/png;base64,${outputs.screenshot}` }),
-        ...pageMeta(res.meta),
-      };
+      return rejectBlockPage(
+        {
+          url,
+          ...(outputs.content === undefined ? {} : { html: outputs.content }),
+          ...(outputs.markdown === undefined ? {} : { markdown: outputs.markdown }),
+          ...(outputs.screenshot === undefined
+            ? {}
+            : { screenshot: `data:image/png;base64,${outputs.screenshot}` }),
+          ...pageMeta(res.meta),
+        },
+        "cloudflare",
+      );
     } catch (error) {
       throw this.fail(error);
     }

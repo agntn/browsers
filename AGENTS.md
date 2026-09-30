@@ -10,6 +10,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 - `src/core/registry.ts` - provider table seeded from the manifest (register/create/providers/has); `create()` is async and imports one provider module
 - `src/core/client.ts` - HTTP client with retry, error mapping, URL sanitization; ofetch loads on the first request
 - `src/core/lazy.ts` - one-shot async memo used by the client, the registry and the MCP server
+- `src/core/block-page.ts` - recognizes block and captcha pages; every provider's `scrape` returns through `rejectBlockPage`
 - `src/core/errors.ts` - typed error hierarchy (BrowserError, HTTPError, AuthError, SessionError, etc.)
 - `src/tool-operations.ts` - executors shared by MCP, Pi, and OMP
 - `src/mcp.ts` - MCP stdio server surface; schemas load on the first `tools/list`, the validator on the first `tools/call`
@@ -25,7 +26,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 ## Adding a provider
 
 1. Create `src/providers/yourprovider.ts`
-2. Implement `BrowserProvider` interface
+2. Implement `BrowserProvider` interface; `scrape` returns its result through `rejectBlockPage`
 3. Export `factory: BrowserProviderFactory`; do not import the registry
 4. Add a manifest entry (key, default URL, `load: () => import("./yourprovider.ts").then((m) => m.factory)`) to `src/providers/index.ts`
 5. Add the key to `browserProviderNames` in `src/tool-contract.ts`

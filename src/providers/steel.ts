@@ -59,9 +59,16 @@ function createSessionBody(options?: CreateSessionOptions): Record<string, unkno
   return body;
 }
 
+/** Steel's name for each scrape format it can return. Plain text has none. */
+const STEEL_FORMATS = { html: "html", markdown: "markdown", cleanedHtml: "cleaned_html" } as const;
+
 function createScrapeBody(url: string, options?: ScrapeOptions): Record<string, unknown> {
   const body: Record<string, unknown> = { url };
   if (!options) return body;
+  const format = options.formats?.flatMap((name) =>
+    Object.hasOwn(STEEL_FORMATS, name) ? [STEEL_FORMATS[name as keyof typeof STEEL_FORMATS]] : [],
+  );
+  if (format?.length) body.format = format;
   if (options.waitFor) body.waitFor = options.waitFor;
   if (options.headers) body.headers = options.headers;
   return body;

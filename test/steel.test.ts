@@ -62,6 +62,64 @@ describe("steel scrape responses", () => {
   });
 });
 
+describe("steel scrape formats", () => {
+  let server: Server;
+  let baseURL: string;
+  let requests: Record<string, unknown>[] = [];
+
+  beforeAll(async () => {
+    server = createServer(async (request, response) => {
+      const body = JSON.parse(await readBody(request)) as { format?: string[] };
+      requests.push(body);
+      const page = { html: "<h1>Docs</h1>", markdown: "# Docs", cleaned_html: "<h1>Docs</h1>" };
+      const format = body.format ?? ["html"];
+      response.setHeader("Content-Type", "application/json");
+      response.end(
+        JSON.stringify({
+          content: Object.fromEntries(
+            Object.entries(page).filter(([name]) => format.includes(name)),
+          ),
+        }),
+      );
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (typeof address === "object" && address) baseURL = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  });
+
+  it("asks Steel for the formats the caller wants", async () => {
+    requests = [];
+    const provider = await create("steel", { apiKey: "test", baseURL });
+
+    const markdown = await provider.scrape("https://docs.example", { formats: ["markdown"] });
+    const both = await provider.scrape("https://docs.example", {
+      formats: ["cleanedHtml", "text", "html"],
+    });
+    const plain = await provider.scrape("https://docs.example");
+    const unknown = await provider.scrape("https://docs.example", {
+      formats: ["pdf" as "html"],
+    });
+
+    expect(markdown.markdown).toBe("# Docs");
+    expect(markdown.html).toBeUndefined();
+    expect(both.cleanedHtml).toBe("<h1>Docs</h1>");
+    expect(plain.html).toBe("<h1>Docs</h1>");
+    expect(unknown.html).toBe("<h1>Docs</h1>");
+    expect(requests.map((body) => body.format)).toEqual([
+      ["markdown"],
+      ["cleaned_html", "html"],
+      undefined,
+      undefined,
+    ]);
+  });
+});
+
 describe("steel screenshots", () => {
   const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
   const session = { id: "session-1", provider: "steel", createdAt: 0 };

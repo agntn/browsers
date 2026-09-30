@@ -23,6 +23,20 @@ function isCommandModule(value: unknown): value is { default: typeof McpCommand 
 }
 
 /**
+ * The source needs `typebox`, a devDependency, so without it the bin keeps the bundle.
+ *
+ * @returns {boolean} Whether `typebox` resolves from this package.
+ */
+function hasSourceDependencies(): boolean {
+  try {
+    import.meta.resolve("typebox");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Loads the MCP command. A built bin inside a checkout runs the live source, as the Pi and
  * OMP extensions do, so a local server needs a restart after a change instead of `pnpm build`.
  * Node never strips types under `node_modules` or with `--no-strip-types`, so a git install
@@ -37,7 +51,8 @@ async function loadMcpCommand(): Promise<typeof McpCommand> {
     process.env.BROWSERS_DIST !== "1" &&
     Boolean(process.features.typescript) &&
     !sourceMcpCommandPath.includes(`${sep}node_modules${sep}`) &&
-    existsSync(sourceMcpCommandPath);
+    existsSync(sourceMcpCommandPath) &&
+    hasSourceDependencies();
   if (!fromSource) return (await import("./commands/mcp.ts")).default;
   const module: unknown = await import(sourceMcpCommand.href);
   if (!isCommandModule(module)) {

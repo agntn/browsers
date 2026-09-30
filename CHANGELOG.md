@@ -1,6 +1,57 @@
 # Changelog
 
 
+## v0.5.0
+
+[compare changes](https://github.com/agntn/browsers/compare/v0.4.0...v0.5.0)
+
+### 🚀 Enhancements
+
+- **screenshot:** Capture one element by selector ([#78](https://github.com/agntn/browsers/pull/78))
+- **cli:** Mcp reads src/ in a checkout ([#84](https://github.com/agntn/browsers/pull/84))
+- **links:** Return links in pages ([#85](https://github.com/agntn/browsers/pull/85))
+- **crawl:** Resume a job by ID ([#89](https://github.com/agntn/browsers/pull/89))
+- **scrape:** Ask Cloudflare for markdown ([#101](https://github.com/agntn/browsers/pull/101))
+- Read a page's accessibility tree ([#110](https://github.com/agntn/browsers/pull/110))
+- **cloudflare:** One render for several outputs ([#114](https://github.com/agntn/browsers/pull/114))
+- **docs:** Browsers.agntn.dev and provider pages ([#117](https://github.com/agntn/browsers/pull/117))
+
+### 🩹 Fixes
+
+- **cloudflare:** Honor fullPage and format ([#81](https://github.com/agntn/browsers/pull/81))
+- **screenshot:** Capture the full page by default ([#83](https://github.com/agntn/browsers/pull/83))
+- **hyperbrowser:** Scrape reports a failed fetch ([#86](https://github.com/agntn/browsers/pull/86))
+- **cloudflare:** Hide the account ID in errors ([#87](https://github.com/agntn/browsers/pull/87))
+- **browserless:** Evaluate in the session's page ([#88](https://github.com/agntn/browsers/pull/88))
+- **client:** Say which provider sent a 429 and why ([#95](https://github.com/agntn/browsers/pull/95))
+- **cloudflare:** Scrape options in Puppeteer shape ([#104](https://github.com/agntn/browsers/pull/104))
+- **cli:** Status lines go to stderr ([#107](https://github.com/agntn/browsers/pull/107))
+- **accessibility:** Join words, not paragraphs ([#112](https://github.com/agntn/browsers/pull/112))
+- **cloudflare:** A CDP URL that connects ([#113](https://github.com/agntn/browsers/pull/113))
+- **client:** Report a timeout as a timeout ([#116](https://github.com/agntn/browsers/pull/116))
+- **deps:** Let Pi supply typebox ([#131](https://github.com/agntn/browsers/pull/131))
+
+### 📦 Build
+
+- One vite.config.ts replaces four configs ([#108](https://github.com/agntn/browsers/pull/108))
+
+### 🏡 Chore
+
+- ⚠️  Drop Node.js 22 and 24 ([#109](https://github.com/agntn/browsers/pull/109))
+
+### ✅ Tests
+
+- **browserless:** Wait for Chromium in beforeAll ([#92](https://github.com/agntn/browsers/pull/92))
+
+#### ⚠️ Breaking Changes
+
+- ⚠️  Drop Node.js 22 and 24 ([#109](https://github.com/agntn/browsers/pull/109))
+
+### ❤️ Contributors
+
+- Ori ([@oritwoen](https://github.com/oritwoen))
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+
 ## v0.4.0
 
 [compare changes](https://github.com/agntn/browsers/compare/v0.3.0...v0.4.0)

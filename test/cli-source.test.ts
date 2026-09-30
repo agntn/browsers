@@ -1,5 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, globSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import {
+  cpSync,
+  globSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vite-plus/test";
@@ -91,6 +100,32 @@ describe("browsers mcp from the built bin", () => {
     try {
       for (const entry of ["dist", "src", "package.json"]) {
         cpSync(join(repoRoot, entry), join(copy, entry), { recursive: true });
+      }
+      const result = run([join(copy, "dist/cli.mjs"), "mcp"]);
+      const copiedSource = pathToFileURL(join(copy, "src/")).href;
+
+      expect(result.status).toBe(0);
+      expect(result.loaded).toContain(pathToFileURL(join(copy, "dist/_chunks/mcp.mjs")).href);
+      expect(result.loaded.filter((url) => url.startsWith(copiedSource))).toEqual([]);
+    } finally {
+      rmSync(copy, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the bundle in a checkout without dev dependencies", () => {
+    const copy = mkdtempSync(join(tmpdir(), "browsers-prod-"));
+    try {
+      for (const entry of ["dist", "src", "package.json"]) {
+        cpSync(join(repoRoot, entry), join(copy, entry), { recursive: true });
+      }
+      const manifest = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")) as {
+        dependencies?: Record<string, string>;
+      };
+      const dependencies = Object.keys(manifest.dependencies ?? {});
+      expect(dependencies).not.toContain("typebox");
+      for (const name of dependencies) {
+        mkdirSync(join(copy, "node_modules", name, ".."), { recursive: true });
+        symlinkSync(join(repoRoot, "node_modules", name), join(copy, "node_modules", name));
       }
       const result = run([join(copy, "dist/cli.mjs"), "mcp"]);
       const copiedSource = pathToFileURL(join(copy, "src/")).href;

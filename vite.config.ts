@@ -101,7 +101,7 @@ export default defineConfig({
       /* JSDoc ships once, in the declarations; the runtime files keep only legal and annotation comments. */
       comments: { jsdoc: false },
     },
-    /** Keeps TypeBox inside the MCP bundle instead of paying module resolution on every spawn. */
+    /** TypeBox is only a peer, so the CLI and the MCP server carry their own copy. */
     deps: {
       onlyBundle: [/^typebox(?:\/|$)/u],
       alwaysBundle: [/^typebox(?:\/|$)/u],

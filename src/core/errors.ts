@@ -1,4 +1,4 @@
-import stripAnsi from "strip-ansi";
+import { stripVTControlCharacters } from "node:util";
 
 export class BrowserError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -9,6 +9,9 @@ export class BrowserError extends Error {
 
 /** Longest provider reason an error message carries; the full body stays on `HTTPError.body`. */
 const MAX_REASON_CHARS = 300;
+
+/** Body text read for a reason; `stripVTControlCharacters` is quadratic on unterminated escapes. */
+const MAX_REASON_SCAN = MAX_REASON_CHARS * 8;
 
 /** Controls and format marks, bidi overrides included; `\s` already covers U+2028 and U+2029. */
 const UNPRINTABLE = /[\p{Cc}\p{Cf}]/gu;
@@ -41,7 +44,7 @@ function responseReason(body: string): string | undefined {
   } catch {
     fields = [text];
   }
-  const reason = stripAnsi(fields.join(" "))
+  const reason = stripVTControlCharacters(fields.join(" ").slice(0, MAX_REASON_SCAN))
     .replaceAll(UNPRINTABLE, " ")
     .replaceAll(/\s+/g, " ")
     .trim();

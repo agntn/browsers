@@ -1,6 +1,12 @@
 import type { $Fetch, FetchError, FetchOptions } from "ofetch";
 import type { ClientOptions } from "./types.ts";
-import { HTTPError, RateLimitError, TimeoutError, parseRetryAfter } from "./errors.ts";
+import {
+  HTTPError,
+  RateLimitError,
+  TimeoutError,
+  TransportError,
+  parseRetryAfter,
+} from "./errors.ts";
 import { lazy } from "./lazy.ts";
 import { version } from "../version.ts";
 
@@ -231,34 +237,86 @@ export class Client {
    *
    * @param {unknown} error Failure from ofetch.
    * @param {string} url Request URL, sanitized before it reaches a message.
-   * @param {AbortSignal} [signal] Caller cancellation: a timeout of its own is not the client's.
+   * @param {AbortSignal} [signal] Caller cancellation: an abort or timeout of its own goes back as is.
    * @returns {Error} The mapped error.
    */
   private mapError(error: unknown, url: string, signal?: AbortSignal): Error {
-    if (this.FetchError !== undefined && error instanceof this.FetchError) {
-      if (isClientTimeout(error.cause, signal))
-        return new TimeoutError(this.timeout, sanitizeUrl(url));
-      const body = responseText(error.data);
-      if (error.statusCode === 429) {
-        const retryAfter = parseRetryAfter(error.response?.headers.get("Retry-After"));
-        return new RateLimitError(retryAfter, sanitizeUrl(url), body);
-      }
-      return new HTTPError(error.statusCode ?? 0, sanitizeUrl(url), body);
+    const failure: unknown = signal?.aborted ? signal.reason : error;
+    if (this.FetchError !== undefined && failure instanceof this.FetchError) {
+      return fetchFailure(failure, sanitizeUrl(url), this.timeout);
     }
-    return error instanceof Error ? error : new Error(String(error));
+    return failure instanceof Error ? failure : new Error(String(failure));
   }
 }
 
 /**
- * Whether a request failed on the client's own timeout rather than on the caller's signal,
- * which may carry a timeout of its own.
+ * Maps an ofetch failure the caller didn't cancel.
  *
- * @param {unknown} cause Cause of the ofetch failure.
- * @param {AbortSignal} [signal] Caller cancellation.
- * @returns {boolean} `true` for the client's timeout.
+ * @param {FetchError} error Failure from ofetch.
+ * @param {string} url Sanitized request URL.
+ * @param {number} timeout The client's timeout in milliseconds.
+ * @returns {Error} The mapped error.
  */
-function isClientTimeout(cause: unknown, signal?: AbortSignal): boolean {
-  return cause instanceof Error && cause.name === "TimeoutError" && !signal?.aborted;
+function fetchFailure(error: FetchError, url: string, timeout: number): Error {
+  if (error.cause instanceof Error && error.cause.name === "TimeoutError") {
+    return new TimeoutError(timeout, url);
+  }
+  if (error.response === undefined) return transportError(error.cause, url);
+  const body = responseText(error.data);
+  if (error.statusCode === 429) {
+    const retryAfter = parseRetryAfter(error.response.headers.get("Retry-After"));
+    return new RateLimitError(retryAfter, url, body);
+  }
+  return new HTTPError(error.statusCode ?? 0, url, body);
+}
+
+/**
+ * The reason is the deepest message in the chain, since `fetch failed` itself says nothing.
+ *
+ * @param {unknown} cause Cause of the ofetch failure, the `TypeError` fetch threw.
+ * @param {string} url Sanitized request URL.
+ * @returns {TransportError} The error with its reason, code and system error.
+ */
+function transportError(cause: unknown, url: string): TransportError {
+  const chain = causeChain(cause);
+  const reason = chain.findLast((error) => error.message)?.message ?? "";
+  const system = chain.find((error) => typeof systemCode(error) === "string");
+  const safeReason = reason
+    .replaceAll(/https?:\/\/\S+/g, (match) => sanitizeUrl(match))
+    .replaceAll(/\s+/g, " ")
+    .trim();
+  return new TransportError(
+    url,
+    safeReason,
+    system && systemCode(system),
+    system && { cause: system },
+  );
+}
+
+/**
+ * Each error down the `cause` links, through the first attempt of an `AggregateError`.
+ *
+ * @param {unknown} error Outermost error.
+ * @returns {Error[]} The chain, outermost first, at most eight deep.
+ */
+function causeChain(error: unknown): Error[] {
+  const chain: Error[] = [];
+  for (let current = error; current instanceof Error && chain.length < 8;) {
+    chain.push(current);
+    current = current.cause ?? (current instanceof AggregateError ? current.errors[0] : undefined);
+  }
+  return chain;
+}
+
+/**
+ * The `code` Node puts on a system error.
+ *
+ * @param {Error} error Any error.
+ * @returns {string | undefined} The code, when it is a string.
+ */
+function systemCode(error: Readonly<Error>): string | undefined {
+  const { code } = error as { code?: unknown };
+  return typeof code === "string" ? code : undefined;
 }
 
 /**

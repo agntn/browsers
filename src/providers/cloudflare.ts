@@ -32,6 +32,7 @@ import {
   HTTPError,
   RateLimitError,
   TimeoutError,
+  TransportError,
   normalizeError,
 } from "../core/errors.ts";
 import {
@@ -294,6 +295,10 @@ class CloudflareProvider implements BrowserProvider {
     }
     if (error instanceof TimeoutError && error.url.includes(account)) {
       return new TimeoutError(error.timeout, error.url.replace(account, "/accounts/[account]/"));
+    }
+    if (error instanceof TransportError && error.url.includes(account)) {
+      const url = error.url.replace(account, "/accounts/[account]/");
+      return new TransportError(url, error.reason, error.code, { cause: error.cause });
     }
     return normalizeError(error, "cloudflare");
   }

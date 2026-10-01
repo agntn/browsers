@@ -76,6 +76,12 @@ describe("browsers MCP server", () => {
       readOnlyHint: false,
       destructiveHint: false,
     });
+    expect(
+      response.tools.find((tool) => tool.name === "browsers_search")?.inputSchema,
+    ).toMatchObject({
+      required: ["query"],
+      properties: { maxResults: { type: "integer", minimum: 1, maximum: 10 } },
+    });
     const pdfTool = response.tools.find((tool) => tool.name === "browsers_pdf");
     expect(pdfTool?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
     expect(pdfTool?.inputSchema.required).toEqual(["url", "path"]);
@@ -104,11 +110,17 @@ describe("browsers MCP server", () => {
       name: "browsers_scrape",
       arguments: { url: "https://example.test", browser: "chromium" },
     });
+    const invalidSearch = await client.callTool({
+      name: "browsers_search",
+      arguments: { query: "browser agents", maxResults: 11 },
+    });
 
     expect(invalidLimit.isError).toBe(true);
     expect(contentTexts(invalidLimit.content)[0]).toContain("Invalid arguments");
     expect(invalidBrowser.isError).toBe(true);
     expect(contentTexts(invalidBrowser.content)[0]).toContain("Invalid arguments");
+    expect(invalidSearch.isError).toBe(true);
+    expect(contentTexts(invalidSearch.content)[0]).toContain("Invalid arguments at /maxResults");
   });
 
   it("takes a crawl job ID in place of the starting URL", async () => {

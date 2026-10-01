@@ -15,6 +15,7 @@ import {
   browserScrape,
   browserSession,
   browserScreenshot,
+  browserSearch,
   listBrowserProviders,
   releaseBrowserSession,
 } from "../src/tool-operations";
@@ -39,6 +40,7 @@ const pdf = vi.fn<NonNullable<BrowserProvider["pdf"]>>();
 const crawl = vi.fn<NonNullable<BrowserProvider["crawl"]>>();
 const resumeCrawl = vi.fn<NonNullable<BrowserProvider["resumeCrawl"]>>();
 const accessibilityTree = vi.fn<NonNullable<BrowserProvider["accessibilityTree"]>>();
+const search = vi.fn<NonNullable<BrowserProvider["search"]>>();
 
 function toolTestProvider(): BrowserProvider {
   return {
@@ -76,12 +78,25 @@ function toolTestProvider(): BrowserProvider {
   };
 }
 
+/* Stands in for Hyperbrowser, the provider browserSearch always calls. */
+function searchTestProvider(): BrowserProvider {
+  const provider = toolTestProvider();
+  return {
+    ...provider,
+    name: () => "hyperbrowser",
+    capabilities: () => ({ ...provider.capabilities(), search: true }),
+    search,
+  };
+}
+
 beforeAll(() => {
   register("tooltest", "https://example.test", () => toolTestProvider());
+  register("hyperbrowser", "https://example.test", () => searchTestProvider());
 });
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
   releaseSession.mockReset().mockResolvedValue(undefined);
   statelessScrape = true;
   if (previousApiKey === undefined) delete process.env.TOOLTEST_API_KEY;
@@ -646,6 +661,46 @@ describe("browser tool operations", () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it("keeps maxResults search results, ten by default, when the provider returns more", async () => {
+    vi.stubEnv("HYPERBROWSER_API_KEY", "test");
+    search.mockResolvedValue(
+      Array.from({ length: 12 }, (_, index) => ({
+        url: `https://example.test/${index + 1}`,
+        title: `Result ${index + 1}`,
+        snippet: `Snippet ${index + 1}`,
+      })),
+    );
+
+    const three = await browserSearch({ query: "browser agents", maxResults: 3 });
+    const whole = await browserSearch({ query: "browser agents" });
+    const [block] = three.content;
+
+    expect(search.mock.calls).toEqual([
+      ["browser agents", { maxResults: 3 }],
+      ["browser agents", { maxResults: 10 }],
+    ]);
+    expect(three.details.results.map(({ url }) => url)).toEqual([
+      "https://example.test/1",
+      "https://example.test/2",
+      "https://example.test/3",
+    ]);
+    expect(block?.type === "text" ? block.text.split("\n")[0] : "").toBe(
+      "[provider=hyperbrowser] 3 results:",
+    );
+    expect(whole.details.results).toHaveLength(10);
+  });
+
+  it("rejects a search maxResults outside 1-10 before provider I/O", async () => {
+    vi.stubEnv("HYPERBROWSER_API_KEY", "test");
+
+    for (const maxResults of [0, 11, 2.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const call = browserSearch({ query: "browser agents", maxResults });
+      await expect(call).rejects.toBeInstanceOf(InvalidInputError);
+      await expect(call).rejects.toThrow("maxResults must be an integer between 1 and 10.");
+    }
+    expect(search).not.toHaveBeenCalled();
   });
 
   it("lists registered providers and reports capabilities consistently", async () => {

@@ -5,6 +5,7 @@ import {
   DEFAULT_SCRAPE_MAX_CHARS,
   MAX_LINKS_LIMIT,
   MAX_SCRAPE_MAX_CHARS,
+  MAX_SEARCH_RESULTS,
 } from "./tool-contract.ts";
 import { BrowserError, InvalidInputError } from "./core/errors.ts";
 import { create, providers } from "./core/registry.ts";
@@ -127,6 +128,7 @@ export interface BrowserAccessibilityParams extends BrowserUrlParams {
 /** Arguments accepted by the browser search tool. */
 export interface BrowserSearchParams {
   query: string;
+  maxResults?: number;
 }
 
 /** Arguments accepted by provider capability discovery. */
@@ -198,6 +200,16 @@ function resolveLinksLimit(value?: number): number {
     throw new InvalidInputError(`limit must be an integer between 1 and ${MAX_LINKS_LIMIT}.`);
   }
   return limit;
+}
+
+function resolveSearchMaxResults(value?: number): number {
+  const maxResults = value ?? MAX_SEARCH_RESULTS;
+  if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > MAX_SEARCH_RESULTS) {
+    throw new InvalidInputError(
+      `maxResults must be an integer between 1 and ${MAX_SEARCH_RESULTS}.`,
+    );
+  }
+  return maxResults;
 }
 
 function resolveLinksOffset(value?: number): number {
@@ -885,9 +897,10 @@ export async function browserAccessibility(
 export async function browserSearch(
   params: Readonly<BrowserSearchParams>,
 ): Promise<ToolResult<{ results: Array<{ url: string; title: string; snippet: string }> }>> {
+  const maxResults = resolveSearchMaxResults(params.maxResults);
   const { name, provider } = await createProvider("hyperbrowser", undefined, "search");
-  const results = await provider.search(params.query);
-  const rows = results.map((result) => ({
+  const results = await provider.search(params.query, { maxResults });
+  const rows = results.slice(0, maxResults).map((result) => ({
     url: result.url,
     title: result.title,
     snippet: result.snippet,

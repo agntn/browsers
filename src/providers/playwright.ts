@@ -403,7 +403,7 @@ class PlaywrightProvider implements BrowserProvider {
     return this.withPage(session, (page) => crawlPage(page, url, baseHostname, options));
   }
 
-  async isAvailable(): Promise<boolean> {
+  async checkAvailability(): Promise<void> {
     try {
       const { chromium } = await import("playwright-core");
       const browser = await chromium.launch({
@@ -411,9 +411,8 @@ class PlaywrightProvider implements BrowserProvider {
         executablePath: resolveSystemChromium(),
       });
       await browser.close();
-      return true;
-    } catch {
-      return false;
+    } catch (error) {
+      throw normalizePlaywrightError(error);
     }
   }
 }

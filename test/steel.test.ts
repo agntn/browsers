@@ -206,8 +206,10 @@ describe("steel availability", () => {
     const provider = await create("steel", { apiKey: "test", baseURL });
     const rejected = await create("steel", { apiKey: "wrong", baseURL });
 
-    expect(await provider.isAvailable?.()).toBe(true);
-    expect(await rejected.isAvailable?.()).toBe(false);
+    await expect(provider.checkAvailability?.()).resolves.toBeUndefined();
+    await expect(rejected.checkAvailability?.()).rejects.toThrow(
+      "Authentication failed for steel: Unauthorized",
+    );
     expect(urls).toEqual(["/v1/sessions?limit=1", "/v1/sessions?limit=1"]);
   });
 });

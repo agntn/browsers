@@ -208,15 +208,14 @@ class KernelProvider implements BrowserProvider {
     return session.cdpUrl;
   }
 
-  async isAvailable(): Promise<boolean> {
+  async checkAvailability(): Promise<void> {
     try {
       await this.client.getJSON<KernelSessionResponse[]>(
         `${this.baseURL}/browsers?limit=1`,
         this.headers(),
       );
-      return true;
-    } catch {
-      return false;
+    } catch (error) {
+      throw normalizeError(error, "kernel");
     }
   }
 }

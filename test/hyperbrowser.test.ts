@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
+import { InvalidInputError } from "../src/core/errors";
 import { create } from "../src/core/registry";
 
 interface CapturedRequest {
@@ -20,6 +21,41 @@ const sessionDetail = {
   liveUrl: "https://hyperbrowser.example/live?token=live-secret",
   token: "session-secret",
 };
+
+/** One page of search results, ten like the live route answers. */
+const searchAnswer = {
+  jobId: "job-4",
+  status: "completed",
+  data: {
+    query: "browser automation",
+    results: Array.from({ length: 10 }, (_, index) => ({
+      title: `Result ${index + 1}`,
+      url: `https://github.com/result-${index + 1}`,
+      description: `Snippet ${index + 1}`,
+    })),
+  },
+};
+
+function fetchAnswer(url: string, baseURL: string): Record<string, unknown> {
+  if (url === "https://down.example/") {
+    return {
+      jobId: "job-2",
+      status: "failed",
+      data: {},
+      error: "net::ERR_TUNNEL_CONNECTION_FAILED at https://down.example",
+    };
+  }
+  if (url === "https://slow.example/") return { jobId: "job-3", status: "running" };
+  return {
+    jobId: "job-1",
+    status: "completed",
+    data: {
+      metadata: { title: "Example Domain" },
+      markdown: "# Example Domain",
+      screenshot: `${baseURL}/screenshots/shot-1.png`,
+    },
+  };
+}
 
 async function readBody(request: IncomingMessage): Promise<string> {
   const chunks: Uint8Array[] = [];
@@ -52,30 +88,7 @@ describe("hyperbrowser current session API", () => {
       switch (`${request.method} ${request.url}`) {
         case "POST /api/web/fetch": {
           const { url } = JSON.parse(captured.body) as { url: string };
-          if (url === "https://down.example/") {
-            response.end(
-              JSON.stringify({
-                jobId: "job-2",
-                status: "failed",
-                data: {},
-                error: "net::ERR_TUNNEL_CONNECTION_FAILED at https://down.example",
-              }),
-            );
-          } else if (url === "https://slow.example/") {
-            response.end(JSON.stringify({ jobId: "job-3", status: "running" }));
-          } else {
-            response.end(
-              JSON.stringify({
-                jobId: "job-1",
-                status: "completed",
-                data: {
-                  metadata: { title: "Example Domain" },
-                  markdown: "# Example Domain",
-                  screenshot: `${baseURL}/screenshots/shot-1.png`,
-                },
-              }),
-            );
-          }
+          response.end(JSON.stringify(fetchAnswer(url, baseURL)));
           return;
         }
         case "POST /api/session":
@@ -100,6 +113,9 @@ describe("hyperbrowser current session API", () => {
           return;
         case "PUT /api/session/session-1/stop":
           response.end(JSON.stringify({ success: true }));
+          return;
+        case "POST /api/web/search":
+          response.end(JSON.stringify(searchAnswer));
           return;
         default:
           response.statusCode = 404;
@@ -241,5 +257,44 @@ describe("hyperbrowser current session API", () => {
     await expect(provider.scrape("https://slow.example/")).rejects.toThrow(
       "Hyperbrowser fetch job job-3 did not finish (status: running); try again",
     );
+  });
+
+  it("searches one domain and keeps maxResults results", async () => {
+    const provider = await create("hyperbrowser", { apiKey: "test", baseURL });
+    requests.length = 0;
+
+    const results = await provider.search?.("browser automation", {
+      maxResults: 3,
+      includeDomains: ["github.com"],
+    });
+    expect(results?.map(({ url }) => url)).toEqual([
+      "https://github.com/result-1",
+      "https://github.com/result-2",
+      "https://github.com/result-3",
+    ]);
+    await expect(provider.search?.("browser automation")).resolves.toHaveLength(10);
+    expect(requests.map(({ body }) => JSON.parse(body) as unknown)).toEqual([
+      { query: "browser automation", filters: { site: "github.com" } },
+      { query: "browser automation" },
+    ]);
+  });
+
+  it("refuses search options the route can't honor before any request", async () => {
+    const provider = await create("hyperbrowser", { apiKey: "test", baseURL });
+    requests.length = 0;
+
+    const domains = provider.search?.("browser automation", {
+      includeDomains: ["github.com", "npmjs.com"],
+    });
+    await expect(domains).rejects.toBeInstanceOf(InvalidInputError);
+    await expect(domains).rejects.toThrow(
+      "Hyperbrowser filters one domain per search, got 2. Pass one in includeDomains.",
+    );
+    for (const maxResults of [0, -1, 2.5, Number.NaN]) {
+      const call = provider.search?.("browser automation", { maxResults });
+      await expect(call).rejects.toBeInstanceOf(InvalidInputError);
+      await expect(call).rejects.toThrow("maxResults must be a positive integer.");
+    }
+    expect(requests).toEqual([]);
   });
 });

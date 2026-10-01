@@ -77,6 +77,27 @@ function createScreenshotBody(options: ScreenshotOptions): Record<string, unknow
 }
 
 /**
+ * Builds the search body. The route filters by one `site` and has no result count.
+ *
+ * @param {string} query Search query.
+ * @param {WebSearchOptions} [options] Search options.
+ * @returns {Record<string, unknown>} Search request body.
+ */
+function createSearchBody(query: string, options?: WebSearchOptions): Record<string, unknown> {
+  const maxResults = options?.maxResults;
+  if (maxResults !== undefined && (!Number.isInteger(maxResults) || maxResults < 1)) {
+    throw new InvalidInputError("maxResults must be a positive integer.");
+  }
+  const domains = options?.includeDomains ?? [];
+  if (domains.length > 1) {
+    throw new InvalidInputError(
+      `Hyperbrowser filters one domain per search, got ${domains.length}. Pass one in includeDomains.`,
+    );
+  }
+  return domains.length === 1 ? { query, filters: { site: domains[0] } } : { query };
+}
+
+/**
  * Rejects a fetch that did not complete. The route answers HTTP 200 with `status: "failed"` for a
  * page it could not load, and the empty `data` of that answer would pass for an empty page.
  *
@@ -435,19 +456,17 @@ class HyperbrowserProvider implements BrowserProvider {
     return pages;
   }
 
-  async search(query: string, _options?: WebSearchOptions): Promise<WebSearchResult[]> {
+  async search(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]> {
     try {
-      const body: Record<string, unknown> = { query };
-
       const res = await this.client.postJSON<Record<string, unknown>>(
         `${this.baseURL}/api/web/search`,
-        body,
+        createSearchBody(query, options),
         this.headers(),
       );
 
       const data = res.data as Record<string, unknown> | undefined;
       const results = (data?.results ?? res.results ?? []) as Array<Record<string, unknown>>;
-      return results.map((r) => ({
+      return results.slice(0, options?.maxResults).map((r) => ({
         url: (r.url ?? "") as string,
         title: (r.title ?? "") as string,
         snippet: (r.description ?? r.snippet ?? "") as string,

@@ -1,3 +1,5 @@
+import { stripVTControlCharacters } from "node:util";
+
 export class BrowserError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
@@ -7,6 +9,12 @@ export class BrowserError extends Error {
 
 /** Longest provider reason an error message carries; the full body stays on `HTTPError.body`. */
 const MAX_REASON_CHARS = 300;
+
+/** Body text read for a reason; `stripVTControlCharacters` is quadratic on unterminated escapes. */
+const MAX_REASON_SCAN = MAX_REASON_CHARS * 8;
+
+/** Controls and format marks, bidi overrides included; `\s` already covers U+2028 and U+2029. */
+const UNPRINTABLE = /[\p{Cc}\p{Cf}]/gu;
 
 function reasonFields(data: unknown): string[] {
   if (typeof data === "string") return [data];
@@ -21,8 +29,8 @@ function reasonFields(data: unknown): string[] {
  * The provider's own explanation of a failed request, read from the response body.
  *
  * JSON bodies give up their `message`, `error` or `detail` field and never land whole; an HTML
- * page gives nothing. The result is one line of at most `MAX_REASON_CHARS` characters, since
- * the message reaches the agent as it is.
+ * page gives nothing. The result is one line of at most `MAX_REASON_CHARS` characters with no
+ * escape sequences, since the message reaches the agent and the terminal as it is.
  *
  * @param body - Response body as the client received it.
  * @returns {string | undefined} A short reason, or `undefined` when the body has none.
@@ -36,7 +44,10 @@ function responseReason(body: string): string | undefined {
   } catch {
     fields = [text];
   }
-  const reason = fields.join(" ").replaceAll(/\s+/g, " ").trim();
+  const reason = stripVTControlCharacters(fields.join(" ").slice(0, MAX_REASON_SCAN))
+    .replaceAll(UNPRINTABLE, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
   if (!reason) return undefined;
   const chars = Array.from(reason);
   return chars.length > MAX_REASON_CHARS

@@ -73,7 +73,7 @@
     "test:run": "vp test run",
     "test:mcp": "pnpm build && node test/eval-mcp.mjs",
     "prepack": "pnpm run build",
-    "release": "pnpm test:run && pnpm build && changelogen --release --push"
+    "release": "pnpm build && pnpm test:run && changelogen --release --push"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.1",

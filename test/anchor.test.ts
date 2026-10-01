@@ -209,10 +209,12 @@ describe("anchor provider", () => {
   it("probes availability on the sessions status route", async () => {
     const provider = await create("anchor", { apiKey: API_KEY, baseURL });
 
-    expect(await provider.isAvailable?.()).toBe(true);
+    await expect(provider.checkAvailability?.()).resolves.toBeUndefined();
     expect(requests[0]).toMatchObject({ method: "GET", url: "/v1/sessions/all/status" });
 
     const rejected = await create("anchor", { apiKey: "sk-wrong", baseURL });
-    expect(await rejected.isAvailable?.()).toBe(false);
+    await expect(rejected.checkAvailability?.()).rejects.toThrow(
+      "Authentication failed for anchor: Unauthorized, please log in.",
+    );
   });
 });

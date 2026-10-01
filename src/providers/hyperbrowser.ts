@@ -487,15 +487,14 @@ class HyperbrowserProvider implements BrowserProvider {
     }
   }
 
-  async isAvailable(): Promise<boolean> {
+  async checkAvailability(): Promise<void> {
     try {
       await this.client.getJSON<HyperbrowserSessionListResponse>(
         `${this.baseURL}/api/sessions`,
         this.headers(),
       );
-      return true;
-    } catch {
-      return false;
+    } catch (error) {
+      throw normalizeError(error, "hyperbrowser");
     }
   }
 }

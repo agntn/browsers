@@ -622,8 +622,10 @@ describe("cloudflare availability", () => {
       accountID: "test-account",
     });
 
-    expect(await provider.isAvailable?.()).toBe(true);
-    expect(await provider.isAvailable?.()).toBe(false);
-    expect(await provider.isAvailable?.()).toBe(false);
+    await expect(provider.checkAvailability?.()).resolves.toBeUndefined();
+    await expect(provider.checkAvailability?.()).rejects.toThrow("Authentication error");
+    await expect(provider.checkAvailability?.()).rejects.toThrow(
+      "HTTP 403 from https://api.cloudflare.com/client/v4/accounts/[account]/browser-rendering/devtools/session: Forbidden",
+    );
   });
 });

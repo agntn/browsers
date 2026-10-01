@@ -178,8 +178,10 @@ describe("browserless current session API", () => {
     const provider = await create("browserless", { apiKey: "test", baseURL });
     const rejected = await create("browserless", { apiKey: "wrong", baseURL });
 
-    expect(await provider.isAvailable?.()).toBe(true);
-    expect(await rejected.isAvailable?.()).toBe(false);
+    await expect(provider.checkAvailability?.()).resolves.toBeUndefined();
+    await expect(rejected.checkAvailability?.()).rejects.toThrow(
+      "Authentication failed for browserless: Invalid or missing API key",
+    );
     expect(requests.map((request) => request.url)).toEqual([
       "/meta?token=test",
       "/meta?token=wrong",

@@ -272,15 +272,14 @@ class AnchorProvider implements BrowserProvider {
     return session.cdpUrl;
   }
 
-  async isAvailable(): Promise<boolean> {
+  async checkAvailability(): Promise<void> {
     try {
       await this.client.getJSON<AnchorEnvelope<AnchorSessionList>>(
         `${this.baseURL}/v1/sessions/all/status`,
         this.headers(),
       );
-      return true;
-    } catch {
-      return false;
+    } catch (error) {
+      throw normalizeError(error, "anchor");
     }
   }
 }

@@ -232,7 +232,8 @@ export interface BrowserProvider {
   ): Promise<AccessibilityTreeResult>;
 
   getCdpUrl?(session: BrowserSession): string | undefined;
-  isAvailable?(): Promise<boolean>;
+  /** Resolves when the provider answers with this config, rejects with the error saying why not. */
+  checkAvailability?(): Promise<void>;
 }
 
 export interface ProviderConfig {

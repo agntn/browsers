@@ -167,7 +167,7 @@ describe("hyperbrowser current session API", () => {
         metadata: { status: "active" },
       },
     ]);
-    expect(await provider.isAvailable?.()).toBe(true);
+    await expect(provider.checkAvailability?.()).resolves.toBeUndefined();
     await provider.releaseSession("session-1");
 
     expect(requests.map(({ method, url }) => `${method} ${url}`)).toEqual([

@@ -282,12 +282,11 @@ class SteelProvider implements BrowserProvider {
     return `wss://connect.steel.dev?apiKey=${this.apiKey}&sessionId=${session.id}`;
   }
 
-  async isAvailable(): Promise<boolean> {
+  async checkAvailability(): Promise<void> {
     try {
       await this.client.getJSON(`${this.baseURL}/v1/sessions?limit=1`, this.headers());
-      return true;
-    } catch {
-      return false;
+    } catch (error) {
+      throw normalizeError(error, "steel");
     }
   }
 }

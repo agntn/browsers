@@ -283,12 +283,11 @@ class BrowserlessProvider implements BrowserProvider {
     }
   }
 
-  async isAvailable(): Promise<boolean> {
+  async checkAvailability(): Promise<void> {
     try {
       await this.client.getJSON(`${this.baseURL}/meta?${this.tokenParam()}`);
-      return true;
-    } catch {
-      return false;
+    } catch (error) {
+      throw normalizeError(error, "browserless");
     }
   }
 }

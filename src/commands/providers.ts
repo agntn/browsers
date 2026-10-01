@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
 import { providers as listProviders, create } from "../core/registry.ts";
 import { _hasKey, providerEnvHint } from "../core/resolve.ts";
-import type { ProviderCapabilities } from "../core/types.ts";
+import type { BrowserProvider, ProviderCapabilities } from "../core/types.ts";
 
 const simpleCapabilityLabels = [
   ["elementScreenshot", "element"],
@@ -39,12 +39,19 @@ function capabilityTags(capabilities: Readonly<ProviderCapabilities>): string {
 }
 
 async function printAvailability(name: string): Promise<void> {
+  let provider: BrowserProvider;
   try {
-    const provider = await create(name);
-    const available = provider.isAvailable ? await provider.isAvailable() : true;
-    console.log(`${available ? "✓" : "✗"} ${name}`);
+    provider = await create(name);
   } catch {
     console.log(`✗ ${name} (not configured)`);
+    return;
+  }
+  try {
+    await provider.checkAvailability?.();
+    console.log(`✓ ${name}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`✗ ${name} (${message.split("\n", 1)[0]})`);
   }
 }
 

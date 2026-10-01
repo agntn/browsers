@@ -674,7 +674,7 @@ class CloudflareProvider implements BrowserProvider {
     }
   }
 
-  async isAvailable(): Promise<boolean> {
+  async checkAvailability(): Promise<void> {
     try {
       this.unwrap(
         await this.client.getJSON<CfEnvelope<unknown[]> | unknown[]>(
@@ -682,9 +682,8 @@ class CloudflareProvider implements BrowserProvider {
           this.headers(),
         ),
       );
-      return true;
-    } catch {
-      return false;
+    } catch (error) {
+      throw this.fail(error);
     }
   }
 }

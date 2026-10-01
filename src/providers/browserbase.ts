@@ -238,15 +238,14 @@ class BrowserbaseProvider implements BrowserProvider {
     return `wss://connect.browserbase.com?sessionId=${session.id}`;
   }
 
-  async isAvailable(): Promise<boolean> {
+  async checkAvailability(): Promise<void> {
     try {
       await this.client.getJSON<Record<string, unknown>>(
         `${this.baseURL}/v1/sessions`,
         this.headers(),
       );
-      return true;
-    } catch {
-      return false;
+    } catch (error) {
+      throw normalizeError(error, "browserbase");
     }
   }
 }

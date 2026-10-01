@@ -599,3 +599,31 @@ describe("cloudflare CDP URL", () => {
     expect(kitesurf.getCdpUrl?.({ ...session, id: "" })).toBeUndefined();
   });
 });
+
+describe("cloudflare availability", () => {
+  it("reads the bare session list as an answer", async () => {
+    const responses = [
+      jsonResponse([]),
+      jsonResponse({
+        success: false,
+        errors: [{ code: 10000, message: "Authentication error" }],
+        messages: [],
+        result: null,
+      }),
+      new Response("Forbidden", { status: 403 }),
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => responses.shift() ?? jsonResponse([])),
+    );
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+
+    expect(await provider.isAvailable?.()).toBe(true);
+    expect(await provider.isAvailable?.()).toBe(false);
+    expect(await provider.isAvailable?.()).toBe(false);
+  });
+});

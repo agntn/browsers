@@ -39,6 +39,21 @@ function serveCapture(req: IncomingMessage, res: ServerResponse): boolean {
   return true;
 }
 
+/**
+ * Answers `/meta` like Browserless: version info for the right token, 401 otherwise.
+ *
+ * @param {IncomingMessage} req Incoming request.
+ * @param {ServerResponse} res Response to write.
+ * @returns {boolean} Whether the request was the meta route.
+ */
+function serveMeta(req: IncomingMessage, res: ServerResponse): boolean {
+  if (req.method !== "GET" || !req.url?.startsWith("/meta?")) return false;
+  res.statusCode = req.url === "/meta?token=test" ? 200 : 401;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify({ version: "2.56.7" }));
+  return true;
+}
+
 describe("browserless current session API", () => {
   let server: Server;
   let baseURL: string;
@@ -73,6 +88,7 @@ describe("browserless current session API", () => {
           return;
         }
         if (serveCapture(req, res)) return;
+        if (serveMeta(req, res)) return;
         res.statusCode = 404;
         res.end("not found");
       });
@@ -155,6 +171,18 @@ describe("browserless current session API", () => {
 
     expect(requests.map((request) => JSON.parse(request.body) as unknown)).toEqual([
       { url: "https://example.com", selector: "#price" },
+    ]);
+  });
+
+  it("probes a route Browserless serves and checks the token", async () => {
+    const provider = await create("browserless", { apiKey: "test", baseURL });
+    const rejected = await create("browserless", { apiKey: "wrong", baseURL });
+
+    expect(await provider.isAvailable?.()).toBe(true);
+    expect(await rejected.isAvailable?.()).toBe(false);
+    expect(requests.map((request) => request.url)).toEqual([
+      "/meta?token=test",
+      "/meta?token=wrong",
     ]);
   });
 });

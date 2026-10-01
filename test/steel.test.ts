@@ -169,3 +169,45 @@ describe("steel screenshots", () => {
     );
   });
 });
+
+describe("steel availability", () => {
+  let server: Server;
+  let baseURL: string;
+  const urls: (string | undefined)[] = [];
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      urls.push(request.url);
+      response.setHeader("Content-Type", "application/json");
+      if (request.headers["steel-api-key"] !== "test") {
+        response.statusCode = 401;
+        response.end(JSON.stringify({ error: "Unauthorized" }));
+        return;
+      }
+      if (request.method === "GET" && request.url === "/v1/sessions?limit=1") {
+        response.end(JSON.stringify({ sessions: [], nextCursor: null, totalCount: 0 }));
+        return;
+      }
+      response.statusCode = 421;
+      response.end(JSON.stringify({ message: `No route defined for GET ${request.url}` }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (typeof address === "object" && address) baseURL = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  });
+
+  it("probes a route Steel serves and checks the key", async () => {
+    const provider = await create("steel", { apiKey: "test", baseURL });
+    const rejected = await create("steel", { apiKey: "wrong", baseURL });
+
+    expect(await provider.isAvailable?.()).toBe(true);
+    expect(await rejected.isAvailable?.()).toBe(false);
+    expect(urls).toEqual(["/v1/sessions?limit=1", "/v1/sessions?limit=1"]);
+  });
+});

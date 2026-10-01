@@ -676,11 +676,13 @@ class CloudflareProvider implements BrowserProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
-      const res = await this.client.getJSON<CfEnvelope<unknown>>(
-        `${this.base()}/devtools/session`,
-        this.headers(),
+      this.unwrap(
+        await this.client.getJSON<CfEnvelope<unknown[]> | unknown[]>(
+          `${this.base()}/devtools/session`,
+          this.headers(),
+        ),
       );
-      return res.success;
+      return true;
     } catch {
       return false;
     }

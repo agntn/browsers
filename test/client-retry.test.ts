@@ -1,8 +1,8 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { Client } from "../src/core/client";
-import { TimeoutError } from "../src/core/errors";
+import { TimeoutError, TransportError } from "../src/core/errors";
 
 const requests = [
   (client: Client, url: string) => client.getJSON(url),
@@ -154,5 +154,110 @@ describe("Client retry timeout", () => {
     const client = new Client({ timeout: 150, maxRetries: 1, baseDelay: 1 });
     await expect(client.getJSON(url)).rejects.toThrow(/^HTTP 400 from .*: Bad request$/);
     expect(count).toBe(1);
+  });
+});
+
+describe("Client with no response", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function closedPort(): Promise<number> {
+    const server = createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Missing TCP address");
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    return address.port;
+  }
+
+  function failure(request: Promise<unknown>): Promise<unknown> {
+    return request.then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+  }
+
+  function failFetch(cause: Error): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed", { cause });
+      }),
+    );
+  }
+
+  it.each(requests)("names a refused connection through request method %#", async (request) => {
+    const port = await closedPort();
+    const client = new Client({ maxRetries: 0 });
+    const error = await failure(request(client, `http://127.0.0.1:${port}/?token=secret`));
+
+    expect(error).toBeInstanceOf(TransportError);
+    expect((error as TransportError).message).toBe(
+      `No response from http://127.0.0.1:${port}/?token=%5BREDACTED%5D: connect ECONNREFUSED 127.0.0.1:${port}`,
+    );
+    expect((error as TransportError).code).toBe("ECONNREFUSED");
+    expect(((error as Error).cause as { code?: string }).code).toBe("ECONNREFUSED");
+  });
+
+  it("names an unresolved host", async () => {
+    failFetch(
+      Object.assign(new Error("getaddrinfo ENOTFOUND nonexistent.invalid"), { code: "ENOTFOUND" }),
+    );
+    const client = new Client({ maxRetries: 0 });
+    const error = await failure(client.getJSON("https://nonexistent.invalid/v1"));
+
+    expect(error).toBeInstanceOf(TransportError);
+    expect((error as Error).message).toBe(
+      "No response from https://nonexistent.invalid/v1: getaddrinfo ENOTFOUND nonexistent.invalid",
+    );
+    expect((error as TransportError).code).toBe("ENOTFOUND");
+  });
+
+  it("reads a refusal on every address family from its first attempt", async () => {
+    const attempts = [
+      Object.assign(new Error("connect ECONNREFUSED ::1:59999"), { code: "ECONNREFUSED" }),
+      Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:59999"), { code: "ECONNREFUSED" }),
+    ];
+    const refused = Object.assign(new AggregateError(attempts, ""), { code: "ECONNREFUSED" });
+    failFetch(refused);
+    const client = new Client({ maxRetries: 0 });
+    const error = await failure(client.getJSON("http://localhost:59999/"));
+
+    expect((error as Error).message).toBe(
+      "No response from http://localhost:59999/: connect ECONNREFUSED ::1:59999",
+    );
+    expect((error as TransportError).code).toBe("ECONNREFUSED");
+    expect((error as Error).cause).toBe(refused);
+  });
+
+  it("adds a code the reason leaves out", async () => {
+    failFetch(
+      Object.assign(new Error("self-signed certificate"), { code: "DEPTH_ZERO_SELF_SIGNED_CERT" }),
+    );
+    const client = new Client({ maxRetries: 0 });
+    const error = await failure(client.getJSON("https://self-signed.example/"));
+
+    expect((error as Error).message).toBe(
+      "No response from https://self-signed.example/: self-signed certificate (DEPTH_ZERO_SELF_SIGNED_CERT)",
+    );
+  });
+
+  it("hands the caller's own abort back as it is", async () => {
+    const server = createServer(() => {});
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Missing TCP address");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 50);
+    const client = new Client({ maxRetries: 0 });
+    const error = await failure(
+      client.getJSON(`http://127.0.0.1:${address.port}/`, undefined, controller.signal),
+    );
+    clearTimeout(timer);
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+
+    expect(error).toBe(controller.signal.reason);
   });
 });

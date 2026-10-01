@@ -16,6 +16,7 @@ import {
   NoProviderAvailableError,
   EmptyUrlError,
   ScrapeNotSupportedError,
+  TransportError,
   parseRetryAfter,
   DEFAULT_RETRY_AFTER,
   normalizeError,
@@ -306,11 +307,13 @@ describe("Client errors", () => {
       () => undefined,
       (failure: unknown) => failure,
     );
-    expect(error).toBeInstanceOf(HTTPError);
-    const message = (error as HTTPError).message;
+    expect(error).toBeInstanceOf(TransportError);
+    const message = (error as TransportError).message;
     expect(message).toContain(
       `from http://%5BREDACTED%5D:%5BREDACTED%5D@${origin.slice("http://".length)}/session/stop`,
     );
+    expect(message).toContain("Request cannot be constructed from a URL that includes credentials");
     expect(message).not.toMatch(/user|pass/);
+    expect((error as TransportError).cause).toBeUndefined();
   });
 });

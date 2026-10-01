@@ -58,6 +58,7 @@ export default defineConfig({
               ],
             },
             { from: "package", name: ["BrowserContext", "Page"], package: "playwright" },
+            { from: "package", name: ["FetchError"], package: "ofetch" },
             { from: "package", name: ["BrowserContext", "Page"], package: "playwright-core" },
             {
               from: "package",

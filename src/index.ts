@@ -39,6 +39,7 @@ export {
   AuthError,
   RateLimitError,
   TimeoutError,
+  TransportError,
   UnknownProviderError,
   SessionError,
   SessionNotFoundError,

@@ -120,6 +120,27 @@ export class TimeoutError extends BrowserError {
   }
 }
 
+export class TransportError extends BrowserError {
+  readonly url: string;
+  readonly reason: string;
+  readonly code: string | undefined;
+
+  /**
+   * @param url - Sanitized request URL, so the agent can tell which provider was out of reach.
+   * @param reason - Why no response came, such as `getaddrinfo ENOTFOUND <host>`.
+   * @param code - System error code, such as `ENOTFOUND` or `ECONNREFUSED`.
+   * @param options - The system error, kept as `cause`.
+   */
+  constructor(url: string, reason: string, code?: string, options?: ErrorOptions) {
+    const detail = code && !reason.includes(code) ? `${reason} (${code})`.trim() : reason;
+    super(`No response${url ? ` from ${url}` : ""}${detail ? `: ${detail}` : ""}`, options);
+    this.name = "TransportError";
+    this.url = url;
+    this.reason = reason;
+    this.code = code;
+  }
+}
+
 export class UnknownProviderError extends BrowserError {
   readonly provider: string;
   constructor(provider: string) {

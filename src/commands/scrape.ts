@@ -4,20 +4,21 @@ import { resolveCapableProvider } from "./_helpers.ts";
 import type { ScrapeResult } from "../core/types.ts";
 import { scrapeWithSessionWhenNeeded } from "../core/utils.ts";
 
+/** Fields each format falls back through. Most providers leave `text` empty. */
+const FORMAT_FIELDS = {
+  html: ["html"],
+  text: ["text", "markdown", "html"],
+  markdown: ["markdown", "text", "html"],
+} as const;
+
 function printScrapeResult(
   format: string,
   result: Readonly<Pick<ScrapeResult, "html" | "text" | "markdown">>,
 ): void {
-  switch (format) {
-    case "html":
-      console.log(result.html ?? "");
-      return;
-    case "text":
-      console.log(result.text ?? "");
-      return;
-    default:
-      console.log(result.markdown ?? result.text ?? result.html ?? "");
-  }
+  const fields =
+    format === "html" || format === "text" ? FORMAT_FIELDS[format] : FORMAT_FIELDS.markdown;
+  const field = fields.find((name) => result[name] !== undefined);
+  console.log(field === undefined ? "" : result[field]);
 }
 
 export default defineCommand({
@@ -65,7 +66,8 @@ export default defineCommand({
 
     try {
       const result = await scrapeWithSessionWhenNeeded(provider, args.url, {
-        formats: [args.format as "markdown" | "text" | "html"],
+        formats:
+          args.format === "text" ? ["text", "markdown"] : [args.format as "markdown" | "html"],
         waitFor: args.waitFor,
         maxChars: args.maxChars ? Number(args.maxChars) : undefined,
       });

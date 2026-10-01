@@ -71,7 +71,7 @@ describe("scrape command", () => {
     expect(createSession).toHaveBeenCalledOnce();
     expect(providerScrape).toHaveBeenCalledWith(
       "https://example.test",
-      { formats: ["text"], waitFor: undefined, maxChars: undefined },
+      { formats: ["text", "markdown"], waitFor: undefined, maxChars: undefined },
       expect.objectContaining({ id: "session-1" }),
     );
     expect(releaseSession).toHaveBeenCalledWith("session-1");
@@ -91,10 +91,26 @@ describe("scrape command", () => {
     expect(createSession).not.toHaveBeenCalled();
     expect(releaseSession).not.toHaveBeenCalled();
     expect(providerScrape).toHaveBeenCalledWith("https://example.test", {
-      formats: ["text"],
+      formats: ["text", "markdown"],
       waitFor: undefined,
       maxChars: undefined,
     });
+  });
+
+  it.each([
+    ["markdown", { markdown: "# Page" }, "# Page"],
+    ["HTML", { html: "<h1>Page</h1>" }, "<h1>Page</h1>"],
+  ])("prints %s for --format text when the provider has no plain text", async (_, page, out) => {
+    process.env.CLITEST_API_KEY = "test";
+    statelessScrape = true;
+    providerScrape.mockResolvedValueOnce({ url: "https://example.test", ...page });
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    await runCommand(scrape, {
+      rawArgs: ["https://example.test", "--provider", "clitest", "--format", "text"],
+    });
+
+    expect(log).toHaveBeenCalledWith(out);
   });
 
   it("writes its status line to stderr, so stdout holds only the page", async () => {

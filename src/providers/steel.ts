@@ -284,7 +284,7 @@ class SteelProvider implements BrowserProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
-      await this.client.getJSON<{ status?: string }>(`${this.baseURL}/v1/health`, this.headers());
+      await this.client.getJSON(`${this.baseURL}/v1/sessions?limit=1`, this.headers());
       return true;
     } catch {
       return false;

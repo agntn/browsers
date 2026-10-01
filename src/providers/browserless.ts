@@ -285,7 +285,7 @@ class BrowserlessProvider implements BrowserProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
-      await this.client.getJSON<{ status?: string }>(`${this.baseURL}/stats?${this.tokenParam()}`);
+      await this.client.getJSON(`${this.baseURL}/meta?${this.tokenParam()}`);
       return true;
     } catch {
       return false;

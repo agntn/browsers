@@ -40,6 +40,9 @@ export const DEFAULT_LINKS_LIMIT = 500;
 /** Largest `limit` accepted by the browser links tool. */
 export const MAX_LINKS_LIMIT = 5_000;
 
+/** Results on one Hyperbrowser search page, the most one browser search call returns. */
+export const MAX_SEARCH_RESULTS = 10;
+
 /** Human-facing labels for each browser tool. */
 export const browserToolLabels: Readonly<Record<BrowserToolName, string>> = {
   browsers_scrape: "Browser Scrape",

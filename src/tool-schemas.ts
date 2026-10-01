@@ -5,6 +5,7 @@ import {
   DEFAULT_SCRAPE_MAX_CHARS,
   MAX_LINKS_LIMIT,
   MAX_SCRAPE_MAX_CHARS,
+  MAX_SEARCH_RESULTS,
 } from "./tool-contract.ts";
 
 const provider = Type.Optional(
@@ -195,7 +196,16 @@ export const browserToolSchemas = {
     { additionalProperties: false },
   ),
   browsers_search: Type.Object(
-    { query: Type.String({ description: "Search query" }) },
+    {
+      query: Type.String({ description: "Search query" }),
+      maxResults: Type.Optional(
+        Type.Integer({
+          description: `Maximum results to return. Defaults to ${MAX_SEARCH_RESULTS}; accepted range: 1-${MAX_SEARCH_RESULTS}.`,
+          minimum: 1,
+          maximum: MAX_SEARCH_RESULTS,
+        }),
+      ),
+    },
     { additionalProperties: false },
   ),
   browsers_capabilities: Type.Object(

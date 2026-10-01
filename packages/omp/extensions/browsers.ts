@@ -11,6 +11,7 @@ import {
   DEFAULT_SCRAPE_MAX_CHARS,
   MAX_LINKS_LIMIT,
   MAX_SCRAPE_MAX_CHARS,
+  MAX_SEARCH_RESULTS,
 } from "../../../src/tool-contract.ts";
 import type * as BrowserTools from "../../../dist/tool-operations.d.mts";
 import {
@@ -234,7 +235,16 @@ function buildParameterSchemas(pi: ExtensionAPI) {
       { additionalProperties: false },
     ),
     search: Type.Object(
-      { query: Type.String({ description: "Search query" }) },
+      {
+        query: Type.String({ description: "Search query" }),
+        maxResults: Type.Optional(
+          Type.Integer({
+            description: `Maximum results to return. Defaults to ${MAX_SEARCH_RESULTS}; accepted range: 1-${MAX_SEARCH_RESULTS}.`,
+            minimum: 1,
+            maximum: MAX_SEARCH_RESULTS,
+          }),
+        ),
+      },
       { additionalProperties: false },
     ),
     capabilities: Type.Object(

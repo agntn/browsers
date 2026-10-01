@@ -210,7 +210,10 @@ describe("browsers OMP extension", () => {
           },
           invalid: { url: "https://example.test", root: "" },
         },
-        browsers_search: { valid: { query: "browser agents" }, invalid: {} },
+        browsers_search: {
+          valid: { query: "browser agents", maxResults: 3 },
+          invalid: { query: "browser agents", maxResults: 11 },
+        },
         browsers_capabilities: { valid: { provider: "playwright" }, invalid: {} },
       };
 
@@ -239,6 +242,17 @@ describe("browsers OMP extension", () => {
     expect(accepts(tool, { url: "https://example.test", maxChars: 200_000 })).toBe(true);
     expect(accepts(tool, { url: "https://example.test", maxChars: 200_001 })).toBe(false);
     expect(accepts(tool, { url: "https://example.test", maxChars: 10.5 })).toBe(false);
+  });
+
+  it("declares the search contract enforced by the shared executor", () => {
+    const tool = requireTool(registerExtension().tools, "browsers_search");
+
+    expect(accepts(tool, { query: "browser agents" })).toBe(true);
+    expect(accepts(tool, { query: "browser agents", maxResults: 1 })).toBe(true);
+    expect(accepts(tool, { query: "browser agents", maxResults: 10 })).toBe(true);
+    expect(accepts(tool, { query: "browser agents", maxResults: 0 })).toBe(false);
+    expect(accepts(tool, { query: "browser agents", maxResults: 11 })).toBe(false);
+    expect(accepts(tool, { query: "browser agents", maxResults: 2.5 })).toBe(false);
   });
 
   it("takes a crawl job ID in place of the starting URL", () => {

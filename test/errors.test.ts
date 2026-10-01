@@ -229,6 +229,31 @@ describe("HTTPError reason", () => {
     expect(Array.from(error.message.slice("HTTP 400: ".length))).toHaveLength(300);
     expect(error.message.endsWith("…")).toBe(true);
   });
+
+  it("drops escape sequences and bidi controls from the reason", () => {
+    const reason = [
+      "bad key\u001B]8;;https://evil.test\u0007click\u001B]8;;\u0007",
+      "\u001B]8;;https://evil.test\u001B\\link\u001B]8;;\u001B\\",
+      "\u001B[31mred\u001B[0m \u009B1mbold\u2028next\u2029para \u202Eexe\u007F end",
+    ].join(" ");
+    const body = JSON.stringify({ message: reason });
+    const expected = "bad keyclick link red bold next para exe end";
+
+    expect(new HTTPError(401, "", body).message).toBe(`HTTP 401: ${expected}`);
+    expect(new RateLimitError(30, "", body).message).toBe(
+      `Rate limited, retry after 30s: ${expected}`,
+    );
+    expect(normalizeError(new HTTPError(401, "", body), "steel").message).toBe(
+      `Authentication failed for steel: ${expected}`,
+    );
+  });
+
+  it("strips a body of unterminated escapes in linear time", () => {
+    const started = performance.now();
+    const error = new HTTPError(400, "", "\u001B]".repeat(100_000));
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(error.message).not.toContain("\u001B");
+  });
 });
 
 describe("RateLimitError reason", () => {

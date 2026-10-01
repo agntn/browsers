@@ -25,6 +25,29 @@ interface BrowserbaseSessionResponse {
   [key: string]: unknown;
 }
 
+interface BrowserbaseFetchResponse {
+  statusCode?: number;
+  contentType?: string;
+  content?: unknown;
+}
+
+function textOf(res?: Readonly<BrowserbaseFetchResponse>): string | undefined {
+  return typeof res?.content === "string" ? res.content : undefined;
+}
+
+function toScrapeResult(
+  url: string,
+  page?: Readonly<BrowserbaseFetchResponse>,
+  markdown?: Readonly<BrowserbaseFetchResponse>,
+): ScrapeResult {
+  return {
+    url,
+    html: page?.contentType?.includes("html") ? textOf(page) : undefined,
+    markdown: textOf(markdown),
+    statusCode: (page ?? markdown)?.statusCode,
+  };
+}
+
 function createSessionBody(options?: CreateSessionOptions): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   if (options?.region) body.region = options.region;
@@ -151,29 +174,38 @@ class BrowserbaseProvider implements BrowserProvider {
     }
   }
 
+  private fetchPage(url: string, format: "raw" | "markdown"): Promise<BrowserbaseFetchResponse> {
+    return this.client.postJSON<BrowserbaseFetchResponse>(
+      `${this.baseURL}/v1/fetch`,
+      { url, format },
+      this.headers(),
+    );
+  }
+
+  private async fetchPages(
+    url: string,
+    formats: Readonly<NonNullable<ScrapeOptions["formats"]>> = [],
+  ): Promise<(BrowserbaseFetchResponse | undefined)[]> {
+    const wantsHtml = formats.includes("html");
+    const settled = await Promise.allSettled([
+      wantsHtml ? this.fetchPage(url, "raw") : undefined,
+      formats.includes("markdown") || !wantsHtml ? this.fetchPage(url, "markdown") : undefined,
+    ]);
+    const pages = settled.map((r) => (r.status === "fulfilled" ? r.value : undefined));
+    if (pages.every((page) => !page)) {
+      throw settled.find((r): r is PromiseRejectedResult => r.status === "rejected")?.reason;
+    }
+    return pages;
+  }
+
   async scrape(
     url: string,
-    _options?: ScrapeOptions,
+    options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
     try {
-      const body: Record<string, unknown> = { url, format: "markdown" };
-
-      const res = await this.client.postJSON<Record<string, unknown>>(
-        `${this.baseURL}/v1/fetch`,
-        body,
-        this.headers(),
-      );
-
-      return rejectBlockPage(
-        {
-          url,
-          html: res.content as string | undefined,
-          markdown: typeof res.content === "string" ? res.content : undefined,
-          statusCode: res.statusCode as number | undefined,
-        },
-        "browserbase",
-      );
+      const [page, markdown] = await this.fetchPages(url, options?.formats);
+      return rejectBlockPage(toScrapeResult(url, page, markdown), "browserbase");
     } catch (error) {
       throw normalizeError(error, "browserbase");
     }

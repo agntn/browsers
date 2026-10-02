@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
+import { NavigationError } from "../src/core/errors";
 import { create } from "../src/core/registry";
 
 async function readBody(request: IncomingMessage): Promise<string> {
@@ -58,6 +59,91 @@ describe("steel scrape responses", () => {
       text: undefined,
       statusCode: undefined,
       links: undefined,
+    });
+  });
+});
+
+/* What Chrome printed on its error page for each URL the mock Steel fails to load. */
+const CHROME_ERRORS: Readonly<Record<string, string>> = {
+  "https://httpbin.org/status/500": "HTTP ERROR 500",
+  "https://httpbin.org/status/403": "HTTP ERROR 403",
+  "https://httpbin.org/status/404": "HTTP ERROR 404",
+  "https://h2.example/": "ERR_HTTP2_PROTOCOL_ERROR",
+};
+
+/* The page in the one format the request asks for, Chrome's error page or an article. */
+function scrapedPage(format: string, error: string | undefined): Record<string, string> {
+  if (format === "cleaned_html") return { cleaned_html: `<div class="error-code">${error}</div>` };
+  if (format === "markdown") {
+    return {
+      markdown: `## This page isn’t working\n\n**httpbin.org** is currently unable to handle this request.\n\n${error}\n\n![](data:image/png;base64,iVBORw0KGgo)`,
+    };
+  }
+  return {
+    html: error
+      ? `<html><head><title>httpbin.org</title><script>var loadTimeDataRaw = {"errorCode":"${error}"};</script></head><body class="neterror"><div id="main-frame-error"></div></body></html>`
+      : "<article>Chrome prints HTTP ERROR 500 on its error page</article>",
+  };
+}
+
+describe("steel navigation errors", () => {
+  let server: Server;
+  let baseURL: string;
+
+  beforeAll(async () => {
+    server = createServer(async (request, response) => {
+      const body = JSON.parse(await readBody(request)) as { url: string; format?: string[] };
+      const error = Object.hasOwn(CHROME_ERRORS, body.url) ? CHROME_ERRORS[body.url] : undefined;
+      response.setHeader("Content-Type", "application/json");
+      response.end(
+        JSON.stringify({
+          content: scrapedPage(body.format?.[0] ?? "html", error),
+          metadata: {
+            statusCode: 200,
+            title: "httpbin.org",
+            urlSource: error ? "chrome-error://chromewebdata/" : body.url,
+          },
+        }),
+      );
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (typeof address === "object" && address) baseURL = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  });
+
+  it("fails when Chrome shows its error page in place of the site", async () => {
+    const provider = await create("steel", { apiKey: "test", baseURL });
+
+    const error = await provider
+      .scrape("https://httpbin.org/status/500")
+      .catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(NavigationError);
+    expect(error).toMatchObject({
+      provider: "steel",
+      reason: "HTTP ERROR 500",
+      statusCode: 500,
+      message: "Steel couldn't load the page, Chrome showed HTTP ERROR 500",
+    });
+    await expect(
+      provider.scrape("https://httpbin.org/status/403", { formats: ["markdown"] }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      provider.scrape("https://httpbin.org/status/404", { formats: ["cleanedHtml"] }),
+    ).rejects.toMatchObject({ reason: "HTTP ERROR 404", statusCode: 404 });
+    await expect(provider.scrape("https://h2.example/")).rejects.toMatchObject({
+      reason: "ERR_HTTP2_PROTOCOL_ERROR",
+      statusCode: undefined,
+    });
+    await expect(
+      provider.scrape("https://errors.example/chrome", { formats: ["html"] }),
+    ).resolves.toMatchObject({
+      html: "<article>Chrome prints HTTP ERROR 500 on its error page</article>",
     });
   });
 });

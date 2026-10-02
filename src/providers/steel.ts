@@ -14,7 +14,7 @@ import type {
 import { rejectBlockPage } from "../core/block-page.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
-import { AuthError, BrowserError, normalizeError } from "../core/errors.ts";
+import { AuthError, BrowserError, NavigationError, normalizeError } from "../core/errors.ts";
 import {
   isNotFoundError,
   assertNoSelector,
@@ -40,6 +40,7 @@ interface SteelScrapeResponse {
   };
   readonly metadata?: {
     readonly title?: string;
+    readonly urlSource?: string;
   };
   readonly links?: readonly { readonly url: string }[];
   readonly [key: string]: unknown;
@@ -73,7 +74,34 @@ function createScrapeBody(url: string, options?: ScrapeOptions): Record<string, 
   return body;
 }
 
+/** What Chrome prints on its error page, like `HTTP ERROR 500` or `ERR_TOO_MANY_REDIRECTS`. */
+const CHROME_ERROR_CODE = /\bHTTP ERROR (\d{3})\b|\bERR_[A-Z_]+\b/;
+
+/**
+ * Reads the failure off Chrome's error page.
+ *
+ * @param page - The page's HTML or markdown.
+ * @returns {NavigationError} The error, with the site's status when Chrome printed one.
+ */
+function chromeError(page = ""): NavigationError {
+  const match = CHROME_ERROR_CODE.exec(page);
+  return new NavigationError("steel", match?.[0] ?? "", match?.[1] ? Number(match[1]) : undefined);
+}
+
+/**
+ * Throws when Steel's browser ended on Chrome's own error page, which Steel serves as content.
+ *
+ * @param response - Steel's scrape response.
+ * @throws {NavigationError} When `metadata.urlSource` is a `chrome-error://` page.
+ */
+function rejectChromeError(response: SteelScrapeResponse): void {
+  if (!response.metadata?.urlSource?.startsWith("chrome-error://")) return;
+  const { html, markdown } = response.content ?? {};
+  throw chromeError(html ?? markdown);
+}
+
 function toScrapeResult(url: string, response: SteelScrapeResponse): ScrapeResult {
+  rejectChromeError(response);
   return rejectBlockPage(
     {
       url,

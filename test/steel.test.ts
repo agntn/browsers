@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
+import { NavigationError } from "../src/core/errors";
 import { create } from "../src/core/registry";
 
 async function readBody(request: IncomingMessage): Promise<string> {
@@ -58,6 +59,70 @@ describe("steel scrape responses", () => {
       text: undefined,
       statusCode: undefined,
       links: undefined,
+    });
+  });
+});
+
+describe("steel navigation errors", () => {
+  let server: Server;
+  let baseURL: string;
+
+  beforeAll(async () => {
+    server = createServer(async (request, response) => {
+      const body = JSON.parse(await readBody(request)) as { url?: string; format?: string[] };
+      const failed = body.url?.startsWith("https://httpbin.org/status/");
+      const code = body.url?.split("/").at(-1);
+      response.setHeader("Content-Type", "application/json");
+      response.end(
+        JSON.stringify({
+          content: body.format?.includes("markdown")
+            ? {
+                markdown: `## This page isn’t working\n\n**httpbin.org** is currently unable to handle this request.\n\nHTTP ERROR ${code}\n\n![](data:image/png;base64,iVBORw0KGgo)`,
+              }
+            : {
+                html: failed
+                  ? `<html><head><title>httpbin.org</title><script>var loadTimeDataRaw = {"errorCode":"HTTP ERROR ${code}"};</script></head><body class="neterror"><div id="main-frame-error"></div></body></html>`
+                  : "<article>Chrome prints HTTP ERROR 500 on its error page</article>",
+              },
+          metadata: {
+            statusCode: 200,
+            title: "httpbin.org",
+            urlSource: failed ? "chrome-error://chromewebdata/" : body.url,
+          },
+        }),
+      );
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (typeof address === "object" && address) baseURL = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  });
+
+  it("fails when Chrome shows its error page in place of the site", async () => {
+    const provider = await create("steel", { apiKey: "test", baseURL });
+
+    const error = await provider
+      .scrape("https://httpbin.org/status/500")
+      .catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(NavigationError);
+    expect(error).toMatchObject({
+      provider: "steel",
+      reason: "HTTP ERROR 500",
+      statusCode: 500,
+      message: "Steel couldn't load the page, Chrome showed HTTP ERROR 500",
+    });
+    await expect(
+      provider.scrape("https://httpbin.org/status/403", { formats: ["markdown"] }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      provider.scrape("https://errors.example/chrome", { formats: ["html"] }),
+    ).resolves.toMatchObject({
+      html: "<article>Chrome prints HTTP ERROR 500 on its error page</article>",
     });
   });
 });

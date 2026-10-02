@@ -252,6 +252,26 @@ export class BlockedPageError extends BrowserError {
   }
 }
 
+export class NavigationError extends BrowserError {
+  readonly provider: string;
+  readonly reason: string;
+  readonly statusCode: number | undefined;
+
+  /**
+   * @param provider - Provider key, like `steel`.
+   * @param reason - What the browser showed, like `HTTP ERROR 500`, or an empty string.
+   * @param statusCode - The site's HTTP status, when the reason carries one.
+   */
+  constructor(provider: string, reason: string, statusCode?: number) {
+    const label = provider.charAt(0).toUpperCase() + provider.slice(1);
+    super(`${label} couldn't load the page${reason ? `, Chrome showed ${reason}` : ""}`);
+    this.name = "NavigationError";
+    this.provider = provider;
+    this.reason = reason;
+    this.statusCode = statusCode;
+  }
+}
+
 export class PaymentError extends BrowserError {
   readonly statusCode: number;
   readonly provider: string;

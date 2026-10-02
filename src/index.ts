@@ -51,6 +51,7 @@ export {
   InvalidInputError,
   UnsupportedOperationError,
   BlockedPageError,
+  NavigationError,
   PaymentError,
   normalizeError,
 } from "./core/errors.ts";

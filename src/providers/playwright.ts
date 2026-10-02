@@ -22,6 +22,7 @@ import {
   BrowserError,
   InvalidInputError,
   SessionNotFoundError,
+  navigationFailure,
   normalizeError,
 } from "../core/errors.ts";
 import { randomUUID } from "node:crypto";
@@ -83,8 +84,30 @@ function truncateText(text: string | undefined, maxChars: number | undefined): s
   return text.slice(0, maxChars);
 }
 
+/**
+ * `page.goto` that throws `NavigationError` when Chrome couldn't load the page.
+ *
+ * @param page - Page to navigate.
+ * @param url - Address to open.
+ * @param options - When the navigation counts as done, and how long to wait for it.
+ */
+async function goto(
+  page: Page,
+  url: string,
+  options: {
+    readonly waitUntil: "load" | "domcontentloaded" | "networkidle";
+    readonly timeout?: number;
+  },
+): Promise<void> {
+  try {
+    await page.goto(url, options);
+  } catch (error) {
+    throw navigationFailure(error, "playwright") ?? error;
+  }
+}
+
 async function scrapePage(page: Page, url: string, options?: ScrapeOptions): Promise<ScrapeResult> {
-  await page.goto(url, {
+  await goto(page, url, {
     waitUntil: options?.waitForNetworkIdle ? "networkidle" : "domcontentloaded",
   });
   if (options?.waitFor) {
@@ -120,7 +143,7 @@ async function renderPdf(
   hasSession: boolean,
 ): Promise<PdfResult> {
   if (!hasSession || url !== page.url()) {
-    await page.goto(url, { waitUntil: "networkidle" });
+    await goto(page, url, { waitUntil: "networkidle" });
   }
   const buffer = await page.pdf({
     format: options?.format ?? "A4",
@@ -134,7 +157,7 @@ async function renderPdf(
 }
 
 async function readLinks(page: Page, url: string): Promise<LinksResult> {
-  await page.goto(url, { waitUntil: "load", timeout: 15000 });
+  await goto(page, url, { waitUntil: "load", timeout: 15000 });
   const links = await page.evaluate(() =>
     Array.from(document.querySelectorAll("a[href]")).map((anchor) => {
       const element = anchor as HTMLAnchorElement;
@@ -149,7 +172,7 @@ async function readLinks(page: Page, url: string): Promise<LinksResult> {
 }
 
 async function readCrawlPage(page: Page, url: string, depth: number): Promise<CrawlPage> {
-  await page.goto(url, { waitUntil: "load", timeout: 15000 });
+  await goto(page, url, { waitUntil: "load", timeout: 15000 });
   const [title, html, text, links] = await Promise.all([
     page.title().catch(() => undefined),
     page.content().catch(() => undefined),
@@ -345,7 +368,7 @@ class PlaywrightProvider implements BrowserProvider {
       const page = this.getPage(session);
 
       if (options.url) {
-        await page.goto(options.url, { waitUntil: "load" });
+        await goto(page, options.url, { waitUntil: "load" });
       }
 
       const type = options.format === "jpeg" ? "jpeg" : "png";
@@ -370,7 +393,7 @@ class PlaywrightProvider implements BrowserProvider {
   async navigate(url: string, session: BrowserSession): Promise<void> {
     try {
       const page = this.getPage(session);
-      await page.goto(url, { waitUntil: "load" });
+      await goto(page, url, { waitUntil: "load" });
     } catch (error) {
       throw normalizeError(error, "playwright");
     }

@@ -14,7 +14,7 @@ import type {
 import { rejectBlockPage } from "../core/block-page.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
-import { AuthError, BrowserError, normalizeError } from "../core/errors.ts";
+import { AuthError, BrowserError, navigationFailure, normalizeError } from "../core/errors.ts";
 import { isNotFoundError, assertNoSelector, assertSessionId } from "../core/utils.ts";
 
 interface KernelSessionResponse {
@@ -153,7 +153,7 @@ class KernelProvider implements BrowserProvider {
       const data = result.value as { html?: string; title?: string } | undefined;
       return rejectBlockPage({ url, title: data?.title, html: data?.html }, "kernel");
     } catch (error) {
-      throw normalizeError(error, "kernel");
+      throw navigationFailure(error, "kernel") ?? normalizeError(error, "kernel");
     }
   }
 
@@ -180,7 +180,11 @@ class KernelProvider implements BrowserProvider {
   }
 
   async navigate(url: string, session: BrowserSession): Promise<void> {
-    await this.evaluate(`await page.goto(${JSON.stringify(url)})`, session);
+    try {
+      await this.evaluate(`await page.goto(${JSON.stringify(url)})`, session);
+    } catch (error) {
+      throw navigationFailure(error, "kernel") ?? error;
+    }
   }
 
   async evaluate(script: string, session: BrowserSession): Promise<EvaluateResult> {

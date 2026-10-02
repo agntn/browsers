@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import type { ServerResponse } from "node:http";
 import { describe, it, expect, afterAll, beforeAll } from "vite-plus/test";
 import { create } from "../src/core/registry";
-import { InvalidInputError, SessionNotFoundError } from "../src/core/errors";
+import { InvalidInputError, NavigationError, SessionNotFoundError } from "../src/core/errors";
 import type { BrowserProvider, BrowserSession } from "../src/core/types";
 
 // A cold Chrome launch on a CI runner takes longer than the 5 s vitest default.
@@ -102,6 +102,37 @@ describe("playwright provider (local)", { timeout: 30_000 }, () => {
     } finally {
       if (delay) clearTimeout(delay);
       delayedResponse?.destroy();
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  });
+
+  it("throws NavigationError without the call log when the page fails to load", async () => {
+    const server = createServer((_request, response) => {
+      response.statusCode = 500;
+      response.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (typeof address !== "object" || !address) throw new Error("Missing test server address");
+    const url = `http://127.0.0.1:${address.port}/`;
+
+    try {
+      for (const call of [() => provider.scrape(url), () => provider.links!(url)]) {
+        const error = await call().catch((caught: unknown) => caught);
+        expect(error).toBeInstanceOf(NavigationError);
+        expect(error).toMatchObject({
+          provider: "playwright",
+          reason: "ERR_HTTP_RESPONSE_CODE_FAILURE",
+          statusCode: undefined,
+          message:
+            "Playwright couldn't load the page, Chrome showed ERR_HTTP_RESPONSE_CODE_FAILURE",
+        });
+        expect(String((error as Error).cause)).toContain("Call log");
+      }
+    } finally {
       server.closeAllConnections();
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),

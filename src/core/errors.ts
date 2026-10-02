@@ -261,15 +261,31 @@ export class NavigationError extends BrowserError {
    * @param provider - Provider key, like `steel`.
    * @param reason - What the browser showed, like `HTTP ERROR 500`, or an empty string.
    * @param statusCode - The site's HTTP status, when the reason carries one.
+   * @param options - The browser's own error, kept as `cause`.
    */
-  constructor(provider: string, reason: string, statusCode?: number) {
+  constructor(provider: string, reason: string, statusCode?: number, options?: ErrorOptions) {
     const label = provider.charAt(0).toUpperCase() + provider.slice(1);
-    super(`${label} couldn't load the page${reason ? `, Chrome showed ${reason}` : ""}`);
+    super(`${label} couldn't load the page${reason ? `, Chrome showed ${reason}` : ""}`, options);
     this.name = "NavigationError";
     this.provider = provider;
     this.reason = reason;
     this.statusCode = statusCode;
   }
+}
+
+/** Chrome's network error that opens Playwright's message, like `net::ERR_NAME_NOT_RESOLVED`. */
+const NET_ERROR_CODE = /^page\.goto: net::(ERR_[A-Z0-9_]+)\b/;
+
+/**
+ * Reads a failed Playwright navigation as a `NavigationError`, without Playwright's call log.
+ *
+ * @param error - What `page.goto` threw, or the error Kernel reported for it.
+ * @param provider - Provider key, like `playwright`.
+ * @returns {NavigationError | undefined} The error, or `undefined` when Chrome gave no `ERR_` code.
+ */
+export function navigationFailure(error: unknown, provider: string): NavigationError | undefined {
+  const code = error instanceof Error ? NET_ERROR_CODE.exec(error.message)?.[1] : undefined;
+  return code ? new NavigationError(provider, code, undefined, { cause: error }) : undefined;
 }
 
 export class PaymentError extends BrowserError {

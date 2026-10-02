@@ -75,15 +75,17 @@ describe("steel navigation errors", () => {
       response.setHeader("Content-Type", "application/json");
       response.end(
         JSON.stringify({
-          content: body.format?.includes("markdown")
-            ? {
-                markdown: `## This page isn’t working\n\n**httpbin.org** is currently unable to handle this request.\n\nHTTP ERROR ${code}\n\n![](data:image/png;base64,iVBORw0KGgo)`,
-              }
-            : {
-                html: failed
-                  ? `<html><head><title>httpbin.org</title><script>var loadTimeDataRaw = {"errorCode":"HTTP ERROR ${code}"};</script></head><body class="neterror"><div id="main-frame-error"></div></body></html>`
-                  : "<article>Chrome prints HTTP ERROR 500 on its error page</article>",
-              },
+          content: body.format?.includes("cleaned_html")
+            ? { cleaned_html: `<div class="error-code">HTTP ERROR ${code}</div>` }
+            : body.format?.includes("markdown")
+              ? {
+                  markdown: `## This page isn’t working\n\n**httpbin.org** is currently unable to handle this request.\n\nHTTP ERROR ${code}\n\n![](data:image/png;base64,iVBORw0KGgo)`,
+                }
+              : {
+                  html: failed
+                    ? `<html><head><title>httpbin.org</title><script>var loadTimeDataRaw = {"errorCode":"HTTP ERROR ${code}"};</script></head><body class="neterror"><div id="main-frame-error"></div></body></html>`
+                    : "<article>Chrome prints HTTP ERROR 500 on its error page</article>",
+                },
           metadata: {
             statusCode: 200,
             title: "httpbin.org",
@@ -119,6 +121,9 @@ describe("steel navigation errors", () => {
     await expect(
       provider.scrape("https://httpbin.org/status/403", { formats: ["markdown"] }),
     ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      provider.scrape("https://httpbin.org/status/404", { formats: ["cleanedHtml"] }),
+    ).rejects.toMatchObject({ reason: "HTTP ERROR 404", statusCode: 404 });
     await expect(
       provider.scrape("https://errors.example/chrome", { formats: ["html"] }),
     ).resolves.toMatchObject({

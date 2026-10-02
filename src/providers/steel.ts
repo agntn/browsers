@@ -80,7 +80,7 @@ const CHROME_ERROR_CODE = /\bHTTP ERROR (\d{3})\b|\bERR_[A-Z_]+\b/;
 /**
  * Reads the failure off Chrome's error page.
  *
- * @param page - The page's HTML or markdown.
+ * @param page - The page's HTML, cleaned HTML or markdown.
  * @returns {NavigationError} The error, with the site's status when Chrome printed one.
  */
 function chromeError(page = ""): NavigationError {
@@ -96,8 +96,8 @@ function chromeError(page = ""): NavigationError {
  */
 function rejectChromeError(response: SteelScrapeResponse): void {
   if (!response.metadata?.urlSource?.startsWith("chrome-error://")) return;
-  const { html, markdown } = response.content ?? {};
-  throw chromeError(html ?? markdown);
+  const { html, cleaned_html: cleanedHtml, markdown } = response.content ?? {};
+  throw chromeError(html ?? cleanedHtml ?? markdown);
 }
 
 function toScrapeResult(url: string, response: SteelScrapeResponse): ScrapeResult {

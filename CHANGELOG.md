@@ -1,6 +1,48 @@
 # Changelog
 
 
+## v0.6.0
+
+[compare changes](https://github.com/agntn/browsers/compare/v0.5.0...v0.6.0)
+
+### 🚀 Enhancements
+
+- **tools:** Take maxResults in browsers_search ([#156](https://github.com/agntn/browsers/pull/156))
+
+### 🩹 Fixes
+
+- **registry:** Share a cold provider's import ([#133](https://github.com/agntn/browsers/pull/133))
+- **registry:** Skip providers that can't do it ([#134](https://github.com/agntn/browsers/pull/134))
+- **errors:** Throw BrowserError from guards ([#135](https://github.com/agntn/browsers/pull/135))
+- **scrape:** Fail on block and captcha pages ([#136](https://github.com/agntn/browsers/pull/136))
+- **steel:** Scrape in markdown when asked ([#138](https://github.com/agntn/browsers/pull/138))
+- **cli:** Print markdown when there's no text ([#141](https://github.com/agntn/browsers/pull/141))
+- **browserbase:** Stop labeling markdown as HTML ([#143](https://github.com/agntn/browsers/pull/143))
+- **cli:** Probe live routes in providers --check ([#144](https://github.com/agntn/browsers/pull/144))
+- **cli:** ⚠️  Say why providers --check fails ([#146](https://github.com/agntn/browsers/pull/146))
+- **client:** ⚠️  Name the network failure ([#150](https://github.com/agntn/browsers/pull/150))
+- **errors:** Strip terminal escapes from reasons ([#152](https://github.com/agntn/browsers/pull/152))
+- **release:** Build before the tests ([#153](https://github.com/agntn/browsers/pull/153))
+- **hyperbrowser:** Cap search at maxResults ([#154](https://github.com/agntn/browsers/pull/154))
+- **cloudflare:** Keep the account out of reasons ([#159](https://github.com/agntn/browsers/pull/159))
+- **steel:** Return scrape links as URLs ([#160](https://github.com/agntn/browsers/pull/160))
+- **steel:** Throw on Chrome's error page ([#164](https://github.com/agntn/browsers/pull/164))
+- **errors:** Name Chrome's code on a failed goto ([#166](https://github.com/agntn/browsers/pull/166))
+
+### 💅 Refactors
+
+- **client:** Drop ofetch for native fetch ([#161](https://github.com/agntn/browsers/pull/161))
+
+#### ⚠️ Breaking Changes
+
+- **cli:** ⚠️  Say why providers --check fails ([#146](https://github.com/agntn/browsers/pull/146))
+- **client:** ⚠️  Name the network failure ([#150](https://github.com/agntn/browsers/pull/150))
+
+### ❤️ Contributors
+
+- Ori ([@oritwoen](https://github.com/oritwoen))
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+
 ## v0.5.0
 
 [compare changes](https://github.com/agntn/browsers/compare/v0.4.0...v0.5.0)

@@ -11,7 +11,6 @@ const hook = fileURLToPath(new URL("./record-loads.mjs", import.meta.url));
 const heavy = {
   sdk: "/node_modules/@modelcontextprotocol/",
   typebox: "/node_modules/typebox/",
-  ofetch: "/node_modules/ofetch/",
   server: "/src/mcp.ts",
   schemas: "/src/tool-schemas.ts",
 };

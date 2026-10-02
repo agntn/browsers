@@ -97,3 +97,72 @@ describe("Client.postResponse", () => {
     await expect(response.json()).resolves.toEqual({ success: true });
   });
 });
+
+describe("Client JSON requests", () => {
+  let server: Server;
+  let baseURL: string;
+  const seen: Array<{ method?: string; headers: Record<string, unknown>; body: string }> = [];
+
+  beforeAll(async () => {
+    server = createServer(async (request, response) => {
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      seen.push({
+        method: request.method,
+        headers: request.headers,
+        body: Buffer.concat(chunks).toString(),
+      });
+      response.setHeader("Content-Type", "application/json");
+      response.end(
+        request.url === "/proto" ? '{"__proto__":{"polluted":true},"ok":true}' : '{"ok":true}',
+      );
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (typeof address === "object" && address) baseURL = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  });
+
+  it("sends a JSON body and lets the caller's headers win", async () => {
+    const client = new Client({ maxRetries: 0, userAgent: "browsers/test" });
+
+    await expect(
+      client.postJSON(
+        `${baseURL}/sessions`,
+        { url: "https://example.com" },
+        { "User-Agent": "mine" },
+      ),
+    ).resolves.toEqual({ ok: true });
+    await client.putJSON(`${baseURL}/sessions/1`);
+    await client.deleteJSON(`${baseURL}/sessions/1`);
+
+    expect(seen.at(-3)).toMatchObject({
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json",
+        "user-agent": "mine",
+      },
+      body: '{"url":"https://example.com"}',
+    });
+    expect(seen.at(-2)).toMatchObject({
+      method: "PUT",
+      headers: { "user-agent": "browsers/test" },
+    });
+    expect(seen.at(-1)).toMatchObject({ method: "DELETE", body: "" });
+  });
+
+  it("drops keys that would reach a prototype", async () => {
+    const client = new Client({ maxRetries: 0 });
+
+    const data = await client.getJSON<Record<string, unknown>>(`${baseURL}/proto`);
+
+    expect(data).toEqual({ ok: true });
+    expect(Object.hasOwn(data, "__proto__")).toBe(false);
+  });
+});

@@ -35,7 +35,7 @@ function stubFetch(answer: (call: Call) => unknown): Call[] {
 }
 
 /**
- * Moves the fake clock until the job settles, yielding to I/O such as the lazy ofetch import.
+ * Moves the fake clock until the job settles, yielding to I/O between polls.
  *
  * @param {Promise<T> | undefined} promise Job in flight.
  * @returns {Promise<T | undefined>} The job once it settles.

@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import type { IncomingMessage, Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { create } from "../src/core/registry";
+import { NavigationError } from "../src/core/errors";
 
 interface CapturedRequest {
   method?: string;
@@ -19,6 +20,10 @@ const sessionResponse = {
   stealth: true,
   timeout_seconds: 25,
 };
+
+/** What Kernel answered for a scrape of a page that returned 500 with no body. */
+const navigationFailure =
+  'page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at https://httpbin.org/status/500\nCall log:\n\u001B[2m  - navigating to "https://httpbin.org/status/500", waiting until "networkidle"\u001B[22m\n';
 
 async function readBody(request: IncomingMessage): Promise<string> {
   const chunks: Uint8Array[] = [];
@@ -53,7 +58,9 @@ describe("kernel current API contract", () => {
           response.end(
             captured.body.includes("throw")
               ? JSON.stringify({ success: false, error: "execution failed" })
-              : JSON.stringify({ success: true, result: "Example Domain", stdout: "done" }),
+              : captured.body.includes("status/500")
+                ? JSON.stringify({ success: false, error: navigationFailure })
+                : JSON.stringify({ success: true, result: "Example Domain", stdout: "done" }),
           );
           return;
         case "POST /browsers/session-1/computer/screenshot":
@@ -163,5 +170,25 @@ describe("kernel current API contract", () => {
     await expect(provider.evaluate("throw new Error('nope')", session)).rejects.toThrow(
       "execution failed",
     );
+  });
+
+  it("throws NavigationError without the call log when the page fails to load", async () => {
+    const provider = await create("kernel", { apiKey: "test", baseURL });
+    const session = { id: "session-1", provider: "kernel", createdAt: 0 };
+    const url = "https://httpbin.org/status/500";
+
+    for (const call of [
+      () => provider.scrape(url, undefined, session),
+      () => provider.navigate(url, session),
+    ]) {
+      const error = await call().catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(NavigationError);
+      expect(error).toMatchObject({
+        provider: "kernel",
+        reason: "ERR_HTTP_RESPONSE_CODE_FAILURE",
+        message: "Kernel couldn't load the page, Chrome showed ERR_HTTP_RESPONSE_CODE_FAILURE",
+      });
+      expect((error as Error).cause).toMatchObject({ message: navigationFailure });
+    }
   });
 });

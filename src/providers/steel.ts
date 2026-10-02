@@ -74,8 +74,8 @@ function createScrapeBody(url: string, options?: ScrapeOptions): Record<string, 
   return body;
 }
 
-/** What Chrome prints on its error page, like `HTTP ERROR 500` or `ERR_TOO_MANY_REDIRECTS`. */
-const CHROME_ERROR_CODE = /\bHTTP ERROR (\d{3})\b|\bERR_[A-Z_]+\b/;
+/** What Chrome prints on its error page, like `HTTP ERROR 500` or `ERR_HTTP2_PROTOCOL_ERROR`. */
+const CHROME_ERROR_CODE = /\bHTTP ERROR (\d{3})\b|\bERR_[A-Z0-9_]+\b/;
 
 /**
  * Reads the failure off Chrome's error page.

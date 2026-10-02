@@ -70,8 +70,9 @@ describe("steel navigation errors", () => {
   beforeAll(async () => {
     server = createServer(async (request, response) => {
       const body = JSON.parse(await readBody(request)) as { url?: string; format?: string[] };
-      const failed = body.url?.startsWith("https://httpbin.org/status/");
-      const code = body.url?.split("/").at(-1);
+      const failed =
+        body.url === "https://h2.example/" || body.url?.startsWith("https://httpbin.org/status/");
+      const code = body.url === "https://h2.example/" ? "" : body.url?.split("/").at(-1);
       response.setHeader("Content-Type", "application/json");
       response.end(
         JSON.stringify({
@@ -83,7 +84,7 @@ describe("steel navigation errors", () => {
                 }
               : {
                   html: failed
-                    ? `<html><head><title>httpbin.org</title><script>var loadTimeDataRaw = {"errorCode":"HTTP ERROR ${code}"};</script></head><body class="neterror"><div id="main-frame-error"></div></body></html>`
+                    ? `<html><head><title>httpbin.org</title><script>var loadTimeDataRaw = {"errorCode":"${code ? `HTTP ERROR ${code}` : "ERR_HTTP2_PROTOCOL_ERROR"}"};</script></head><body class="neterror"><div id="main-frame-error"></div></body></html>`
                     : "<article>Chrome prints HTTP ERROR 500 on its error page</article>",
                 },
           metadata: {
@@ -124,6 +125,10 @@ describe("steel navigation errors", () => {
     await expect(
       provider.scrape("https://httpbin.org/status/404", { formats: ["cleanedHtml"] }),
     ).rejects.toMatchObject({ reason: "HTTP ERROR 404", statusCode: 404 });
+    await expect(provider.scrape("https://h2.example/")).rejects.toMatchObject({
+      reason: "ERR_HTTP2_PROTOCOL_ERROR",
+      statusCode: undefined,
+    });
     await expect(
       provider.scrape("https://errors.example/chrome", { formats: ["html"] }),
     ).resolves.toMatchObject({

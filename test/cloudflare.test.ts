@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { resetDefaultClientForTests } from "../src/core/client";
-import { TimeoutError, TransportError } from "../src/core/errors";
+import { HTTPError, RateLimitError, TimeoutError, TransportError } from "../src/core/errors";
 import { create } from "../src/core/registry";
 import {
   browserAccessibility,
@@ -457,6 +457,34 @@ describe("cloudflare errors", () => {
     expect(text).toContain("/accounts/[account]/browser-rendering/markdown");
     expect(text).toContain("Rate limit exceeded");
     expect(text).not.toContain(accountID);
+  });
+
+  it("keeps the account ID out of Cloudflare's reason for a path it can't route", async () => {
+    failWith(
+      404,
+      `Could not route to /client/v4/accounts/${accountID}/browser-rendering/markdown, perhaps your object identifier is invalid?`,
+    );
+    const error = await browserScrape({ url: "https://example.com", provider: "cloudflare" }).then(
+      () => undefined,
+      (failure: unknown) => failure,
+    );
+
+    expect(errorMessage(error)).toBe(
+      "HTTP 404 from https://api.cloudflare.com/client/v4/accounts/[account]/browser-rendering/markdown: Could not route to /client/v4/accounts/[account]/browser-rendering/markdown, perhaps your object identifier is invalid?",
+    );
+    expect((error as HTTPError).body).not.toContain(accountID);
+  });
+
+  it("keeps the account ID out of a rate limit's reason", async () => {
+    failWith(429, `Too many requests for account ${accountID}`);
+    const error = await browserScrape({ url: "https://example.com", provider: "cloudflare" }).then(
+      () => undefined,
+      (failure: unknown) => failure,
+    );
+
+    expect(error).toBeInstanceOf(RateLimitError);
+    expect(errorMessage(error)).toContain("Too many requests for account [account]");
+    expect((error as RateLimitError).body).not.toContain(accountID);
   });
 
   it("waits past Browser Run's own 30 second waits and names the timeout", async () => {

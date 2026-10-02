@@ -287,11 +287,13 @@ class CloudflareProvider implements BrowserProvider {
     const account = `/accounts/${this.accountID}/`;
     if (error instanceof HTTPError && error.url.includes(account)) {
       const url = error.url.replace(account, "/accounts/[account]/");
-      return normalizeError(new HTTPError(error.statusCode, url, error.body), "cloudflare");
+      const body = error.body.replaceAll(this.accountID, "[account]");
+      return normalizeError(new HTTPError(error.statusCode, url, body), "cloudflare");
     }
     if (error instanceof RateLimitError && error.url.includes(account)) {
       const url = error.url.replace(account, "/accounts/[account]/");
-      return new RateLimitError(error.retryAfter, url, error.body, error.provider);
+      const body = error.body.replaceAll(this.accountID, "[account]");
+      return new RateLimitError(error.retryAfter, url, body, error.provider);
     }
     if (error instanceof TimeoutError && error.url.includes(account)) {
       return new TimeoutError(error.timeout, error.url.replace(account, "/accounts/[account]/"));

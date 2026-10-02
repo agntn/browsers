@@ -63,34 +63,45 @@ describe("steel scrape responses", () => {
   });
 });
 
+/* What Chrome printed on its error page for each URL the mock Steel fails to load. */
+const CHROME_ERRORS: Readonly<Record<string, string>> = {
+  "https://httpbin.org/status/500": "HTTP ERROR 500",
+  "https://httpbin.org/status/403": "HTTP ERROR 403",
+  "https://httpbin.org/status/404": "HTTP ERROR 404",
+  "https://h2.example/": "ERR_HTTP2_PROTOCOL_ERROR",
+};
+
+/* The page in the one format the request asks for, Chrome's error page or an article. */
+function scrapedPage(format: string, error: string | undefined): Record<string, string> {
+  if (format === "cleaned_html") return { cleaned_html: `<div class="error-code">${error}</div>` };
+  if (format === "markdown") {
+    return {
+      markdown: `## This page isn’t working\n\n**httpbin.org** is currently unable to handle this request.\n\n${error}\n\n![](data:image/png;base64,iVBORw0KGgo)`,
+    };
+  }
+  return {
+    html: error
+      ? `<html><head><title>httpbin.org</title><script>var loadTimeDataRaw = {"errorCode":"${error}"};</script></head><body class="neterror"><div id="main-frame-error"></div></body></html>`
+      : "<article>Chrome prints HTTP ERROR 500 on its error page</article>",
+  };
+}
+
 describe("steel navigation errors", () => {
   let server: Server;
   let baseURL: string;
 
   beforeAll(async () => {
     server = createServer(async (request, response) => {
-      const body = JSON.parse(await readBody(request)) as { url?: string; format?: string[] };
-      const failed =
-        body.url === "https://h2.example/" || body.url?.startsWith("https://httpbin.org/status/");
-      const code = body.url === "https://h2.example/" ? "" : body.url?.split("/").at(-1);
+      const body = JSON.parse(await readBody(request)) as { url: string; format?: string[] };
+      const error = Object.hasOwn(CHROME_ERRORS, body.url) ? CHROME_ERRORS[body.url] : undefined;
       response.setHeader("Content-Type", "application/json");
       response.end(
         JSON.stringify({
-          content: body.format?.includes("cleaned_html")
-            ? { cleaned_html: `<div class="error-code">HTTP ERROR ${code}</div>` }
-            : body.format?.includes("markdown")
-              ? {
-                  markdown: `## This page isn’t working\n\n**httpbin.org** is currently unable to handle this request.\n\nHTTP ERROR ${code}\n\n![](data:image/png;base64,iVBORw0KGgo)`,
-                }
-              : {
-                  html: failed
-                    ? `<html><head><title>httpbin.org</title><script>var loadTimeDataRaw = {"errorCode":"${code ? `HTTP ERROR ${code}` : "ERR_HTTP2_PROTOCOL_ERROR"}"};</script></head><body class="neterror"><div id="main-frame-error"></div></body></html>`
-                    : "<article>Chrome prints HTTP ERROR 500 on its error page</article>",
-                },
+          content: scrapedPage(body.format?.[0] ?? "html", error),
           metadata: {
             statusCode: 200,
             title: "httpbin.org",
-            urlSource: failed ? "chrome-error://chromewebdata/" : body.url,
+            urlSource: error ? "chrome-error://chromewebdata/" : body.url,
           },
         }),
       );

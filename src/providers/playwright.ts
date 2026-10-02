@@ -27,7 +27,7 @@ import {
 } from "../core/errors.ts";
 import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
-import type { Browser, Page } from "playwright-core";
+import type { Browser, Frame, Page } from "playwright-core";
 
 function resolveSystemChromium(): string | undefined {
   const candidates = [
@@ -86,6 +86,7 @@ function truncateText(text: string | undefined, maxChars: number | undefined): s
 
 /**
  * `page.goto` that throws `NavigationError` when Chrome couldn't load the page.
+ * It first waits for Chrome's error page, which would interrupt the next `goto`.
  *
  * @param page - Page to navigate.
  * @param url - Address to open.
@@ -99,11 +100,36 @@ async function goto(
     readonly timeout?: number;
   },
 ): Promise<void> {
+  const errorPage = Promise.withResolvers<void>();
+  const onNavigated = (frame: Frame): void => {
+    if (frame === page.mainFrame() && frame.url().startsWith("chrome-error:")) errorPage.resolve();
+  };
+  page.on("framenavigated", onNavigated);
   try {
     await page.goto(url, options);
   } catch (error) {
-    throw navigationFailure(error, "playwright") ?? error;
+    const failure = navigationFailure(error, "playwright");
+    if (failure && failure.reason !== "ERR_ABORTED")
+      await waitForErrorPage(errorPage.promise, 5000);
+    throw failure ?? error;
+  } finally {
+    page.off("framenavigated", onNavigated);
   }
+}
+
+/**
+ * Waits for `committed`, giving up after `timeout` ms if Chrome commits no error page.
+ *
+ * @param committed - Resolves when the error page commits.
+ * @param timeout - Milliseconds to wait before giving up.
+ */
+async function waitForErrorPage(
+  committed: Readonly<Promise<void>>,
+  timeout: number,
+): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  await Promise.race([committed, new Promise((resolve) => (timer = setTimeout(resolve, timeout)))]);
+  clearTimeout(timer);
 }
 
 async function scrapePage(page: Page, url: string, options?: ScrapeOptions): Promise<ScrapeResult> {

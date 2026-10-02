@@ -1,4 +1,3 @@
-import type { $Fetch, FetchError, FetchOptions } from "ofetch";
 import type { ClientOptions } from "./types.ts";
 import {
   HTTPError,
@@ -7,16 +6,45 @@ import {
   TransportError,
   parseRetryAfter,
 } from "./errors.ts";
-import { lazy } from "./lazy.ts";
 import { version } from "../version.ts";
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY = 100;
 const DEFAULT_TIMEOUT = 30_000;
 
+/** Statuses worth another attempt. A request that got no response is retried too. */
+const RETRY_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
+
+/** Statuses that never carry a body. */
+const EMPTY_STATUS_CODES = new Set([101, 204, 205, 304]);
+
+/** How a response body is read: parsed as JSON where it is JSON, as text, or as bytes. */
+type BodyFormat = "json" | "text" | "bytes";
+
+interface Call {
+  readonly method: string;
+  readonly body?: Readonly<Record<string, unknown>>;
+  readonly headers?: Headers | Readonly<Record<string, string>>;
+  readonly signal?: AbortSignal;
+  readonly format: BodyFormat;
+}
+
+interface Init {
+  readonly method: string;
+  readonly headers: Headers;
+  readonly body?: string;
+}
+
+interface Reply {
+  readonly headers: Headers;
+  readonly data: unknown;
+}
+
+type Attempt = { readonly reply: Reply } | { readonly error: Error; readonly retry: boolean };
+
 /**
- * Headers for a POST whose response is text or bytes: ofetch asks for JSON
- * whenever the body is an object, and Browserless answers that with a 404.
+ * Headers for a POST whose response is text or bytes: a JSON body would otherwise ask for
+ * JSON back, and Browserless answers that with a 404.
  *
  * @param {Readonly<Record<string, string>>} [headers] Caller headers, kept as given.
  * @returns {Headers} Headers that accept any content type unless the caller chose one.
@@ -32,23 +60,6 @@ export class Client {
   readonly baseDelay: number;
   readonly timeout: number;
   readonly userAgent: string;
-  private FetchError: typeof FetchError | undefined;
-  /**
-   * The configured ofetch instance, imported and created on the first request: ofetch and its
-   * fetch polyfill are the heaviest modules the package imports, and a process that only
-   * resolves or lists providers never needs them.
-   */
-  private readonly http = lazy(async (): Promise<$Fetch> => {
-    const ofetch = await import("ofetch");
-    this.FetchError = ofetch.FetchError;
-    return ofetch.ofetch.create({
-      timeout: this.timeout,
-      retry: this.maxRetries,
-      retryDelay: this.baseDelay,
-      retryStatusCodes: [408, 429, 500, 502, 503, 504],
-      headers: { "User-Agent": this.userAgent },
-    });
-  });
 
   constructor(options: ClientOptions = {}) {
     this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
@@ -62,12 +73,8 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<T> {
-    const fetch = await this.http();
-    try {
-      return await fetch<T>(url, { headers, ...this.retryControl(signal) });
-    } catch (error) {
-      throw this.mapError(error, url, signal);
-    }
+    const reply = await this.request(url, { method: "GET", headers, signal, format: "json" });
+    return reply.data as T;
   }
 
   async postJSON<T>(
@@ -76,12 +83,14 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<T> {
-    const fetch = await this.http();
-    try {
-      return await fetch<T>(url, { method: "POST", body, headers, ...this.retryControl(signal) });
-    } catch (error) {
-      throw this.mapError(error, url, signal);
-    }
+    const reply = await this.request(url, {
+      method: "POST",
+      body,
+      headers,
+      signal,
+      format: "json",
+    });
+    return reply.data as T;
   }
 
   async putJSON<T>(
@@ -89,12 +98,8 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<T> {
-    const fetch = await this.http();
-    try {
-      return await fetch<T>(url, { method: "PUT", headers, ...this.retryControl(signal) });
-    } catch (error) {
-      throw this.mapError(error, url, signal);
-    }
+    const reply = await this.request(url, { method: "PUT", headers, signal, format: "json" });
+    return reply.data as T;
   }
 
   async postText(
@@ -103,18 +108,14 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<string> {
-    const fetch = await this.http();
-    try {
-      const res = await fetch.raw(url, {
-        method: "POST",
-        body,
-        headers: acceptAnyType(headers),
-        ...this.retryControl(signal),
-      });
-      return typeof res._data === "string" ? res._data : String(res._data);
-    } catch (error) {
-      throw this.mapError(error, url, signal);
-    }
+    const reply = await this.request(url, {
+      method: "POST",
+      body,
+      headers: acceptAnyType(headers),
+      signal,
+      format: "text",
+    });
+    return typeof reply.data === "string" ? reply.data : "";
   }
 
   /**
@@ -130,17 +131,8 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<ArrayBuffer> {
-    const fetch = await this.http();
-    try {
-      const res = await fetch.raw(url, {
-        headers,
-        ...this.retryControl(signal),
-        responseType: "arrayBuffer",
-      });
-      return res._data as ArrayBuffer;
-    } catch (error) {
-      throw this.mapError(error, url, signal);
-    }
+    const reply = await this.request(url, { method: "GET", headers, signal, format: "bytes" });
+    return reply.data as ArrayBuffer;
   }
 
   async postRaw(
@@ -149,19 +141,14 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<ArrayBuffer> {
-    const fetch = await this.http();
-    try {
-      const res = await fetch.raw(url, {
-        method: "POST",
-        body,
-        headers: acceptAnyType(headers),
-        ...this.retryControl(signal),
-        responseType: "arrayBuffer",
-      });
-      return res._data as ArrayBuffer;
-    } catch (error) {
-      throw this.mapError(error, url, signal);
-    }
+    const reply = await this.request(url, {
+      method: "POST",
+      body,
+      headers: acceptAnyType(headers),
+      signal,
+      format: "bytes",
+    });
+    return reply.data as ArrayBuffer;
   }
 
   async deleteJSON<T>(
@@ -169,12 +156,8 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<T> {
-    const fetch = await this.http();
-    try {
-      return await fetch<T>(url, { method: "DELETE", headers, ...this.retryControl(signal) });
-    } catch (error) {
-      throw this.mapError(error, url, signal);
-    }
+    const reply = await this.request(url, { method: "DELETE", headers, signal, format: "json" });
+    return reply.data as T;
   }
 
   /**
@@ -192,88 +175,195 @@ export class Client {
     headers?: Readonly<Record<string, string>>,
     signal?: AbortSignal,
   ): Promise<{ headers: Headers; arrayBuffer(): Promise<ArrayBuffer>; json(): Promise<unknown> }> {
-    const fetch = await this.http();
-    try {
-      const res = await fetch.raw(url, {
-        method: "POST",
-        body,
-        headers: acceptAnyType(headers),
-        ...this.retryControl(signal),
-      });
-      const data: unknown = res._data;
-      return {
-        headers: res.headers as unknown as Headers,
-        arrayBuffer: () =>
-          data instanceof Blob ? data.arrayBuffer() : Promise.resolve(data as ArrayBuffer),
-        json: () => Promise.resolve(data as unknown),
-      };
-    } catch (error) {
-      throw this.mapError(error, url, signal);
-    }
-  }
-
-  /**
-   * ofetch carries its generated signal into retries; each attempt needs its own clock.
-   * @param {AbortSignal} [signal] Caller cancellation, shared across attempts.
-   * @returns {FetchOptions} Hooks that renew the timeout without renewing cancellation.
-   */
-  private retryControl(signal?: AbortSignal): Pick<FetchOptions, "onRequest" | "onRequestError"> {
+    const reply = await this.request(url, {
+      method: "POST",
+      body,
+      headers: acceptAnyType(headers),
+      signal,
+      format: "bytes",
+    });
+    const data = (reply.data as ArrayBuffer | undefined) ?? new ArrayBuffer(0);
     return {
-      onRequest: ({ options }) => {
-        signal?.throwIfAborted();
-        const timeout =
-          this.timeout > 0 ? AbortSignal.timeout(Math.trunc(this.timeout)) : undefined;
-        const signals = [signal, timeout].filter((candidate) => candidate !== undefined);
-        options.signal = signals.length > 0 ? AbortSignal.any(signals) : undefined;
-      },
-      onRequestError: ({ options }) => {
-        if (signal?.aborted) options.retry = false;
-      },
+      headers: reply.headers,
+      arrayBuffer: () => Promise.resolve(data),
+      json: () => Promise.resolve(parseJSON(new TextDecoder().decode(data))),
     };
   }
 
   /**
-   * Turns an ofetch failure into the error the caller sees.
+   * A caller who cancelled gets their own reason back, whatever failed underneath.
    *
-   * @param {unknown} error Failure from ofetch.
-   * @param {string} url Request URL, sanitized before it reaches a message.
-   * @param {AbortSignal} [signal] Caller cancellation: an abort or timeout of its own goes back as is.
-   * @returns {Error} The mapped error.
+   * @param {string} url Target URL.
+   * @param {Call} request Method, body, headers, cancellation and body format.
+   * @returns {Promise<Reply>} Headers and body of the successful response.
    */
-  private mapError(error: unknown, url: string, signal?: AbortSignal): Error {
-    const failure: unknown = signal?.aborted ? signal.reason : error;
-    if (this.FetchError !== undefined && failure instanceof this.FetchError) {
-      return fetchFailure(failure, sanitizeUrl(url), this.timeout);
+  private async request(url: string, request: Call): Promise<Reply> {
+    try {
+      return await this.send(url, request);
+    } catch (error) {
+      const failure: unknown = request.signal?.aborted ? request.signal.reason : error;
+      throw failure instanceof Error ? failure : new Error(String(failure));
     }
-    return failure instanceof Error ? failure : new Error(String(failure));
+  }
+
+  /**
+   * Retries with a fresh timeout per attempt until the budget or the caller's signal runs out.
+   *
+   * @param {string} url Target URL.
+   * @param {Call} request Method, body, headers, cancellation and body format.
+   * @returns {Promise<Reply>} Headers and body of the successful response.
+   */
+  private async send(url: string, request: Call): Promise<Reply> {
+    const init = requestInit(request, this.userAgent);
+    for (let retries = this.maxRetries; ; retries -= 1) {
+      request.signal?.throwIfAborted();
+      const outcome = await this.attempt(url, init, request);
+      if ("reply" in outcome) return outcome.reply;
+      if (retries <= 0 || !outcome.retry) throw outcome.error;
+      await this.backoff();
+    }
+  }
+
+  /**
+   * One request: a failure says whether to retry, and the caller's cancellation is thrown.
+   *
+   * @param {string} url Target URL.
+   * @param {Init} init Method, headers and serialized body.
+   * @param {Call} request Cancellation and body format.
+   * @returns {Promise<Attempt>} The reply, or the mapped error.
+   */
+  private async attempt(url: string, init: Init, request: Call): Promise<Attempt> {
+    let response: Response;
+    try {
+      response = await fetch(url, { ...init, signal: this.attemptSignal(request.signal) });
+    } catch (error) {
+      if (request.signal?.aborted) throw error;
+      return { error: noResponse(error, sanitizeUrl(url), this.timeout), retry: true };
+    }
+    const data = await readBody(response, init.method, request.format);
+    if (response.status < 400 || response.status >= 600) {
+      return { reply: { headers: response.headers, data } };
+    }
+    return {
+      error: failedResponse(response, data, sanitizeUrl(url)),
+      retry: RETRY_STATUS_CODES.has(response.status),
+    };
+  }
+
+  /**
+   * The signal for one attempt: the caller's, joined with a timeout of its own.
+   *
+   * @param {AbortSignal} [signal] Caller cancellation.
+   * @returns {AbortSignal | undefined} The combined signal, or none when neither applies.
+   */
+  private attemptSignal(signal?: AbortSignal): AbortSignal | undefined {
+    const timeout = this.timeout > 0 ? AbortSignal.timeout(Math.trunc(this.timeout)) : undefined;
+    const signals = [signal, timeout].filter((candidate) => candidate !== undefined);
+    return signals.length > 0 ? AbortSignal.any(signals) : undefined;
+  }
+
+  /**
+   * Waits out the retry delay.
+   *
+   * @returns {Promise<void>} Resolves after `baseDelay` milliseconds.
+   */
+  private async backoff(): Promise<void> {
+    if (this.baseDelay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, this.baseDelay));
+    }
   }
 }
 
 /**
- * Maps an ofetch failure the caller didn't cancel.
+ * Caller headers over the user agent, and a JSON body that asks for JSON back by default.
  *
- * @param {FetchError} error Failure from ofetch.
- * @param {string} url Sanitized request URL.
- * @param {number} timeout The client's timeout in milliseconds.
- * @returns {Error} The mapped error.
+ * @param {Call} request Method, body and headers.
+ * @param {string} userAgent The client's user agent.
+ * @returns {Init} What every attempt sends.
  */
-function fetchFailure(error: FetchError, url: string, timeout: number): Error {
-  if (error.cause instanceof Error && error.cause.name === "TimeoutError") {
-    return new TimeoutError(timeout, url);
+function requestInit(request: Call, userAgent: string): Init {
+  const headers = new Headers({ "User-Agent": userAgent });
+  for (const [name, value] of new Headers(request.headers)) headers.set(name, value);
+  if (request.body === undefined) {
+    return { method: request.method, headers };
   }
-  if (error.response === undefined) return transportError(error.cause, url);
-  const body = responseText(error.data);
-  if (error.statusCode === 429) {
-    const retryAfter = parseRetryAfter(error.response.headers.get("Retry-After"));
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
+  return { method: request.method, headers, body: JSON.stringify(request.body) };
+}
+
+/**
+ * Reads a response body in the format the route expects.
+ *
+ * @param {Response} response The response.
+ * @param {string} method Request method.
+ * @param {BodyFormat} format How to read the body.
+ * @returns {Promise<unknown>} The body, or `undefined` when the response has none.
+ */
+async function readBody(response: Response, method: string, format: BodyFormat): Promise<unknown> {
+  if (!response.body || EMPTY_STATUS_CODES.has(response.status) || method === "HEAD") {
+    return undefined;
+  }
+  if (format === "bytes") return response.arrayBuffer();
+  const text = await response.text();
+  return format === "json" ? parseJSON(text) : text;
+}
+
+/**
+ * JSON when the text parses, the text otherwise, without keys that could reach a prototype.
+ *
+ * @param {string} text Response text.
+ * @returns {unknown} The parsed value or the text.
+ */
+function parseJSON(text: string): unknown {
+  try {
+    return JSON.parse(text, (key, value: unknown) =>
+      key === "__proto__" ||
+      (key === "constructor" && typeof value === "object" && value !== null && "prototype" in value)
+        ? undefined
+        : value,
+    );
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * Maps a response with an error status.
+ *
+ * @param {Response} response The response.
+ * @param {unknown} data Its body, as read for the route.
+ * @param {string} url Sanitized request URL.
+ * @returns {Error} The rate limit or HTTP error.
+ */
+function failedResponse(response: Response, data: unknown, url: string): Error {
+  const body = responseText(data);
+  if (response.status === 429) {
+    const retryAfter = parseRetryAfter(response.headers.get("Retry-After"));
     return new RateLimitError(retryAfter, url, body);
   }
-  return new HTTPError(error.statusCode ?? 0, url, body);
+  return new HTTPError(response.status, url, body);
+}
+
+/**
+ * Maps a request that got no response and that the caller didn't cancel.
+ *
+ * @param {unknown} error What `fetch` threw.
+ * @param {string} url Sanitized request URL.
+ * @param {number} timeout The client's timeout in milliseconds.
+ * @returns {Error} The timeout or transport error.
+ */
+function noResponse(error: unknown, url: string, timeout: number): Error {
+  if (error instanceof Error && error.name === "TimeoutError") {
+    return new TimeoutError(timeout, url);
+  }
+  return transportError(error, url);
 }
 
 /**
  * The reason is the deepest message in the chain, since `fetch failed` itself says nothing.
  *
- * @param {unknown} cause Cause of the ofetch failure, the `TypeError` fetch threw.
+ * @param {unknown} cause What `fetch` threw, usually a `TypeError` with the system error below.
  * @param {string} url Sanitized request URL.
  * @returns {TransportError} The error with its reason, code and system error.
  */
@@ -320,10 +410,10 @@ function systemCode(error: Readonly<Error>): string | undefined {
 }
 
 /**
- * The body of a failed response as text: the byte routes (`getRaw`, `postRaw`) get an
- * `ArrayBuffer` back from ofetch, which `JSON.stringify` would turn into `{}`.
+ * The body of a failed response as text: the byte routes (`getRaw`, `postRaw`) read an
+ * `ArrayBuffer`, which `JSON.stringify` would turn into `{}`.
  *
- * @param {unknown} data Parsed body from the ofetch error.
+ * @param {unknown} data Body as read for the route.
  * @returns {string} The body as the provider sent it, or its JSON form.
  */
 function responseText(data: unknown): string {

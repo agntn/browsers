@@ -140,6 +140,46 @@ describe("playwright provider (local)", { timeout: 30_000 }, () => {
     }
   });
 
+  it("loads the next page in a session after a failed one", async () => {
+    const server = createServer((request, response) => {
+      if (request.url === "/500") {
+        response.statusCode = 500;
+        response.end();
+      } else if (request.url === "/drop") {
+        request.socket.destroy();
+      } else {
+        response.setHeader("content-type", "text/html");
+        response.end("<title>Loaded</title>");
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (typeof address !== "object" || !address) throw new Error("Missing test server address");
+    const base = `http://127.0.0.1:${address.port}`;
+    const session = await provider.createSession({ headless: true });
+    sessions.push(session);
+
+    try {
+      for (const failures of [["/500"], ["/drop"], ["/500", "/drop", "/drop"]]) {
+        for (const failing of failures) {
+          await expect(
+            provider.scrape(`${base}${failing}`, undefined, session),
+          ).rejects.toBeInstanceOf(NavigationError);
+        }
+        for (const _attempt of [1, 2]) {
+          await expect(provider.scrape(`${base}/ok`, undefined, session)).resolves.toMatchObject({
+            title: "Loaded",
+          });
+        }
+      }
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  });
+
   it("preserves a missing-session error while scraping", async () => {
     const session = { id: "executable", provider: "playwright", createdAt: 0 };
     await expect(

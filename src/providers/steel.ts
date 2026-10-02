@@ -31,18 +31,17 @@ interface SteelSessionResponse {
   readonly [key: string]: unknown;
 }
 
+/** No `metadata.statusCode`: Steel answers 200 for 404, 403 and 500 pages alike. */
 interface SteelScrapeResponse {
   readonly content?: {
     readonly html?: string;
     readonly markdown?: string;
     readonly cleaned_html?: string;
-    readonly readability?: string;
   };
   readonly metadata?: {
-    readonly status_code?: number;
     readonly title?: string;
   };
-  readonly links?: readonly string[];
+  readonly links?: readonly { readonly url: string }[];
   readonly [key: string]: unknown;
 }
 
@@ -82,9 +81,7 @@ function toScrapeResult(url: string, response: SteelScrapeResponse): ScrapeResul
       html: response.content?.html,
       cleanedHtml: response.content?.cleaned_html,
       markdown: response.content?.markdown,
-      text: response.content?.readability,
-      statusCode: response.metadata?.status_code,
-      links: response.links ? [...response.links] : undefined,
+      links: response.links?.map((link) => link.url),
     },
     "steel",
   );

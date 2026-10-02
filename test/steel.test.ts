@@ -26,7 +26,7 @@ describe("steel scrape responses", () => {
               : "<article>How challenges.cloudflare.com works</article>",
           },
           metadata: {
-            status_code: 200,
+            statusCode: 200,
             title: challenge ? "Just a moment..." : "Cloudflare challenge explained",
           },
         }),
@@ -56,9 +56,64 @@ describe("steel scrape responses", () => {
       cleanedHtml: undefined,
       markdown: undefined,
       text: undefined,
-      statusCode: 200,
+      statusCode: undefined,
       links: undefined,
     });
+  });
+});
+
+describe("steel scrape metadata", () => {
+  let server: Server;
+  let baseURL: string;
+
+  beforeAll(async () => {
+    server = createServer((_request, response) => {
+      response.setHeader("Content-Type", "application/json");
+      response.end(
+        JSON.stringify({
+          content: {
+            markdown: "[Skip to content](#start-of-content)",
+            readability: { 0: "<", 1: "b", 2: "o" },
+          },
+          metadata: {
+            statusCode: 200,
+            title: "Page not found · GitHub · GitHub",
+            urlSource: "https://github.com/agntn/no-such-repo-139",
+          },
+          links: [
+            {
+              url: "https://github.com/agntn/no-such-repo-139#start-of-content",
+              text: "Skip to content",
+            },
+            { url: "https://github.com/", text: "" },
+          ],
+        }),
+      );
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (typeof address === "object" && address) baseURL = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  });
+
+  it("keeps link URLs and leaves out what Steel cannot tell", async () => {
+    const provider = await create("steel", { apiKey: "test", baseURL });
+
+    const page = await provider.scrape("https://github.com/agntn/no-such-repo-139", {
+      formats: ["markdown"],
+    });
+
+    expect(page.links).toEqual([
+      "https://github.com/agntn/no-such-repo-139#start-of-content",
+      "https://github.com/",
+    ]);
+    expect(page.statusCode).toBeUndefined();
+    expect(page.text).toBeUndefined();
   });
 });
 

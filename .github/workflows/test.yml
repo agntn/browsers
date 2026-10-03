@@ -31,3 +31,6 @@ jobs:
 
       - name: Test
         run: pnpm test:run
+
+      - name: MCP smoke
+        run: node test/eval-mcp.mjs

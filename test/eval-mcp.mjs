@@ -4,6 +4,7 @@ import {
   getDefaultEnvironment,
   StdioClientTransport,
 } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { browserToolNames } from "../src/tool-contract.ts";
 
 /** `BROWSERS_DIST=1` keeps the bundle; a checkout would otherwise serve the live source. */
 const transport = new StdioClientTransport({
@@ -40,8 +41,10 @@ function contentTexts(content) {
 try {
   await client.connect(transport);
   const listed = await client.listTools();
-  if (listed.tools.length !== 11) {
-    throw new Error(`Expected 11 tools, got ${listed.tools.length}`);
+  const listedNames = listed.tools.map((tool) => tool.name).sort();
+  const expectedNames = [...browserToolNames].sort();
+  if (listedNames.join() !== expectedNames.join()) {
+    throw new Error(`Expected tools ${expectedNames.join(", ")}, got ${listedNames.join(", ")}`);
   }
   const result = await client.callTool({
     name: "browsers_capabilities",

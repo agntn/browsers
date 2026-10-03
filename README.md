@@ -204,9 +204,9 @@ Want a ninth? A class that implements `BrowserProvider`, an exported `factory`, 
 pnpm install
 pnpm lint         # builds first, then vp lint and vp fmt --check
 pnpm lint:fix
-pnpm typecheck    # tsc, then a build, then the extensions
+pnpm typecheck    # tsc, the build config, a build, then the extensions
 pnpm test:run
-pnpm build        # vp pack
+pnpm build        # obuild
 ```
 
 ## 💛 Thanks

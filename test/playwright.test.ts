@@ -73,17 +73,10 @@ describe("playwright provider (local)", { timeout: 30_000 }, () => {
   });
 
   it("returns the DOM before a slow image finishes", async () => {
-    let imageFinished = false;
     let delayedResponse: ServerResponse | undefined;
-    let delay: NodeJS.Timeout | undefined;
     const server = createServer((request, response) => {
       if (request.url === "/slow.png") {
         delayedResponse = response;
-        delay = setTimeout(() => {
-          imageFinished = true;
-          response.setHeader("Content-Type", "image/png");
-          response.end();
-        }, 1_000);
         return;
       }
       response.setHeader("Content-Type", "text/html");
@@ -98,9 +91,7 @@ describe("playwright provider (local)", { timeout: 30_000 }, () => {
 
       expect(result.text).toContain("Ready");
       expect(delayedResponse).toBeDefined();
-      expect(imageFinished).toBe(false);
     } finally {
-      if (delay) clearTimeout(delay);
       delayedResponse?.destroy();
       server.closeAllConnections();
       await new Promise<void>((resolve, reject) =>

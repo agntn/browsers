@@ -50,4 +50,10 @@ describe("packages the host supplies", () => {
 
     expect(importers).toEqual([]);
   });
+
+  it("ship the license of the typebox they inline", () => {
+    expect(readFileSync(join(repoRoot, "dist/THIRD-PARTY-LICENSES.md"), "utf8")).toMatch(
+      /^## typebox$[\s\S]*?Copyright \(c\) .* Haydn Paterson/mu,
+    );
+  });
 });

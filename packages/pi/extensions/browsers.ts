@@ -209,7 +209,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
     promptSnippet: "Save a PDF of a URL to a file.",
     promptGuidelines: [
       "Use browsers_pdf when the user needs a PDF of a webpage.",
-      "Cloudflare and Browserless work statelessly (no session needed).",
+      "Cloudflare, Browserless and Playwright work statelessly (no session needed).",
     ],
     parameters: browserToolSchemas.browsers_pdf,
     ...statusRenderers("browsers_pdf"),

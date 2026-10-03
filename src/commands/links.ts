@@ -16,7 +16,7 @@ export default defineCommand({
     provider: {
       type: "string",
       alias: "p",
-      description: "Provider (cloudflare)",
+      description: "Provider (cloudflare, playwright)",
     },
     browser: {
       type: "string",

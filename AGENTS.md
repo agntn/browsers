@@ -33,7 +33,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 6. Add any nonstandard environment key to `src/core/resolve.ts`
 7. Add its page as `docs/content/2.providers/<position>.<name>.md` with `::provider-facts{name="<name>"}`, its name, glyph and blurb to `PRESENTATION` in `docs/app/utils/providers.ts`, and a recorded scrape to `docs/app/data/scrape-sample.json`
 
-`test/registry.test.ts` fails when the manifest, the provider files and `browserProviderNames` disagree; `test/docs.test.ts` fails when a provider has no page or no recording; `test/loads.test.ts` fails when an entry or a CLI usage path starts loading a provider, TypeBox or the MCP SDK.
+`test/registry.test.ts` fails when the manifest, the provider files and `browserProviderNames` disagree; `test/docs.test.ts` fails when a provider has no page or no recording; `test/cli-help.test.ts` fails when the `-p` help of `links`, `crawl`, `pdf`, `extract`, `search` or `accessibility` doesn't name the providers that implement the command, in registry order; `test/loads.test.ts` fails when an entry or a CLI usage path starts loading a provider, TypeBox or the MCP SDK.
 
 ## Conventions
 

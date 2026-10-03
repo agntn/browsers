@@ -43,14 +43,22 @@ npx @agntn/browsers scrape https://example.com --provider playwright
 
 ```
 ℹ Scraping via playwright...
-Example Domain
+This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.
 
-This domain is for use in documentation examples without needing permission. Avoid use in operations.
+هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.
+
+该域名仅用于文档示例，无需获得许可。这并非一项服务，请勿将其用于测试和监控目的。
+
+L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable. Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.
+
+Данный домен предназначен для использования в примерах документации без необходимости получения предварительного разрешения. Это не сервис; не рекомендуется его использование для тестирования и мониторинга.
+
+Este dominio está destinado al uso en ejemplos de documentación sin necesidad de permiso. Esto no es un servicio; evitar utilizarlo para realizar pruebas o monitoreos.
 
 Learn more
 ```
 
-No key, no account. Playwright runs Chromium here. After `pnpm add`, that command is `pnpm exec browsers`, or install it once with `pnpm add -g @agntn/browsers`. Skip `--provider` and the first configured backend that can run the command wins. Steel if that key is set. Playwright if nothing else is. `links` on a Steel setup skips Steel, which has no links endpoint.
+Six languages now, same notice. No key, no account. Playwright runs Chromium here. After `pnpm add`, that command is `pnpm exec browsers`, or install it once with `pnpm add -g @agntn/browsers`. Skip `--provider` and the first configured backend that can run the command wins. Steel if that key is set. Playwright if nothing else is. `links` on a Steel setup skips Steel, which has no links endpoint.
 
 The scrape said "Learn more" and dropped the href. This did not:
 
@@ -59,7 +67,7 @@ browsers links https://example.com --provider playwright
 ```
 
 ```
-https://iana.org/domains/example
+https://iana.org/help/example-domains
 ```
 
 Same page, different door. A form wants a third one, the accessibility tree:
@@ -110,10 +118,10 @@ Filled dot means that key was in the env on this run. Playwright is always fille
 
 ```bash
 browsers scrape https://example.com --provider playwright --format html
-browsers scrape https://example.com --provider playwright --waitFor h1
+browsers scrape https://example.com --provider playwright --waitFor p
 browsers scrape https://example.com --browser kitesurf
 browsers screenshot https://example.com -o page.png
-browsers screenshot https://example.com -o heading.png --selector h1 -p browserless
+browsers screenshot https://example.com -o notice.png --selector p -p browserless
 browsers pdf https://example.com -o page.pdf --provider playwright
 browsers crawl https://example.com --maxPages 5 --provider playwright
 browsers crawl --job <job-id> --provider cloudflare

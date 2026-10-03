@@ -16,7 +16,7 @@ export default defineCommand({
     provider: {
       type: "string",
       alias: "p",
-      description: "Provider (cloudflare, hyperbrowser)",
+      description: "Provider (hyperbrowser, cloudflare)",
     },
     browser: {
       type: "string",

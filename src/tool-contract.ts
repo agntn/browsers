@@ -76,7 +76,7 @@ export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> 
   browsers_crawl:
     "Crawl a website following links. Returns each page's URL and title with its text, markdown or HTML, which share one maxChars budget. Cloudflare and Hyperbrowser wait up to two minutes for the crawl job; one still running after that returns its job ID and no pages. Pass that jobId with the same provider and browser, without url, to wait for the job again.",
   browsers_pdf:
-    "Generate a PDF from a URL and write it to `path`. Cloudflare and Browserless support stateless PDF generation.",
+    "Generate a PDF from a URL and write it to `path`. Cloudflare, Browserless and Playwright support stateless PDF generation.",
   browsers_links:
     "Extract the unique links of a webpage in page order. Returns up to `limit` links from `offset` with the total count; when links remain, call again with the next offset it reports. Each call reads the page again, so a changed total means the page changed between calls. Cloudflare and Playwright support stateless link extraction.",
   browsers_accessibility:

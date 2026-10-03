@@ -14,7 +14,14 @@ import type {
 import { rejectBlockPage } from "../core/block-page.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
-import { AuthError, BrowserError, navigationFailure, normalizeError } from "../core/errors.ts";
+import {
+  AuthError,
+  BrowserError,
+  NavigationError,
+  navigationFailure,
+  normalizeError,
+  responseReason,
+} from "../core/errors.ts";
 import { isNotFoundError, assertNoSelector, assertSessionId } from "../core/utils.ts";
 
 interface KernelSessionResponse {
@@ -45,6 +52,37 @@ function mapSession(response: KernelSessionResponse): BrowserSession {
     provider: "kernel",
     createdAt: response.created_at ? new Date(response.created_at).getTime() : Date.now(),
   };
+}
+
+/** Kernel's proxy answering for a site it couldn't reach, like a DNS miss or a bad certificate. */
+const PROXY_FAILURE =
+  /^(?:upstream request failed|egress-proxy-mitm encountered an unexpected error)\b/;
+
+/** The start of a 5xx answer to `page.goto`, which may be the proxy's and not the site's. */
+type ServerError = Readonly<{ status: number; text: string }>;
+
+/**
+ * Playwright code that opens `url` and keeps the start of a 5xx answer for `rejectProxyFailure`.
+ *
+ * @param url - The page to open.
+ * @param waitUntil - Playwright's load state to wait for, or Playwright's default.
+ * @returns {string} Code that declares `serverError` after `page.goto`.
+ */
+function gotoScript(url: string, waitUntil?: string): string {
+  const options = waitUntil ? `, { waitUntil: ${JSON.stringify(waitUntil)} }` : "";
+  return `const response = await page.goto(${JSON.stringify(url)}${options}); const serverError = response && response.status() >= 500 ? { status: response.status(), text: (await response.text()).slice(0, 500) } : undefined;`;
+}
+
+/**
+ * Throws when the page is the proxy's error text, which Chrome renders like any other page.
+ *
+ * @param serverError - What `gotoScript` kept, if the answer was a 5xx.
+ * @throws {NavigationError} With the proxy's status and its text as the reason.
+ */
+function rejectProxyFailure(serverError: ServerError | undefined): void {
+  if (!serverError || !PROXY_FAILURE.test(serverError.text)) return;
+  const lines = serverError.text.split("\n").filter((line) => line.trim());
+  throw new NavigationError("kernel", responseReason(lines.join(": ")) ?? "", serverError.status);
 }
 
 class KernelProvider implements BrowserProvider {
@@ -146,11 +184,14 @@ class KernelProvider implements BrowserProvider {
       assertSessionId(session?.id, "kernel", "scrape");
 
       const result = await this.evaluate(
-        `await page.goto(${JSON.stringify(url)}, { waitUntil: 'networkidle' }); return { html: await page.content(), title: await page.title() }`,
+        `${gotoScript(url, "networkidle")} return { serverError, html: await page.content(), title: await page.title() }`,
         session!,
       );
 
-      const data = result.value as { html?: string; title?: string } | undefined;
+      const data = result.value as
+        | { serverError?: ServerError; html?: string; title?: string }
+        | undefined;
+      rejectProxyFailure(data?.serverError);
       return rejectBlockPage({ url, title: data?.title, html: data?.html }, "kernel");
     } catch (error) {
       throw navigationFailure(error, "kernel") ?? normalizeError(error, "kernel");
@@ -181,7 +222,8 @@ class KernelProvider implements BrowserProvider {
 
   async navigate(url: string, session: BrowserSession): Promise<void> {
     try {
-      await this.evaluate(`await page.goto(${JSON.stringify(url)})`, session);
+      const result = await this.evaluate(`${gotoScript(url)} return serverError`, session);
+      rejectProxyFailure(result.value as ServerError | undefined);
     } catch (error) {
       throw navigationFailure(error, "kernel") ?? error;
     }

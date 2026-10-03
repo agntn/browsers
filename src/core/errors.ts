@@ -35,7 +35,7 @@ function reasonFields(data: unknown): string[] {
  * @param body - Response body as the client received it.
  * @returns {string | undefined} A short reason, or `undefined` when the body has none.
  */
-function responseReason(body: string): string | undefined {
+export function responseReason(body: string): string | undefined {
   const text = body.trim();
   if (!text || text.startsWith("<")) return undefined;
   let fields: string[];

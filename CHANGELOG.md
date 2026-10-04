@@ -1,6 +1,34 @@
 # Changelog
 
 
+## v0.6.1
+
+[compare changes](https://github.com/agntn/browsers/compare/v0.6.0...v0.6.1)
+
+### 🩹 Fixes
+
+- **playwright:** Wait out Chrome's error page ([#171](https://github.com/agntn/browsers/pull/171))
+- **kernel:** Reject the proxy's error page ([#172](https://github.com/agntn/browsers/pull/172))
+- **cli:** Name every provider in the -p help ([#175](https://github.com/agntn/browsers/pull/175))
+
+### 📖 Documentation
+
+- Rerun the README examples on example.com ([#178](https://github.com/agntn/browsers/pull/178))
+
+### 📦 Build
+
+- Go back to obuild ([#176](https://github.com/agntn/browsers/pull/176))
+
+### ✅ Tests
+
+- **playwright:** Hold the slow image open ([#174](https://github.com/agntn/browsers/pull/174))
+- Check the MCP smoke tools by name ([#177](https://github.com/agntn/browsers/pull/177))
+
+### ❤️ Contributors
+
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+- Ori ([@oritwoen](https://github.com/oritwoen))
+
 ## v0.6.0
 
 [compare changes](https://github.com/agntn/browsers/compare/v0.5.0...v0.6.0)

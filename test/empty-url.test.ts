@@ -3,6 +3,7 @@ import { resetDefaultClientForTests } from "../src/core/client";
 import { EmptyUrlError, InvalidInputError } from "../src/core/errors";
 import { create, providers } from "../src/core/registry";
 import type { BrowserProvider, BrowserSession } from "../src/core/types";
+import { scrapeWithSessionWhenNeeded, screenshotWithSessionWhenNeeded } from "../src/core/utils";
 import { browserScrape } from "../src/tool-operations";
 
 const session: BrowserSession = { id: "session", provider: "test", createdAt: 0 };
@@ -46,6 +47,25 @@ describe("empty URL", () => {
           ).rejects.toBeInstanceOf(EmptyUrlError);
         }
       }
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it(`${name} opens no session for it on the CLI and tool path`, async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({}));
+      vi.stubGlobal("fetch", fetch);
+      resetDefaultClientForTests();
+      const provider = await create(name, { apiKey: "key", accountID: "account" });
+      const createSession = vi.spyOn(provider, "createSession");
+
+      for (const url of ["", " \t\n"]) {
+        await expect(scrapeWithSessionWhenNeeded(provider, url)).rejects.toBeInstanceOf(
+          EmptyUrlError,
+        );
+        await expect(screenshotWithSessionWhenNeeded(provider, { url })).rejects.toBeInstanceOf(
+          EmptyUrlError,
+        );
+      }
+      expect(createSession).not.toHaveBeenCalled();
       expect(fetch).not.toHaveBeenCalled();
     });
   }

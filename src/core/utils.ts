@@ -108,7 +108,7 @@ export function assertUrlOrSession(
   provider: string,
   operation: string,
 ): void {
-  if (!url && !session?.id) {
+  if (!url?.trim() && !session?.id) {
     throw new InvalidInputError(`${provider} ${operation} requires either a URL or a session`);
   }
 }
@@ -137,6 +137,7 @@ export async function scrapeWithSessionWhenNeeded(
   url: string,
   options?: ScrapeOptions,
 ): Promise<ScrapeResult> {
+  assertUrl(url);
   const capabilities = provider.capabilities();
   if (!capabilities.scrape || capabilities.statelessScrape) {
     return provider.scrape(url, options);
@@ -163,6 +164,7 @@ export async function screenshotWithSessionWhenNeeded(
   options: ScreenshotOptions,
   sessionOptions?: CreateSessionOptions,
 ): Promise<ScreenshotResult> {
+  assertUrl(options.url ?? "");
   if (options.selector === "") {
     throw new InvalidInputError("selector is empty. Pass a CSS selector or leave it out.");
   }

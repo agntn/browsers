@@ -61,9 +61,10 @@ interface HyperbrowserFetchResponse {
  * @returns {Record<string, unknown>} Fetch request body asking for one screenshot.
  */
 function createScreenshotBody(options: ScreenshotOptions): Record<string, unknown> {
-  if (!options.url) {
+  if (options.url === undefined) {
     throw new InvalidInputError("hyperbrowser screenshot requires a URL");
   }
+  assertUrl(options.url);
   assertNoSelector(options.selector, "hyperbrowser");
   const body: Record<string, unknown> = {
     url: options.url,

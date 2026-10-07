@@ -22,7 +22,13 @@ import {
   normalizeError,
   responseReason,
 } from "../core/errors.ts";
-import { assertUrl, isNotFoundError, assertNoSelector, assertSessionId } from "../core/utils.ts";
+import {
+  assertUrl,
+  assertUrlOrSession,
+  isNotFoundError,
+  assertNoSelector,
+  assertSessionId,
+} from "../core/utils.ts";
 
 interface KernelSessionResponse {
   readonly session_id: string;
@@ -205,6 +211,7 @@ class KernelProvider implements BrowserProvider {
   ): Promise<ScreenshotResult> {
     try {
       assertSessionId(session?.id, "kernel", "screenshot");
+      assertUrlOrSession(options.url, session, "kernel", "screenshot");
       assertNoSelector(options.selector, "kernel");
       const png = await this.client.postRaw(
         `${this.baseURL}/browsers/${session.id}/computer/screenshot`,

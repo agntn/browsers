@@ -50,6 +50,19 @@ describe("empty URL", () => {
       expect(fetch).not.toHaveBeenCalled();
     });
 
+    it(`${name} refuses it next to a session in screenshot`, async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({}));
+      vi.stubGlobal("fetch", fetch);
+      resetDefaultClientForTests();
+      const provider = await create(name, { apiKey: "key", accountID: "account" });
+      if (!provider.capabilities().screenshot) return;
+
+      for (const url of ["", " \t\n"]) {
+        await expect(provider.screenshot({ url }, session)).rejects.toBeInstanceOf(EmptyUrlError);
+      }
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
     it(`${name} opens no session for it on the CLI and tool path`, async () => {
       const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({}));
       vi.stubGlobal("fetch", fetch);

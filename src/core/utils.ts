@@ -94,7 +94,7 @@ export function assertNoSelector(selector: string | undefined, provider: string)
 }
 
 /**
- * Assert that either a URL or session is available.
+ * Assert that a URL or a session is available, and that a URL the caller gave isn't blank.
  *
  * @param {string | undefined} url Target URL.
  * @param {{ readonly id: string } | undefined} session Browser session.
@@ -108,7 +108,8 @@ export function assertUrlOrSession(
   provider: string,
   operation: string,
 ): void {
-  if (!url?.trim() && !session?.id) {
+  if (url !== undefined) assertUrl(url);
+  else if (!session?.id) {
     throw new InvalidInputError(`${provider} ${operation} requires either a URL or a session`);
   }
 }

@@ -209,9 +209,7 @@ class BrowserlessProvider implements BrowserProvider {
     session?: BrowserSession,
   ): Promise<ScreenshotResult> {
     try {
-      if (!options.url && !session?.id) {
-        assertUrlOrSession(options.url, session, "browserless", "screenshot");
-      }
+      assertUrlOrSession(options.url, session, "browserless", "screenshot");
 
       const body: Record<string, unknown> = {};
       if (options.url) body.url = options.url;

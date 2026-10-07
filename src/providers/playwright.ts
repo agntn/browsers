@@ -25,7 +25,7 @@ import {
   navigationFailure,
   normalizeError,
 } from "../core/errors.ts";
-import { assertUrl } from "../core/utils.ts";
+import { assertUrl, assertUrlOrSession } from "../core/utils.ts";
 import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
 import type { Browser, Frame, Page } from "playwright-core";
@@ -392,6 +392,7 @@ class PlaywrightProvider implements BrowserProvider {
       );
     }
 
+    assertUrlOrSession(options.url, session, "playwright", "screenshot");
     try {
       const page = this.getPage(session);
 

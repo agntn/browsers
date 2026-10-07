@@ -20,6 +20,7 @@ import {
   isNotFoundError,
   assertNoSelector,
   assertSessionId,
+  assertUrlOrSession,
   imageMimeType,
   notSupportedViaRest,
 } from "../core/utils.ts";
@@ -121,6 +122,7 @@ function createScreenshotBody(
   session?: BrowserSession,
 ): Record<string, unknown> {
   assertSessionId(session?.id, "steel", "screenshot");
+  assertUrlOrSession(options.url, session, "steel", "screenshot");
   assertNoSelector(options.selector, "steel");
   const body: Record<string, unknown> = {
     sessionId: session.id,

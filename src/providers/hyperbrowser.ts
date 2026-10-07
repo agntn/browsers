@@ -24,6 +24,7 @@ import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
 import { AuthError, BrowserError, InvalidInputError, normalizeError } from "../core/errors.ts";
 import {
+  assertUrl,
   JOB_TIMEOUT,
   assertNoSelector,
   isNotFoundError,
@@ -60,9 +61,10 @@ interface HyperbrowserFetchResponse {
  * @returns {Record<string, unknown>} Fetch request body asking for one screenshot.
  */
 function createScreenshotBody(options: ScreenshotOptions): Record<string, unknown> {
-  if (!options.url) {
+  if (options.url === undefined) {
     throw new InvalidInputError("hyperbrowser screenshot requires a URL");
   }
+  assertUrl(options.url);
   assertNoSelector(options.selector, "hyperbrowser");
   const body: Record<string, unknown> = {
     url: options.url,
@@ -309,6 +311,7 @@ class HyperbrowserProvider implements BrowserProvider {
     _options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
+    assertUrl(url);
     try {
       const body: Record<string, unknown> = {
         url,
@@ -383,6 +386,7 @@ class HyperbrowserProvider implements BrowserProvider {
     options?: CrawlOptions,
     _session?: BrowserSession,
   ): Promise<CrawlResult> {
+    assertUrl(url);
     try {
       const { jobId } = await this.client.postJSON<{ jobId: string }>(
         `${this.baseURL}/api/web/crawl`,
@@ -481,6 +485,7 @@ class HyperbrowserProvider implements BrowserProvider {
     options?: ExtractOptions,
     _session?: BrowserSession,
   ): Promise<ExtractResult> {
+    assertUrl(url);
     try {
       const body: Record<string, unknown> = { urls: [url] };
       if (options?.schema) body.schema = options.schema;

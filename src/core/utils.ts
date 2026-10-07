@@ -1,5 +1,5 @@
 import type { HTTPError } from "./errors.ts";
-import { InvalidInputError, UnsupportedOperationError } from "./errors.ts";
+import { EmptyUrlError, InvalidInputError, UnsupportedOperationError } from "./errors.ts";
 import type {
   BrowserProvider,
   CloudflareBrowser,
@@ -94,7 +94,7 @@ export function assertNoSelector(selector: string | undefined, provider: string)
 }
 
 /**
- * Assert that either a URL or session is available.
+ * Assert that a URL or a session is available, and that a URL the caller gave isn't blank.
  *
  * @param {string | undefined} url Target URL.
  * @param {{ readonly id: string } | undefined} session Browser session.
@@ -108,9 +108,21 @@ export function assertUrlOrSession(
   provider: string,
   operation: string,
 ): void {
-  if (!url && !session?.id) {
+  if (url !== undefined) assertUrl(url);
+  else if (!session?.id) {
     throw new InvalidInputError(`${provider} ${operation} requires either a URL or a session`);
   }
+}
+
+/**
+ * Refuse a blank URL here, where it's cheap, not at a vendor or inside Chromium.
+ *
+ * @param {string} url Target URL.
+ * @returns {void}
+ * @throws {EmptyUrlError} When the URL is empty or only whitespace.
+ */
+export function assertUrl(url: string): void {
+  if (!url.trim()) throw new EmptyUrlError();
 }
 
 /**
@@ -126,6 +138,7 @@ export async function scrapeWithSessionWhenNeeded(
   url: string,
   options?: ScrapeOptions,
 ): Promise<ScrapeResult> {
+  assertUrl(url);
   const capabilities = provider.capabilities();
   if (!capabilities.scrape || capabilities.statelessScrape) {
     return provider.scrape(url, options);
@@ -152,6 +165,7 @@ export async function screenshotWithSessionWhenNeeded(
   options: ScreenshotOptions,
   sessionOptions?: CreateSessionOptions,
 ): Promise<ScreenshotResult> {
+  assertUrl(options.url ?? "");
   if (options.selector === "") {
     throw new InvalidInputError("selector is empty. Pass a CSS selector or leave it out.");
   }

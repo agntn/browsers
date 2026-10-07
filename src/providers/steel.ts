@@ -16,9 +16,11 @@ import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
 import { AuthError, BrowserError, NavigationError, normalizeError } from "../core/errors.ts";
 import {
+  assertUrl,
   isNotFoundError,
   assertNoSelector,
   assertSessionId,
+  assertUrlOrSession,
   imageMimeType,
   notSupportedViaRest,
 } from "../core/utils.ts";
@@ -120,6 +122,7 @@ function createScreenshotBody(
   session?: BrowserSession,
 ): Record<string, unknown> {
   assertSessionId(session?.id, "steel", "screenshot");
+  assertUrlOrSession(options.url, session, "steel", "screenshot");
   assertNoSelector(options.selector, "steel");
   const body: Record<string, unknown> = {
     sessionId: session.id,
@@ -266,6 +269,7 @@ class SteelProvider implements BrowserProvider {
     options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
+    assertUrl(url);
     try {
       const res = await this.client.postJSON<SteelScrapeResponse>(
         `${this.baseURL}/v1/scrape`,

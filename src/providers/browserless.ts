@@ -18,7 +18,7 @@ import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
 import type { Browser, Page } from "playwright-core";
 import { AuthError, BrowserError, normalizeError, SessionNotFoundError } from "../core/errors.ts";
-import { assertUrlOrSession } from "../core/utils.ts";
+import { assertUrl, assertUrlOrSession } from "../core/utils.ts";
 
 interface BrowserlessSessionResponse {
   readonly id?: string;
@@ -191,6 +191,7 @@ class BrowserlessProvider implements BrowserProvider {
     _options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
+    assertUrl(url);
     try {
       const html = await this.client.postText(
         `${this.baseURL}/content?${this.tokenParam()}`,
@@ -208,9 +209,7 @@ class BrowserlessProvider implements BrowserProvider {
     session?: BrowserSession,
   ): Promise<ScreenshotResult> {
     try {
-      if (!options.url && !session?.id) {
-        assertUrlOrSession(options.url, session, "browserless", "screenshot");
-      }
+      assertUrlOrSession(options.url, session, "browserless", "screenshot");
 
       const body: Record<string, unknown> = {};
       if (options.url) body.url = options.url;
@@ -238,6 +237,7 @@ class BrowserlessProvider implements BrowserProvider {
   }
 
   async navigate(url: string, session: BrowserSession): Promise<void> {
+    assertUrl(url);
     try {
       const page = await this.page(session);
       await page.goto(url, { waitUntil: "load" });
@@ -266,6 +266,7 @@ class BrowserlessProvider implements BrowserProvider {
   }
 
   async pdf(url: string, options?: PdfOptions, _session?: BrowserSession): Promise<PdfResult> {
+    assertUrl(url);
     try {
       const body: Record<string, unknown> = { url };
       if (options?.landscape !== undefined) body.landscape = options.landscape;

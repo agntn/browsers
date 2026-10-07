@@ -36,6 +36,7 @@ import {
   normalizeError,
 } from "../core/errors.ts";
 import {
+  assertUrl,
   assertUrlOrSession,
   JOB_TIMEOUT,
   notSupportedViaRest,
@@ -415,6 +416,7 @@ class CloudflareProvider implements BrowserProvider {
     options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
+    assertUrl(url);
     try {
       const formats = scrapeFormats(options);
       const format = formats[0]!;
@@ -506,6 +508,7 @@ class CloudflareProvider implements BrowserProvider {
     options?: CrawlOptions,
     _session?: BrowserSession,
   ): Promise<CrawlResult> {
+    assertUrl(url);
     try {
       const jobId = this.unwrap(
         await this.client.postJSON<CfEnvelope<string>>(
@@ -591,6 +594,7 @@ class CloudflareProvider implements BrowserProvider {
   }
 
   async pdf(url: string, options?: PdfOptions, _session?: BrowserSession): Promise<PdfResult> {
+    assertUrl(url);
     try {
       const res = await this.client.postResponse(
         this.browserEndpoint("/pdf"),
@@ -615,6 +619,7 @@ class CloudflareProvider implements BrowserProvider {
   }
 
   async links(url: string, _session?: BrowserSession): Promise<LinksResult> {
+    assertUrl(url);
     try {
       const res = await this.client.postJSON<CfEnvelope<string[]>>(
         this.browserEndpoint("/links"),
@@ -637,6 +642,7 @@ class CloudflareProvider implements BrowserProvider {
     options?: Readonly<AccessibilityTreeOptions>,
     _session?: BrowserSession,
   ): Promise<AccessibilityTreeResult> {
+    assertUrl(url);
     try {
       const res = await this.client.postJSON<CfAccessibilityTreeResponse>(
         this.browserEndpoint("/accessibilityTree"),
@@ -659,6 +665,7 @@ class CloudflareProvider implements BrowserProvider {
     options?: ExtractOptions,
     _session?: BrowserSession,
   ): Promise<ExtractResult> {
+    assertUrl(url);
     try {
       const body: Record<string, unknown> = { url };
       if (options?.prompt) body.prompt = options.prompt;

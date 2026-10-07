@@ -203,13 +203,6 @@ export class NoProviderAvailableError extends BrowserError {
   }
 }
 
-export class EmptyUrlError extends BrowserError {
-  constructor() {
-    super("URL cannot be empty");
-    this.name = "EmptyUrlError";
-  }
-}
-
 export class ScrapeNotSupportedError extends BrowserError {
   readonly provider: string;
   constructor(provider: string) {
@@ -223,6 +216,13 @@ export class InvalidInputError extends BrowserError {
   constructor(message: string) {
     super(message);
     this.name = "InvalidInputError";
+  }
+}
+
+export class EmptyUrlError extends InvalidInputError {
+  constructor() {
+    super("URL cannot be empty. Pass the page to open, like https://example.com");
+    this.name = "EmptyUrlError";
   }
 }
 

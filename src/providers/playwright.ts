@@ -25,6 +25,7 @@ import {
   navigationFailure,
   normalizeError,
 } from "../core/errors.ts";
+import { assertUrl } from "../core/utils.ts";
 import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
 import type { Browser, Frame, Page } from "playwright-core";
@@ -375,6 +376,7 @@ class PlaywrightProvider implements BrowserProvider {
     options?: ScrapeOptions,
     session?: BrowserSession,
   ): Promise<ScrapeResult> {
+    assertUrl(url);
     return this.withPage(session, async (page) =>
       rejectBlockPage(await scrapePage(page, url, options), "playwright"),
     );
@@ -417,6 +419,7 @@ class PlaywrightProvider implements BrowserProvider {
   }
 
   async navigate(url: string, session: BrowserSession): Promise<void> {
+    assertUrl(url);
     try {
       const page = this.getPage(session);
       await goto(page, url, { waitUntil: "load" });
@@ -440,14 +443,17 @@ class PlaywrightProvider implements BrowserProvider {
   }
 
   async pdf(url: string, options?: PdfOptions, session?: BrowserSession): Promise<PdfResult> {
+    assertUrl(url);
     return this.withPage(session, (page) => renderPdf(page, url, options, session !== undefined));
   }
 
   async links(url: string, session?: BrowserSession): Promise<LinksResult> {
+    assertUrl(url);
     return this.withPage(session, (page) => readLinks(page, url));
   }
 
   async crawl(url: string, options?: CrawlOptions, session?: BrowserSession): Promise<CrawlResult> {
+    assertUrl(url);
     const baseHostname = new URL(url).hostname;
     return this.withPage(session, (page) => crawlPage(page, url, baseHostname, options));
   }

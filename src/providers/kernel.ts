@@ -22,7 +22,7 @@ import {
   normalizeError,
   responseReason,
 } from "../core/errors.ts";
-import { isNotFoundError, assertNoSelector, assertSessionId } from "../core/utils.ts";
+import { assertUrl, isNotFoundError, assertNoSelector, assertSessionId } from "../core/utils.ts";
 
 interface KernelSessionResponse {
   readonly session_id: string;
@@ -180,6 +180,7 @@ class KernelProvider implements BrowserProvider {
     options?: ScrapeOptions,
     session?: BrowserSession,
   ): Promise<ScrapeResult> {
+    assertUrl(url);
     try {
       assertSessionId(session?.id, "kernel", "scrape");
 
@@ -221,6 +222,7 @@ class KernelProvider implements BrowserProvider {
   }
 
   async navigate(url: string, session: BrowserSession): Promise<void> {
+    assertUrl(url);
     try {
       const result = await this.evaluate(`${gotoScript(url)} return serverError`, session);
       rejectProxyFailure(result.value as ServerError | undefined);

@@ -16,6 +16,7 @@ import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
 import { AuthError, BrowserError, NavigationError, normalizeError } from "../core/errors.ts";
 import {
+  assertUrl,
   isNotFoundError,
   assertNoSelector,
   assertSessionId,
@@ -266,6 +267,7 @@ class SteelProvider implements BrowserProvider {
     options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
+    assertUrl(url);
     try {
       const res = await this.client.postJSON<SteelScrapeResponse>(
         `${this.baseURL}/v1/scrape`,

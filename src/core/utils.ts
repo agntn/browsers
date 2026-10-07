@@ -1,5 +1,5 @@
 import type { HTTPError } from "./errors.ts";
-import { InvalidInputError, UnsupportedOperationError } from "./errors.ts";
+import { EmptyUrlError, InvalidInputError, UnsupportedOperationError } from "./errors.ts";
 import type {
   BrowserProvider,
   CloudflareBrowser,
@@ -111,6 +111,17 @@ export function assertUrlOrSession(
   if (!url && !session?.id) {
     throw new InvalidInputError(`${provider} ${operation} requires either a URL or a session`);
   }
+}
+
+/**
+ * Refuse a blank URL here, where it's cheap, not at a vendor or inside Chromium.
+ *
+ * @param {string} url Target URL.
+ * @returns {void}
+ * @throws {EmptyUrlError} When the URL is empty or only whitespace.
+ */
+export function assertUrl(url: string): void {
+  if (!url.trim()) throw new EmptyUrlError();
 }
 
 /**

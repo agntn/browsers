@@ -11,14 +11,14 @@
   },
   "dependencies": {
     "better-sqlite3": "12.11.1",
-    "docus": "5.13.0",
-    "nuxt": "4.5.2"
+    "docus": "5.14.0",
+    "nuxt": "4.6.0"
   },
   "devDependencies": {
     "@iconify-json/lucide": "1.2.139",
     "@iconify-json/simple-icons": "1.2.98",
     "@iconify-json/vscode-icons": "1.2.84",
-    "wrangler": "4.128.0"
+    "wrangler": "4.148.0"
   },
   "packageManager": "pnpm@11.3.0"
 }

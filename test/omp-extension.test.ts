@@ -3,7 +3,7 @@ import * as TypeBox from "@oh-my-pi/omptype/typebox";
 import { Value } from "typebox/value";
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@oh-my-pi/pi-coding-agent";
 import { describe, expect, it } from "vite-plus/test";
-import browsersOmpExtension from "../packages/omp/extensions/browsers";
+import browsersOmpExtension from "../extensions/omp/browsers";
 import { browserToolNames } from "../src/tool-contract";
 import { browserToolSchemas } from "../src/tool-schemas";
 
@@ -95,13 +95,13 @@ describe("browsers OMP extension", () => {
       omp: { extensions: string[] };
     };
 
-    expect(manifest.omp.extensions).toEqual(["./packages/omp/extensions/browsers.ts"]);
+    expect(manifest.omp.extensions).toEqual(["./extensions/omp/browsers.ts"]);
     expect(manifest.exports).toHaveProperty("./mcp");
     expect(manifest.files).toEqual(
       expect.arrayContaining([
         "dist",
-        "packages/omp/extensions",
-        "packages/pi/extensions",
+        "extensions/omp",
+        "extensions/pi",
         "src/tool-contract.ts",
         "src/tool-schemas.ts",
       ]),

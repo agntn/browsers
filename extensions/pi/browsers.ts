@@ -6,19 +6,19 @@ import {
   type BrowserToolName,
   browserToolDescriptions,
   browserToolLabels,
-} from "../../../src/tool-contract.ts";
-import { browserToolSchemas } from "../../../src/tool-schemas.ts";
-import type * as BrowserTools from "../../../dist/tool-operations.d.mts";
+} from "../../src/tool-contract.ts";
+import { browserToolSchemas } from "../../src/tool-schemas.ts";
+import type * as BrowserTools from "../../dist/tool-operations.d.mts";
 import {
   type RenderedToolResult,
   type RenderOptions,
   renderToolCall,
   renderToolResult,
   type StatusTheme,
-} from "../../shared/tui.ts";
+} from "../shared/tui.ts";
 
-const sourceModuleUrl = new URL("../../../src/tool-operations.ts", import.meta.url);
-const distributionModuleUrl = new URL("../../../dist/tool-operations.mjs", import.meta.url);
+const sourceModuleUrl = new URL("../../src/tool-operations.ts", import.meta.url);
+const distributionModuleUrl = new URL("../../dist/tool-operations.mjs", import.meta.url);
 let toolOperationsPromise: Promise<typeof BrowserTools> | undefined;
 
 /**

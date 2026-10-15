@@ -17,9 +17,9 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 - `src/providers/index.ts` - the manifest: key, default URL and a literal `import()` per provider
 - `src/providers/*.ts` - one file per provider, exports `factory`; nothing runs at import
 - `src/commands/*.ts` - CLI subcommands (citty)
-- `packages/pi/extensions/browsers.ts` - Pi agent tools
-- `packages/omp/extensions/browsers.ts` - OMP agent tools
-- `packages/shared/tui.ts` - terminal rendering shared by Pi and OMP
+- `extensions/pi/browsers.ts` - Pi agent tools
+- `extensions/omp/browsers.ts` - OMP agent tools
+- `extensions/shared/tui.ts` - terminal rendering shared by Pi and OMP
 - `docs/` - the browsers.agntn.dev site, its own pnpm project, outside the root lint; `docs/AGENTS.md` has its rules
 - `build.config.ts` - obuild config: one bundle with an input per provider file, and the hook that inlines typebox
 - `vite.config.ts` - Vite+ config for `vp test`, `vp lint` and `vp fmt`; lint and fmt spread the shared `@agntn/ox` policy

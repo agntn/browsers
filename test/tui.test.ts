@@ -1,6 +1,10 @@
 import stringWidth from "string-width";
 import { describe, expect, it } from "vite-plus/test";
-import { renderToolCall, renderToolResult, sanitizeTerminalText } from "../packages/shared/tui.ts";
+import {
+  renderToolCall,
+  renderToolResult,
+  sanitizeTerminalText,
+} from "../extensions/shared/tui.ts";
 
 const plainTheme = {};
 

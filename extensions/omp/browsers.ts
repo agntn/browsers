@@ -12,17 +12,17 @@ import {
   MAX_LINKS_LIMIT,
   MAX_SCRAPE_MAX_CHARS,
   MAX_SEARCH_RESULTS,
-} from "../../../src/tool-contract.ts";
-import type * as BrowserTools from "../../../dist/tool-operations.d.mts";
+} from "../../src/tool-contract.ts";
+import type * as BrowserTools from "../../dist/tool-operations.d.mts";
 import {
   type RenderedToolResult,
   type RenderOptions,
   renderToolCall,
   renderToolResult,
   type StatusTheme,
-} from "../../shared/tui.ts";
+} from "../shared/tui.ts";
 
-const sourceModulePath = fileURLToPath(new URL("../../../src/tool-operations.ts", import.meta.url));
+const sourceModulePath = fileURLToPath(new URL("../../src/tool-operations.ts", import.meta.url));
 let toolOperationsPromise: Promise<typeof BrowserTools> | undefined;
 
 /**
@@ -33,8 +33,8 @@ let toolOperationsPromise: Promise<typeof BrowserTools> | undefined;
 function loadToolOperations(): Promise<typeof BrowserTools> {
   toolOperationsPromise ??= (
     existsSync(sourceModulePath)
-      ? import("../../../src/tool-operations.ts")
-      : import("../../../dist/tool-operations.mjs")
+      ? import("../../src/tool-operations.ts")
+      : import("../../dist/tool-operations.mjs")
   ).catch((error: unknown) => {
     toolOperationsPromise = undefined;
     throw error;

@@ -36,9 +36,9 @@
   },
   "files": [
     "dist",
-    "packages/omp/extensions",
-    "packages/pi/extensions",
-    "packages/shared",
+    "extensions/omp",
+    "extensions/pi",
+    "extensions/shared",
     "src/tool-contract.ts",
     "src/tool-schemas.ts"
   ],
@@ -123,12 +123,12 @@
   "packageManager": "pnpm@10.33.4",
   "omp": {
     "extensions": [
-      "./packages/omp/extensions/browsers.ts"
+      "./extensions/omp/browsers.ts"
     ]
   },
   "pi": {
     "extensions": [
-      "./packages/pi/extensions/*.ts"
+      "./extensions/pi/*.ts"
     ]
   }
 }

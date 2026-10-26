@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import type {
   AgentToolResult,
   ExtensionAPI,
-  ExtensionContext,
+  ExtensionToolContext,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -30,7 +30,7 @@ type ExecutableTool = {
     params: Record<string, unknown>,
     signal: AbortSignal | undefined,
     onUpdate: undefined,
-    context: ExtensionContext,
+    context: ExtensionToolContext,
   ) => Promise<AgentToolResult<unknown>>;
 };
 
@@ -88,7 +88,7 @@ async function executeTool(
     params,
     undefined,
     undefined,
-    {} as ExtensionContext,
+    {} as ExtensionToolContext,
   );
 }
 

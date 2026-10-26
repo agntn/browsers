@@ -5,6 +5,7 @@ import type { BrowserProvider, ProviderCapabilities } from "../core/types.ts";
 
 const simpleCapabilityLabels = [
   ["elementScreenshot", "element"],
+  ["screenshotWaitFor", "waitFor"],
   ["navigate", "navigate"],
   ["evaluate", "evaluate"],
   ["sessions", "sessions"],

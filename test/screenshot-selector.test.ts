@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { InvalidInputError, UnsupportedOperationError } from "../src/core/errors";
-import { create } from "../src/core/registry";
+import { create, register } from "../src/core/registry";
+import { factory as browserlessFactory } from "../src/providers/browserless";
 import { createScreenshotProvider } from "../src/core/resolve";
 import { screenshotWithSessionWhenNeeded } from "../src/core/utils";
 
@@ -25,6 +26,45 @@ describe("element screenshots on providers without them", () => {
       });
     },
   );
+});
+
+describe("waiting screenshots on providers that shoot right away", () => {
+  it.each(["steel", "anchor", "kernel", "hyperbrowser"])(
+    "%s refuses waitFor instead of capturing the page too early",
+    async (name) => {
+      const provider = await create(name, { apiKey: "test", baseURL });
+
+      const error = await provider
+        .screenshot({ url: "https://example.com", waitFor: "#ready" }, session)
+        .catch((error: unknown) => error);
+
+      expect(error).toBeInstanceOf(UnsupportedOperationError);
+      expect(error).toMatchObject({
+        provider: name,
+        message: `${name} cannot wait for a selector before a screenshot. Use cloudflare, browserless or playwright, or drop waitFor.`,
+      });
+    },
+  );
+
+  it("refuses before opening a session the provider would bill", async () => {
+    const steel = await create("steel", { apiKey: "test", baseURL });
+    const createSession = vi.spyOn(steel, "createSession");
+
+    await expect(
+      screenshotWithSessionWhenNeeded(steel, { url: "https://example.com", waitFor: "#ready" }),
+    ).rejects.toBeInstanceOf(UnsupportedOperationError);
+    expect(createSession).not.toHaveBeenCalled();
+  });
+
+  it("refuses an empty waitFor instead of shooting at once", async () => {
+    const browserless = await create("browserless", { apiKey: "test", baseURL });
+    const screenshot = vi.spyOn(browserless, "screenshot");
+
+    await expect(
+      screenshotWithSessionWhenNeeded(browserless, { url: "https://example.com", waitFor: "" }),
+    ).rejects.toBeInstanceOf(InvalidInputError);
+    expect(screenshot).not.toHaveBeenCalled();
+  });
 });
 
 describe("element screenshots through a temporary session", () => {
@@ -72,10 +112,44 @@ describe("provider choice for element screenshots", () => {
   it("skips a provider that would refuse the selector", async () => {
     onlySteelConfigured();
 
-    await expect(createScreenshotProvider(undefined, undefined, "h1")).resolves.toMatchObject({
+    await expect(
+      createScreenshotProvider(undefined, undefined, { selector: "h1" }),
+    ).resolves.toMatchObject({
       name: "playwright",
     });
     await expect(createScreenshotProvider()).resolves.toMatchObject({ name: "steel" });
+  });
+
+  it("skips a provider that would shoot before waitFor shows up", async () => {
+    onlySteelConfigured();
+
+    await expect(
+      createScreenshotProvider(undefined, undefined, { waitFor: "#ready" }),
+    ).resolves.toMatchObject({ name: "playwright" });
+  });
+
+  it("wants both flags for an element that has to show up first", async () => {
+    onlySteelConfigured();
+    vi.stubEnv("STEEL_API_KEY", "");
+    vi.stubEnv("BROWSERLESS_API_KEY", "test");
+    register("browserless", baseURL, (config) => {
+      const provider = browserlessFactory(config);
+      return {
+        ...provider,
+        capabilities: () => ({ ...provider.capabilities(), screenshotWaitFor: false }),
+      };
+    });
+
+    try {
+      await expect(
+        createScreenshotProvider(undefined, undefined, { selector: "#ready", waitFor: "#ready" }),
+      ).resolves.toMatchObject({ name: "playwright" });
+      await expect(
+        createScreenshotProvider(undefined, undefined, { selector: "#ready" }),
+      ).resolves.toMatchObject({ name: "browserless" });
+    } finally {
+      register("browserless", "https://chrome.browserless.io", browserlessFactory);
+    }
   });
 
   it("skips a provider with no screenshot for a plain one", async () => {
@@ -89,7 +163,9 @@ describe("provider choice for element screenshots", () => {
   it("keeps a provider the caller named", async () => {
     onlySteelConfigured();
 
-    await expect(createScreenshotProvider("steel", undefined, "h1")).resolves.toMatchObject({
+    await expect(
+      createScreenshotProvider("steel", undefined, { selector: "h1" }),
+    ).resolves.toMatchObject({
       name: "steel",
     });
   });

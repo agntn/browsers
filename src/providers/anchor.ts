@@ -17,6 +17,7 @@ import { AuthError, BrowserError, normalizeError } from "../core/errors.ts";
 import {
   isNotFoundError,
   assertNoSelector,
+  assertNoWaitFor,
   assertUrlOrSession,
   imageMimeType,
   notSupportedViaRest,
@@ -153,6 +154,7 @@ class AnchorProvider implements BrowserProvider {
       statelessScrape: false,
       statelessScreenshot: false,
       elementScreenshot: false,
+      screenshotWaitFor: false,
       crawl: false,
       pdf: false,
       links: false,
@@ -238,6 +240,7 @@ class AnchorProvider implements BrowserProvider {
     try {
       assertUrlOrSession(options.url, session, "anchor", "screenshot");
       assertNoSelector(options.selector, "anchor");
+      assertNoWaitFor(options.waitFor, "anchor");
       const body: Record<string, unknown> = { capture_full_height: options.fullPage ?? true };
       if (options.url) body.url = options.url;
       if (options.quality !== undefined) body.image_quality = options.quality;

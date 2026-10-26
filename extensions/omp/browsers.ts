@@ -114,6 +114,13 @@ function buildParameterSchemas(pi: ExtensionAPI) {
               "CSS selector of the element to capture instead of the page; the first match wins. Cloudflare, Browserless and Playwright only.",
           }),
         ),
+        waitFor: Type.Optional(
+          Type.String({
+            minLength: 1,
+            description:
+              "CSS selector to wait for before the shot, for pages that render their state after load. Cloudflare, Browserless and Playwright only.",
+          }),
+        ),
         path: Type.Optional(
           Type.String({
             description:

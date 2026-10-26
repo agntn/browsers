@@ -133,13 +133,45 @@ async function waitForErrorPage(
   clearTimeout(timer);
 }
 
+/**
+ * Waits for a `waitFor` selector and reports a miss by name, not as Playwright's call log.
+ *
+ * @param page - Page to watch.
+ * @param selector - CSS selector the caller waits for.
+ * @param timeout - Milliseconds to wait before giving up.
+ * @throws {BrowserError} When the selector doesn't show up in time.
+ */
+async function waitForSelector(page: Page, selector: string, timeout = 25000): Promise<void> {
+  try {
+    await page.waitForSelector(selector, { timeout });
+  } catch (error) {
+    if (!(error instanceof Error) || error.name !== "TimeoutError") throw error;
+    throw new BrowserError(
+      `waitFor ${JSON.stringify(selector)} didn't show up within ${timeout / 1000}s. Check the selector against the page, or drop waitFor.`,
+      { cause: error },
+    );
+  }
+}
+
+/**
+ * Brings the page to the state the screenshot asks for: loaded, then `waitFor` present.
+ *
+ * @param page - Page to shoot.
+ * @param options - Screenshot options with the URL and the selector to wait for.
+ */
+async function prepareShot(
+  page: Page,
+  options: Readonly<Pick<ScreenshotOptions, "url" | "waitFor">>,
+): Promise<void> {
+  if (options.url) await goto(page, options.url, { waitUntil: "load" });
+  if (options.waitFor !== undefined) await waitForSelector(page, options.waitFor);
+}
+
 async function scrapePage(page: Page, url: string, options?: ScrapeOptions): Promise<ScrapeResult> {
   await goto(page, url, {
     waitUntil: options?.waitForNetworkIdle ? "networkidle" : "domcontentloaded",
   });
-  if (options?.waitFor) {
-    await page.waitForSelector(options.waitFor, { timeout: options.timeout ?? 25000 });
-  }
+  if (options?.waitFor) await waitForSelector(page, options.waitFor, options.timeout);
 
   const [title, html, text, links] = await Promise.all([
     page.title(),
@@ -288,6 +320,7 @@ class PlaywrightProvider implements BrowserProvider {
       statelessScrape: true,
       statelessScreenshot: false,
       elementScreenshot: true,
+      screenshotWaitFor: true,
       crawl: true,
       pdf: true,
       links: true,
@@ -395,10 +428,7 @@ class PlaywrightProvider implements BrowserProvider {
     assertUrlOrSession(options.url, session, "playwright", "screenshot");
     try {
       const page = this.getPage(session);
-
-      if (options.url) {
-        await goto(page, options.url, { waitUntil: "load" });
-      }
+      await prepareShot(page, options);
 
       const type = options.format === "jpeg" ? "jpeg" : "png";
       const screenshotOptions: { type: "png" | "jpeg"; quality?: number } = { type };

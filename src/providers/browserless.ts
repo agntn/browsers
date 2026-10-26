@@ -38,6 +38,9 @@ interface BrowserlessSessionRecord {
 
 const browserlessSessionStores = new Map<string, Map<string, BrowserlessSessionRecord>>();
 
+/** Milliseconds Browserless waits for `waitFor`, under the client's 30 s so its error arrives. */
+const WAIT_FOR_TIMEOUT = 25_000;
+
 /**
  * The CDP connection navigate and evaluate share, per session. Browserless
  * refuses a second client while it still counts the first, so one connection
@@ -120,6 +123,7 @@ class BrowserlessProvider implements BrowserProvider {
       statelessScrape: true,
       statelessScreenshot: true,
       elementScreenshot: true,
+      screenshotWaitFor: true,
       crawl: false,
       pdf: true,
       links: false,
@@ -214,6 +218,9 @@ class BrowserlessProvider implements BrowserProvider {
       const body: Record<string, unknown> = {};
       if (options.url) body.url = options.url;
       if (options.selector !== undefined) body.selector = options.selector;
+      if (options.waitFor !== undefined) {
+        body.waitForSelector = { selector: options.waitFor, timeout: WAIT_FOR_TIMEOUT };
+      }
 
       const png = await this.client.postRaw(
         `${this.baseURL}/screenshot?${this.tokenParam()}`,

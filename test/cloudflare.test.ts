@@ -403,6 +403,12 @@ describe("cloudflare screenshot", () => {
 
     expect(body).toEqual({ url: "https://example.test" });
   });
+
+  it("waits for the waitFor selector the way scrape does", async () => {
+    const { body } = await screenshot({ url: "https://example.test", waitFor: "#ready" });
+
+    expect(body).toEqual({ url: "https://example.test", waitForSelector: { selector: "#ready" } });
+  });
 });
 
 describe("cloudflare errors", () => {

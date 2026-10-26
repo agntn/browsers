@@ -94,6 +94,21 @@ export function assertNoSelector(selector: string | undefined, provider: string)
 }
 
 /**
+ * Rejects `waitFor` on a provider that would shoot right away, before the page reaches that state.
+ *
+ * @param {string | undefined} waitFor Requested selector to wait for.
+ * @param {string} provider Provider name.
+ * @returns {void}
+ */
+export function assertNoWaitFor(waitFor: string | undefined, provider: string): void {
+  if (waitFor === undefined) return;
+  throw new UnsupportedOperationError(
+    `${provider} cannot wait for a selector before a screenshot. Use cloudflare, browserless or playwright, or drop waitFor.`,
+    provider,
+  );
+}
+
+/**
  * Assert that a URL or a session is available, and that a URL the caller gave isn't blank.
  *
  * @param {string | undefined} url Target URL.
@@ -153,6 +168,29 @@ export async function scrapeWithSessionWhenNeeded(
 }
 
 /**
+ * Refuses screenshot options the provider would drop or misread, before any request.
+ *
+ * @param {BrowserProvider} provider Resolved provider.
+ * @param {ScreenshotOptions} options Screenshot options, including the page URL.
+ * @returns {void}
+ */
+function assertScreenshotOptions(
+  provider: Readonly<BrowserProvider>,
+  options: Readonly<Pick<ScreenshotOptions, "url" | "selector" | "waitFor">>,
+): void {
+  assertUrl(options.url ?? "");
+  if (options.selector === "") {
+    throw new InvalidInputError("selector is empty. Pass a CSS selector or leave it out.");
+  }
+  if (options.waitFor === "") {
+    throw new InvalidInputError("waitFor is empty. Pass a CSS selector or leave it out.");
+  }
+  const capabilities = provider.capabilities();
+  if (!capabilities.elementScreenshot) assertNoSelector(options.selector, provider.name());
+  if (!capabilities.screenshotWaitFor) assertNoWaitFor(options.waitFor, provider.name());
+}
+
+/**
  * Screenshot one URL, opening a temporary session when the provider cannot screenshot statelessly.
  *
  * @param {BrowserProvider} provider Resolved provider.
@@ -165,12 +203,8 @@ export async function screenshotWithSessionWhenNeeded(
   options: ScreenshotOptions,
   sessionOptions?: CreateSessionOptions,
 ): Promise<ScreenshotResult> {
-  assertUrl(options.url ?? "");
-  if (options.selector === "") {
-    throw new InvalidInputError("selector is empty. Pass a CSS selector or leave it out.");
-  }
+  assertScreenshotOptions(provider, options);
   const capabilities = provider.capabilities();
-  if (!capabilities.elementScreenshot) assertNoSelector(options.selector, provider.name());
   if (!capabilities.screenshot || capabilities.statelessScreenshot) {
     return provider.screenshot(options);
   }

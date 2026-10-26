@@ -50,6 +50,8 @@ export interface ScrapeOptions {
 export interface ScreenshotOptions {
   url?: string;
   selector?: string;
+  /** CSS selector to wait for after the page loads, so the shot shows the state it marks. */
+  waitFor?: string;
   format?: "png" | "jpeg" | "webp";
   quality?: number;
   fullPage?: boolean;
@@ -193,6 +195,8 @@ export interface ProviderCapabilities {
   statelessScreenshot: boolean;
   /** Screenshot can capture the one element `selector` names. Missing means it cannot. */
   elementScreenshot?: boolean;
+  /** Screenshot can wait for the `waitFor` selector before the shot. Missing means it cannot. */
+  screenshotWaitFor?: boolean;
   crawl: boolean;
   pdf: boolean;
   links: boolean;

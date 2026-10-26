@@ -150,6 +150,7 @@ export default function browsersExtension(pi: ExtensionAPI): void {
       "Use browsers_screenshot when the user needs a visual capture of a webpage.",
       "Cloudflare, Browserless and Hyperbrowser work statelessly (no session needed).",
       "Other providers open a temporary session inside this tool, capture, and release it.",
+      "Pass waitFor with a CSS selector when the page builds its state after load, so the shot doesn't catch it halfway.",
     ],
     parameters: browserToolSchemas.browsers_screenshot,
     ...statusRenderers("browsers_screenshot"),

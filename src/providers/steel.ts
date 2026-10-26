@@ -19,6 +19,7 @@ import {
   assertUrl,
   isNotFoundError,
   assertNoSelector,
+  assertNoWaitFor,
   assertSessionId,
   assertUrlOrSession,
   imageMimeType,
@@ -124,6 +125,7 @@ function createScreenshotBody(
   assertSessionId(session?.id, "steel", "screenshot");
   assertUrlOrSession(options.url, session, "steel", "screenshot");
   assertNoSelector(options.selector, "steel");
+  assertNoWaitFor(options.waitFor, "steel");
   const body: Record<string, unknown> = {
     sessionId: session.id,
     fullPage: options.fullPage ?? true,
@@ -161,6 +163,7 @@ class SteelProvider implements BrowserProvider {
       statelessScrape: true,
       statelessScreenshot: false,
       elementScreenshot: false,
+      screenshotWaitFor: false,
       crawl: false,
       pdf: false,
       links: false,

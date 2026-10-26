@@ -6,7 +6,7 @@ import {
   InvalidInputError,
   UnsupportedOperationError,
 } from "./errors.ts";
-import type { BrowserProvider, CrawlOptions, CrawlResult } from "./types.ts";
+import type { BrowserProvider, CrawlOptions, CrawlResult, ScreenshotOptions } from "./types.ts";
 import { resolveCloudflareBrowser } from "./utils.ts";
 
 type ProviderEnvRequirements = readonly (readonly [string, ...string[]])[];
@@ -160,53 +160,62 @@ export async function createProvider(
 }
 
 /** Capability flags that pick the provider for a call that names none. */
-export type ProviderCapability = "scrape" | "screenshot" | "elementScreenshot" | "sessions";
+export type ProviderCapability =
+  | "scrape"
+  | "screenshot"
+  | "elementScreenshot"
+  | "screenshotWaitFor"
+  | "sessions";
 
 const capabilityLabels: Readonly<Record<ProviderCapability, string>> = {
   scrape: "scrape",
   screenshot: "screenshots",
   elementScreenshot: "element screenshots",
+  screenshotWaitFor: "screenshots that wait for a selector",
   sessions: "sessions",
 };
 
 /**
- * Without a provider or browser, pick the first configured one whose `capability` is set.
+ * Without a provider or browser, pick the first configured one that sets every flag asked for.
  *
  * @param {string | undefined} preferred Preferred provider name.
  * @param {string | undefined} browser Optional Cloudflare browser engine.
- * @param {ProviderCapability} capability Flag the provider has to set in `capabilities()`.
+ * @param {ProviderCapability | readonly ProviderCapability[]} capability Flags it must set.
  * @returns {Promise<{ name: string; provider: BrowserProvider }>} Resolved name and provider.
  */
 export async function createCapableProvider(
   preferred: string | undefined,
   browser: string | undefined,
-  capability: ProviderCapability,
+  capability: ProviderCapability | readonly ProviderCapability[],
 ): Promise<{ name: string; provider: BrowserProvider }> {
   if (preferred || browser) return createProvider(preferred, browser);
+  const required = typeof capability === "string" ? [capability] : capability;
   return firstProvider(
-    (provider): provider is BrowserProvider => provider.capabilities()[capability] === true,
-    capabilityLabels[capability],
+    (provider): provider is BrowserProvider => {
+      const capabilities = provider.capabilities();
+      return required.every((flag) => capabilities[flag] === true);
+    },
+    required.map((flag) => capabilityLabels[flag]).join(" and "),
   );
 }
 
 /**
- * Resolve and build the provider for a page screenshot, or for the `selector` element alone.
+ * Resolve and build a screenshot provider that can take the `selector` and `waitFor` asked for.
  *
  * @param {string} [preferred] Preferred provider name.
  * @param {string} [browser] Optional Cloudflare browser engine.
- * @param {string} [selector] Element the screenshot is limited to.
+ * @param {ScreenshotOptions} [options] Element to capture and selector to wait for.
  * @returns {Promise<{ name: string; provider: BrowserProvider }>} Resolved name and provider.
  */
 export async function createScreenshotProvider(
   preferred?: string,
   browser?: string,
-  selector?: string,
+  options: Readonly<Pick<ScreenshotOptions, "selector" | "waitFor">> = {},
 ): Promise<{ name: string; provider: BrowserProvider }> {
-  return createCapableProvider(
-    preferred,
-    browser,
-    selector === undefined ? "screenshot" : "elementScreenshot",
-  );
+  const required: ProviderCapability[] = [];
+  if (options.selector !== undefined) required.push("elementScreenshot");
+  if (options.waitFor !== undefined) required.push("screenshotWaitFor");
+  return createCapableProvider(preferred, browser, required.length > 0 ? required : "screenshot");
 }
 
 /**

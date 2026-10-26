@@ -47,6 +47,10 @@ export default defineCommand({
       alias: "s",
       description: "CSS selector of one element to capture instead of the page",
     },
+    waitFor: {
+      type: "string",
+      description: "CSS selector to wait for before the shot",
+    },
     width: {
       type: "string",
       description: "Viewport width in pixels",
@@ -60,7 +64,7 @@ export default defineCommand({
     const { name: providerName, provider } = await resolveScreenshotProvider(
       args.provider,
       args.browser,
-      args.selector,
+      { selector: args.selector, waitFor: args.waitFor },
     );
     consola.info(`Screenshot via ${providerName}...`);
     const viewport =
@@ -76,6 +80,7 @@ export default defineCommand({
           format: args.format as "png" | "jpeg" | "webp",
           fullPage: args.selector === undefined ? args.fullPage : undefined,
           selector: args.selector,
+          waitFor: args.waitFor,
           viewport,
         },
         { viewport },

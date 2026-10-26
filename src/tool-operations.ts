@@ -75,6 +75,7 @@ export interface BrowserScreenshotParams {
   format?: string;
   fullPage?: boolean;
   selector?: string;
+  waitFor?: string;
   path?: string;
 }
 
@@ -360,15 +361,15 @@ export async function browserScreenshot(
   if (params.selector !== undefined && params.fullPage === true) {
     throw new InvalidInputError("Pass selector or fullPage, not both.");
   }
-  const { name, provider } = await createScreenshotProvider(
-    params.provider,
-    params.browser,
-    params.selector,
-  );
+  const { name, provider } = await createScreenshotProvider(params.provider, params.browser, {
+    selector: params.selector,
+    waitFor: params.waitFor,
+  });
   const result = await screenshotWithSessionWhenNeeded(provider, {
     url: params.url,
     fullPage: params.selector === undefined ? (params.fullPage ?? true) : params.fullPage,
     selector: params.selector,
+    waitFor: params.waitFor,
     format: screenshotFormat(params.format),
   });
   const image = screenshotImage(result, name);

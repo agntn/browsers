@@ -176,6 +176,7 @@ function createScreenshotBody(
   if (options.url) body.url = options.url;
   if (session?.id) body.sessionId = session.id;
   if (options.selector !== undefined) body.selector = options.selector;
+  if (options.waitFor !== undefined) body.waitForSelector = { selector: options.waitFor };
   const screenshotOptions = createScreenshotOptions(options);
   if (Object.keys(screenshotOptions).length > 0) body.screenshotOptions = screenshotOptions;
   return body;
@@ -257,6 +258,7 @@ class CloudflareProvider implements BrowserProvider {
       statelessScrape: true,
       statelessScreenshot: true,
       elementScreenshot: true,
+      screenshotWaitFor: true,
       crawl: true,
       pdf: true,
       links: true,

@@ -27,6 +27,7 @@ import {
   assertUrlOrSession,
   isNotFoundError,
   assertNoSelector,
+  assertNoWaitFor,
   assertSessionId,
 } from "../core/utils.ts";
 
@@ -120,6 +121,7 @@ class KernelProvider implements BrowserProvider {
       statelessScrape: false,
       statelessScreenshot: false,
       elementScreenshot: false,
+      screenshotWaitFor: false,
       crawl: false,
       pdf: false,
       links: false,
@@ -213,6 +215,7 @@ class KernelProvider implements BrowserProvider {
       assertSessionId(session?.id, "kernel", "screenshot");
       assertUrlOrSession(options.url, session, "kernel", "screenshot");
       assertNoSelector(options.selector, "kernel");
+      assertNoWaitFor(options.waitFor, "kernel");
       const png = await this.client.postRaw(
         `${this.baseURL}/browsers/${session.id}/computer/screenshot`,
         {},

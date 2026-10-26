@@ -89,6 +89,7 @@ class BrowserbaseProvider implements BrowserProvider {
       statelessScrape: true,
       statelessScreenshot: false,
       elementScreenshot: false,
+      screenshotWaitFor: false,
       crawl: false,
       pdf: false,
       links: false,

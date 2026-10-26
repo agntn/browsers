@@ -2,7 +2,12 @@ import { createServer } from "node:http";
 import type { ServerResponse } from "node:http";
 import { describe, it, expect, afterAll, beforeAll } from "vite-plus/test";
 import { create } from "../src/core/registry";
-import { InvalidInputError, NavigationError, SessionNotFoundError } from "../src/core/errors";
+import {
+  BrowserError,
+  InvalidInputError,
+  NavigationError,
+  SessionNotFoundError,
+} from "../src/core/errors";
 import type { BrowserProvider, BrowserSession } from "../src/core/types";
 
 // A cold Chrome launch on a CI runner takes longer than the 5 s vitest default.
@@ -70,6 +75,17 @@ describe("playwright provider (local)", { timeout: 30_000 }, () => {
     expect(result.html).toContain("Hello");
     expect(result.title).toBe("Test");
     expect(result.text).toContain("Hello");
+  });
+
+  it("names a waitFor selector that never shows up, without the call log", async () => {
+    const error = await provider
+      .scrape("data:text/html,<body>Hello</body>", { waitFor: "#never", timeout: 200 })
+      .catch((error: unknown) => error);
+
+    expect(error).toBeInstanceOf(BrowserError);
+    expect((error as Error).message).toBe(
+      'waitFor "#never" didn\'t show up within 0.2s. Check the selector against the page, or drop waitFor.',
+    );
   });
 
   it("returns the DOM before a slow image finishes", async () => {
@@ -238,6 +254,23 @@ describe("playwright provider (local)", { timeout: 30_000 }, () => {
       "base64",
     );
     expect([first.readUInt32BE(16), first.readUInt32BE(20)]).toEqual([60, 20]);
+
+    await provider.releaseSession(session.id);
+    sessions.pop();
+  });
+
+  it("holds the shot until the waitFor selector shows up", async () => {
+    const session = await provider.createSession({ headless: true });
+    sessions.push(session);
+    /** The page grows to 3000 px only after load, the way a hydrated deep link lands late. */
+    const url =
+      'data:text/html,<body style="margin:0"><script>setTimeout(() => { const d = document.createElement("div"); d.id = "late"; d.style.height = "3000px"; document.body.append(d); }, 300)</script></body>';
+
+    const eager = await provider.screenshot({ url, fullPage: true }, session);
+    const patient = await provider.screenshot({ url, fullPage: true, waitFor: "#late" }, session);
+
+    expect(Buffer.from(eager.data, "base64").readUInt32BE(20)).toBeLessThan(3000);
+    expect(Buffer.from(patient.data, "base64").readUInt32BE(20)).toBe(3000);
 
     await provider.releaseSession(session.id);
     sessions.pop();

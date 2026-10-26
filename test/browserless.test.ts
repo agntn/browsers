@@ -174,6 +174,16 @@ describe("browserless current session API", () => {
     ]);
   });
 
+  it("waits for the waitFor selector before the shot", async () => {
+    const provider = await create("browserless", { apiKey: "test", baseURL });
+
+    await provider.screenshot({ url: "https://example.com", waitFor: "#ready" });
+
+    expect(requests.map((request) => JSON.parse(request.body) as unknown)).toEqual([
+      { url: "https://example.com", waitForSelector: { selector: "#ready", timeout: 25_000 } },
+    ]);
+  });
+
   it("probes a route Browserless serves and checks the token", async () => {
     const provider = await create("browserless", { apiKey: "test", baseURL });
     const rejected = await create("browserless", { apiKey: "wrong", baseURL });

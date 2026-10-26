@@ -55,6 +55,7 @@ function toolTestProvider(): BrowserProvider {
       statelessScrape,
       statelessScreenshot: true,
       elementScreenshot: true,
+      screenshotWaitFor: true,
       crawl: true,
       pdf: true,
       links: true,
@@ -521,6 +522,17 @@ describe("browser tool operations", () => {
       selector: "h1",
       format: undefined,
     });
+  });
+
+  it("passes waitFor to the provider", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    screenshot.mockResolvedValue({ data: PNG_BYTES.toString("base64"), mimeType: "image/png" });
+
+    await browserScreenshot({ provider: "tooltest", url: "https://example.test", waitFor: "#ok" });
+
+    expect(screenshot).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.test", waitFor: "#ok" }),
+    );
   });
 
   it("rejects a selector together with a full page", async () => {

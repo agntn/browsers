@@ -27,6 +27,7 @@ import {
   assertUrl,
   JOB_TIMEOUT,
   assertNoSelector,
+  assertNoWaitFor,
   isNotFoundError,
   notSupportedViaRest,
   waitForJob,
@@ -66,6 +67,7 @@ function createScreenshotBody(options: ScreenshotOptions): Record<string, unknow
   }
   assertUrl(options.url);
   assertNoSelector(options.selector, "hyperbrowser");
+  assertNoWaitFor(options.waitFor, "hyperbrowser");
   const body: Record<string, unknown> = {
     url: options.url,
     outputs: {
@@ -244,6 +246,7 @@ class HyperbrowserProvider implements BrowserProvider {
       statelessScrape: true,
       statelessScreenshot: true,
       elementScreenshot: false,
+      screenshotWaitFor: false,
       crawl: true,
       pdf: false,
       links: false,

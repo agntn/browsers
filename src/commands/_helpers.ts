@@ -5,7 +5,7 @@ import {
   createScreenshotProvider,
 } from "../core/resolve.ts";
 import type { ProviderCapability, ProviderOperation, ProviderWith } from "../core/resolve.ts";
-import type { BrowserProvider } from "../core/types.ts";
+import type { BrowserProvider, ScreenshotOptions } from "../core/types.ts";
 
 /**
  * Resolve and create a provider, or terminate with a readable error.
@@ -65,16 +65,16 @@ export async function resolveCapableProvider(
  *
  * @param {string} [preferred] Preferred provider name.
  * @param {string} [browser] Optional Cloudflare browser engine.
- * @param {string} [selector] Element the screenshot is limited to.
+ * @param {ScreenshotOptions} [options] Element to capture and selector to wait for.
  * @returns {Promise<{ name: string; provider: BrowserProvider }>} Resolved name and provider.
  */
 export async function resolveScreenshotProvider(
   preferred?: string,
   browser?: string,
-  selector?: string,
+  options?: Readonly<Pick<ScreenshotOptions, "selector" | "waitFor">>,
 ): Promise<{ name: string; provider: BrowserProvider }> {
   try {
-    return await createScreenshotProvider(preferred, browser, selector);
+    return await createScreenshotProvider(preferred, browser, options);
   } catch (error) {
     consola.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

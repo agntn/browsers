@@ -22,4 +22,8 @@ describe("browser tool advertising", () => {
   it("does not imply screenshot is waiting on a navigate tool", () => {
     expect(browserToolDescriptions.browsers_screenshot).not.toMatch(/without navigate support/);
   });
+
+  it.each(browserToolNames)("keeps a space between the sentences of %s", (name) => {
+    expect(browserToolDescriptions[name]).not.toMatch(/[a-z)`]\.[A-Z`]/);
+  });
 });

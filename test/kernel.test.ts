@@ -206,7 +206,7 @@ describe("kernel current API contract", () => {
     await provider.scrape("https://example.com", { waitFor: ".quote" }, session);
 
     const { code } = JSON.parse(requests[0]?.body ?? "{}") as { code: string };
-    expect(code).toContain('page.waitForSelector(".quote", { timeout: 20000 })');
+    expect(code).toContain('page.waitForSelector(".quote", { timeout: 25000 })');
     expect(code.indexOf("waitForSelector")).toBeGreaterThan(code.indexOf("page.goto"));
     expect(code.indexOf("waitForSelector")).toBeLessThan(code.indexOf("page.content()"));
   });
@@ -222,7 +222,7 @@ describe("kernel current API contract", () => {
     expect(error).toBeInstanceOf(BrowserError);
     expect(error).toMatchObject({
       message:
-        'waitFor "#never" didn\'t show up within 20s. Check the selector against the page, or drop waitFor.',
+        'waitFor "#never" didn\'t show up within 25s. Check the selector against the page, or drop waitFor.',
     });
   });
 

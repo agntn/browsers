@@ -12,8 +12,7 @@ import type {
   ProviderCapabilities,
 } from "../core/types.ts";
 import { rejectBlockPage } from "../core/block-page.ts";
-import { defaultClient } from "../core/client.ts";
-import type { Client } from "../core/client.ts";
+import { Client, defaultClient } from "../core/client.ts";
 import {
   AuthError,
   BrowserError,
@@ -81,8 +80,11 @@ function gotoScript(url: string, waitUntil?: string): string {
   return `const response = await page.goto(${JSON.stringify(url)}${options}); const serverError = response && response.status() >= 500 ? { status: response.status(), text: (await response.text()).slice(0, 500) } : undefined;`;
 }
 
-/** Milliseconds Kernel waits for `waitFor`, leaving the page load room in the client's 30 s. */
-const WAIT_FOR_TIMEOUT = 20_000;
+/** Milliseconds Kernel waits for `waitFor`, the same as Playwright and Browserless. */
+const WAIT_FOR_TIMEOUT = 25_000;
+
+/** Kernel stops an execute call at 60 s, so its own answer has to arrive before this one. */
+const EXECUTE_TIMEOUT = 65_000;
 
 /**
  * Playwright code that waits for `waitFor` and declares `missed`, true when it never showed up.
@@ -122,6 +124,8 @@ function rejectProxyFailure(serverError: ServerError | undefined): void {
 
 class KernelProvider implements BrowserProvider {
   private readonly client: Client;
+  /** One try per execute call: a retry would load the page and wait all over again. */
+  private readonly executeClient = new Client({ timeout: EXECUTE_TIMEOUT, maxRetries: 0 });
   private readonly baseURL: string;
   private readonly apiKey: string;
 
@@ -274,7 +278,7 @@ class KernelProvider implements BrowserProvider {
 
   async evaluate(script: string, session: BrowserSession): Promise<EvaluateResult> {
     try {
-      const res = await this.client.postJSON<{
+      const res = await this.executeClient.postJSON<{
         success: boolean;
         result?: unknown;
         error?: string;

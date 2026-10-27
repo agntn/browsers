@@ -106,12 +106,12 @@ browsers providers
 ```
 ● steel           scrape screenshot(sess) sessions cdp
 ● browserbase     scrape sessions cdp
-● kernel          scrape(sess) screenshot(sess) navigate evaluate sessions cdp
-● browserless     scrape screenshot element waitFor navigate evaluate sessions cdp pdf
+● kernel          scrape(sess) screenshot(sess) scrapeWaitFor navigate evaluate sessions cdp
+● browserless     scrape screenshot element scrapeWaitFor screenshotWaitFor navigate evaluate sessions cdp pdf
 ● hyperbrowser    scrape screenshot sessions cdp crawl search extract
 ● anchor          screenshot(sess) sessions cdp
-● cloudflare      scrape screenshot element waitFor sessions cdp crawl pdf links extract accessibility
-● playwright      scrape screenshot(sess) element waitFor navigate evaluate sessions crawl pdf links
+● cloudflare      scrape screenshot element scrapeWaitFor screenshotWaitFor sessions cdp crawl pdf links extract accessibility
+● playwright      scrape screenshot(sess) element scrapeWaitFor screenshotWaitFor navigate evaluate sessions crawl pdf links
 ```
 
 Filled dot means that key was in the env on this run. Playwright is always filled. A few more:
@@ -168,16 +168,16 @@ That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resol
 
 ## 🗺️ Providers
 
-| Provider         | Auth                             | Capabilities                                                                                                              |
-| ---------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **steel**        | `STEEL_API_KEY`                  | scrape, screenshot (session), sessions, CDP                                                                               |
-| **browserbase**  | `BROWSERBASE_API_KEY`            | scrape, sessions, CDP                                                                                                     |
-| **kernel**       | `KERNEL_API_KEY`                 | scrape (session), screenshot (session), navigate, evaluate, sessions, CDP                                                 |
-| **browserless**  | `BROWSERLESS_API_KEY`            | scrape, screenshot, element screenshot, screenshot waitFor, navigate, evaluate, sessions, CDP, PDF                        |
-| **hyperbrowser** | `HYPERBROWSER_API_KEY`           | scrape, screenshot, sessions, CDP, crawl, search, extract                                                                 |
-| **anchor**       | `ANCHOR_API_KEY`                 | screenshot (session), sessions, CDP                                                                                       |
-| **cloudflare**   | `CF_API_TOKEN` + `CF_ACCOUNT_ID` | scrape, screenshot, element screenshot, screenshot waitFor, sessions, CDP, crawl, PDF, links, extract, accessibility tree |
-| **playwright**   | none, local                      | scrape, screenshot (session), element screenshot, screenshot waitFor, navigate, evaluate, sessions, crawl, PDF, links     |
+| Provider         | Auth                             | Capabilities                                                                                                                              |
+| ---------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **steel**        | `STEEL_API_KEY`                  | scrape, screenshot (session), sessions, CDP                                                                                               |
+| **browserbase**  | `BROWSERBASE_API_KEY`            | scrape, sessions, CDP                                                                                                                     |
+| **kernel**       | `KERNEL_API_KEY`                 | scrape (session), scrape waitFor, screenshot (session), navigate, evaluate, sessions, CDP                                                 |
+| **browserless**  | `BROWSERLESS_API_KEY`            | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, navigate, evaluate, sessions, CDP, PDF                        |
+| **hyperbrowser** | `HYPERBROWSER_API_KEY`           | scrape, screenshot, sessions, CDP, crawl, search, extract                                                                                 |
+| **anchor**       | `ANCHOR_API_KEY`                 | screenshot (session), sessions, CDP                                                                                                       |
+| **cloudflare**   | `CF_API_TOKEN` + `CF_ACCOUNT_ID` | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, sessions, CDP, crawl, PDF, links, extract, accessibility tree |
+| **playwright**   | none, local                      | scrape, scrape waitFor, screenshot (session), element screenshot, screenshot waitFor, navigate, evaluate, sessions, crawl, PDF, links     |
 
 Anchor does not scrape. The row stays, because someone will look for it. Cloudflare also accepts `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 
@@ -204,6 +204,8 @@ Twelve tools, `browsers_scrape` through `browsers_capabilities`, the same twelve
 Pass `selector` and you get one element instead of the page. Cloudflare, Browserless and Playwright can do that. Leave `provider` out and one of them gets picked; name another and it says no rather than hand back the whole page.
 
 `waitFor` holds the shot until a CSS selector shows up, so a page that fills itself in late stops coming back half built. Same three providers, same flat no from the rest.
+
+`browsers_scrape` takes `waitFor` too. Kernel joins the club there, since it runs Playwright inside the session anyway. Steel, Browserbase and Hyperbrowser have nothing to wait with, so they refuse before a single request. Used to be they'd hand back the empty skeleton and call it a scrape.
 
 ## 🚫 What this does not do
 

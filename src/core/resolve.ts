@@ -6,7 +6,13 @@ import {
   InvalidInputError,
   UnsupportedOperationError,
 } from "./errors.ts";
-import type { BrowserProvider, CrawlOptions, CrawlResult, ScreenshotOptions } from "./types.ts";
+import type {
+  BrowserProvider,
+  CrawlOptions,
+  CrawlResult,
+  ScrapeOptions,
+  ScreenshotOptions,
+} from "./types.ts";
 import { resolveCloudflareBrowser } from "./utils.ts";
 
 type ProviderEnvRequirements = readonly (readonly [string, ...string[]])[];
@@ -165,6 +171,7 @@ export type ProviderCapability =
   | "screenshot"
   | "elementScreenshot"
   | "screenshotWaitFor"
+  | "scrapeWaitFor"
   | "sessions";
 
 const capabilityLabels: Readonly<Record<ProviderCapability, string>> = {
@@ -172,8 +179,21 @@ const capabilityLabels: Readonly<Record<ProviderCapability, string>> = {
   screenshot: "screenshots",
   elementScreenshot: "element screenshots",
   screenshotWaitFor: "screenshots that wait for a selector",
+  scrapeWaitFor: "scrapes that wait for a selector",
   sessions: "sessions",
 };
+
+/**
+ * The flags a scrape needs: `scrape`, plus `scrapeWaitFor` once the caller waits for a selector.
+ *
+ * @param {ScrapeOptions} options The scrape's `waitFor`.
+ * @returns {readonly ProviderCapability[]} Flags for `createCapableProvider`.
+ */
+export function scrapeCapabilities(
+  options: Readonly<Pick<ScrapeOptions, "waitFor">>,
+): readonly ProviderCapability[] {
+  return options.waitFor === undefined ? ["scrape"] : ["scrape", "scrapeWaitFor"];
+}
 
 /**
  * Without a provider or browser, pick the first configured one that sets every flag asked for.

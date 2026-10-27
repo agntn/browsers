@@ -28,6 +28,7 @@ import {
   isNotFoundError,
   assertNoSelector,
   assertNoWaitFor,
+  waitForMissMessage,
   assertSessionId,
 } from "../core/utils.ts";
 
@@ -80,6 +81,33 @@ function gotoScript(url: string, waitUntil?: string): string {
   return `const response = await page.goto(${JSON.stringify(url)}${options}); const serverError = response && response.status() >= 500 ? { status: response.status(), text: (await response.text()).slice(0, 500) } : undefined;`;
 }
 
+/** Milliseconds Kernel waits for `waitFor`, leaving the page load room in the client's 30 s. */
+const WAIT_FOR_TIMEOUT = 20_000;
+
+/**
+ * Playwright code that waits for `waitFor` and declares `missed`, true when it never showed up.
+ *
+ * @param selector - CSS selector to wait for, or none.
+ * @returns {string} Code to run after `gotoScript`.
+ */
+function waitForScript(selector: string | undefined): string {
+  if (selector === undefined) return "const missed = false;";
+  return `const missed = await page.waitForSelector(${JSON.stringify(selector)}, { timeout: ${WAIT_FOR_TIMEOUT} }).then(() => false, (error) => { if (error.name === "TimeoutError") return true; throw error; });`;
+}
+
+/**
+ * Throws when `waitForScript` gave up on the selector, rather than return the page without it.
+ *
+ * @param missed - What `waitForScript` declared.
+ * @param selector - The selector it waited for.
+ * @throws {BrowserError} Naming the selector and the wait.
+ */
+function rejectMissedWait(missed: boolean | undefined, selector: string | undefined): void {
+  if (missed === true && selector !== undefined) {
+    throw new BrowserError(waitForMissMessage(selector, WAIT_FOR_TIMEOUT));
+  }
+}
+
 /**
  * Throws when the page is the proxy's error text, which Chrome renders like any other page.
  *
@@ -122,6 +150,7 @@ class KernelProvider implements BrowserProvider {
       statelessScreenshot: false,
       elementScreenshot: false,
       screenshotWaitFor: false,
+      scrapeWaitFor: true,
       crawl: false,
       pdf: false,
       links: false,
@@ -191,16 +220,18 @@ class KernelProvider implements BrowserProvider {
     assertUrl(url);
     try {
       assertSessionId(session?.id, "kernel", "scrape");
+      const waitFor = options?.waitFor;
 
       const result = await this.evaluate(
-        `${gotoScript(url, "networkidle")} return { serverError, html: await page.content(), title: await page.title() }`,
+        `${gotoScript(url, "networkidle")} ${waitForScript(waitFor)} return { serverError, missed, html: await page.content(), title: await page.title() }`,
         session!,
       );
 
       const data = result.value as
-        | { serverError?: ServerError; html?: string; title?: string }
+        | { serverError?: ServerError; missed?: boolean; html?: string; title?: string }
         | undefined;
       rejectProxyFailure(data?.serverError);
+      rejectMissedWait(data?.missed, waitFor);
       return rejectBlockPage({ url, title: data?.title, html: data?.html }, "kernel");
     } catch (error) {
       throw navigationFailure(error, "kernel") ?? normalizeError(error, "kernel");

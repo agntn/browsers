@@ -62,7 +62,7 @@ export const browserToolLabels: Readonly<Record<BrowserToolName, string>> = {
 /** Model-facing descriptions shared by Pi, OMP, and MCP. */
 export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> = {
   browsers_scrape:
-    "Read-only/open-world network fetch: scrape content from a URL using a cloud browser provider. Returns rendered HTML/markdown/text after JavaScript execution. Use when a URL needs a real browser to render (JS-heavy SPAs, sites with bot protection, dynamic content). This tool does not accept a session ID. Providers that need a session open and release one internally.",
+    "Read-only/open-world network fetch: scrape content from a URL using a cloud browser provider. Returns rendered HTML/markdown/text after JavaScript execution. Use when a URL needs a real browser to render (JS-heavy SPAs, sites with bot protection, dynamic content). `waitFor` holds the read until a CSS selector shows up; Kernel, Browserless, Cloudflare and Playwright support it, and without `provider` the first configured one of them is used. This tool does not accept a session ID. Providers that need a session open and release one internally.",
   browsers_session:
     "Create a cloud browser session. Returns an opaque session ID. Only browsers_release accepts this ID; no other tool can drive the session.",
   browsers_release:

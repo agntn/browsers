@@ -28,7 +28,11 @@ export const browserToolSchemas = {
       provider,
       browser,
       waitFor: Type.Optional(
-        Type.String({ description: "CSS selector to wait for before extraction" }),
+        Type.String({
+          minLength: 1,
+          description:
+            "CSS selector to wait for before reading the page, for content that renders after load. Kernel, Browserless, Cloudflare and Playwright only.",
+        }),
       ),
       maxChars: Type.Optional(
         Type.Integer({

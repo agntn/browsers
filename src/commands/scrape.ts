@@ -2,6 +2,7 @@ import { defineCommand } from "citty";
 import { consola } from "./_logger.ts";
 import { resolveCapableProvider } from "./_helpers.ts";
 import type { ScrapeResult } from "../core/types.ts";
+import { scrapeCapabilities } from "../core/resolve.ts";
 import { scrapeWithSessionWhenNeeded } from "../core/utils.ts";
 
 /** Fields each format falls back through. Most providers leave `text` empty. */
@@ -60,7 +61,7 @@ export default defineCommand({
     const { name: providerName, provider } = await resolveCapableProvider(
       args.provider,
       args.browser,
-      "scrape",
+      scrapeCapabilities({ waitFor: args.waitFor }),
     );
     consola.info(`Scraping via ${providerName}...`);
 

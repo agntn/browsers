@@ -28,6 +28,7 @@ import {
   JOB_TIMEOUT,
   assertNoSelector,
   assertNoWaitFor,
+  assertNoScrapeWaitFor,
   isNotFoundError,
   notSupportedViaRest,
   waitForJob,
@@ -247,6 +248,7 @@ class HyperbrowserProvider implements BrowserProvider {
       statelessScreenshot: true,
       elementScreenshot: false,
       screenshotWaitFor: false,
+      scrapeWaitFor: false,
       crawl: true,
       pdf: false,
       links: false,
@@ -311,11 +313,12 @@ class HyperbrowserProvider implements BrowserProvider {
 
   async scrape(
     url: string,
-    _options?: ScrapeOptions,
+    options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
     assertUrl(url);
     try {
+      assertNoScrapeWaitFor(options?.waitFor, "hyperbrowser");
       const body: Record<string, unknown> = {
         url,
         outputs: { formats: ["markdown"] },

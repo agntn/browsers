@@ -109,6 +109,32 @@ export function assertNoWaitFor(waitFor: string | undefined, provider: string): 
 }
 
 /**
+ * Rejects `waitFor` on a provider whose scrape reads the page without waiting for anything.
+ *
+ * @param {string | undefined} waitFor Requested selector to wait for.
+ * @param {string} provider Provider name.
+ * @returns {void}
+ */
+export function assertNoScrapeWaitFor(waitFor: string | undefined, provider: string): void {
+  if (waitFor === undefined) return;
+  throw new UnsupportedOperationError(
+    `${provider} cannot wait for a selector before a scrape. Use kernel, browserless, cloudflare or playwright, or drop waitFor.`,
+    provider,
+  );
+}
+
+/**
+ * Why a `waitFor` selector failed, worded the same on Playwright and Kernel.
+ *
+ * @param {string} selector CSS selector the caller waited for.
+ * @param {number} timeout Milliseconds the wait lasted.
+ * @returns {string} A message that names the selector and the wait.
+ */
+export function waitForMissMessage(selector: string, timeout: number): string {
+  return `waitFor ${JSON.stringify(selector)} didn't show up within ${timeout / 1000}s. Check the selector against the page, or drop waitFor.`;
+}
+
+/**
  * Assert that a URL or a session is available, and that a URL the caller gave isn't blank.
  *
  * @param {string | undefined} url Target URL.
@@ -154,7 +180,11 @@ export async function scrapeWithSessionWhenNeeded(
   options?: ScrapeOptions,
 ): Promise<ScrapeResult> {
   assertUrl(url);
+  if (options?.waitFor === "") {
+    throw new InvalidInputError("waitFor is empty. Pass a CSS selector or leave it out.");
+  }
   const capabilities = provider.capabilities();
+  if (!capabilities.scrapeWaitFor) assertNoScrapeWaitFor(options?.waitFor, provider.name());
   if (!capabilities.scrape || capabilities.statelessScrape) {
     return provider.scrape(url, options);
   }

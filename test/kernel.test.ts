@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import type { IncomingMessage, Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { create } from "../src/core/registry";
-import { NavigationError } from "../src/core/errors";
+import { BrowserError, NavigationError } from "../src/core/errors";
 
 interface CapturedRequest {
   method?: string;
@@ -44,9 +44,11 @@ const proxyAnswers: Readonly<Record<string, { status: number; text: string }>> =
 
 /* Answers a Kernel execute call, with the recorded 5xx for a URL in `proxyAnswers`. */
 function executeResponse(body: string): unknown {
-  if (body.includes("throw")) return { success: false, error: "execution failed" };
-  if (body.includes("status/500")) return { success: false, error: navigationFailure };
   const code = (JSON.parse(body) as { code: string }).code;
+  if (code.startsWith("throw")) return { success: false, error: "execution failed" };
+  if (code.includes("status/500")) return { success: false, error: navigationFailure };
+  if (code.includes('"#never"'))
+    return { success: true, result: { missed: true, html: "", title: "" } };
   const url = Object.keys(proxyAnswers).find((key) => code.includes(JSON.stringify(key)));
   if (!url) return { success: true, result: "Example Domain", stdout: "done" };
   const serverError = proxyAnswers[url];
@@ -194,6 +196,34 @@ describe("kernel current API contract", () => {
     await expect(provider.evaluate("throw new Error('nope')", session)).rejects.toThrow(
       "execution failed",
     );
+  });
+
+  it("waits for the waitFor selector before reading the page", async () => {
+    const provider = await create("kernel", { apiKey: "test", baseURL });
+    const session = { id: "session-1", provider: "kernel", createdAt: 0 };
+    requests.length = 0;
+
+    await provider.scrape("https://example.com", { waitFor: ".quote" }, session);
+
+    const { code } = JSON.parse(requests[0]?.body ?? "{}") as { code: string };
+    expect(code).toContain('page.waitForSelector(".quote", { timeout: 20000 })');
+    expect(code.indexOf("waitForSelector")).toBeGreaterThan(code.indexOf("page.goto"));
+    expect(code.indexOf("waitForSelector")).toBeLessThan(code.indexOf("page.content()"));
+  });
+
+  it("names the waitFor selector that never showed up", async () => {
+    const provider = await create("kernel", { apiKey: "test", baseURL });
+    const session = { id: "session-1", provider: "kernel", createdAt: 0 };
+
+    const error = await provider
+      .scrape("https://example.com", { waitFor: "#never" }, session)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(BrowserError);
+    expect(error).toMatchObject({
+      message:
+        'waitFor "#never" didn\'t show up within 20s. Check the selector against the page, or drop waitFor.',
+    });
   });
 
   it("throws NavigationError without the call log when the page fails to load", async () => {

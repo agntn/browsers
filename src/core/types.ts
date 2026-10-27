@@ -197,6 +197,8 @@ export interface ProviderCapabilities {
   elementScreenshot?: boolean;
   /** Screenshot can wait for the `waitFor` selector before the shot. Missing means it cannot. */
   screenshotWaitFor?: boolean;
+  /** Scrape can wait for the `waitFor` selector before reading. Missing means it cannot. */
+  scrapeWaitFor?: boolean;
   crawl: boolean;
   pdf: boolean;
   links: boolean;

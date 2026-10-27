@@ -14,6 +14,7 @@ import {
   createCrawl,
   createProvider,
   createScreenshotProvider,
+  scrapeCapabilities,
 } from "./core/resolve.ts";
 import type {
   AccessibilityNode,
@@ -231,7 +232,11 @@ export async function browserScrape(
   params: Readonly<BrowserScrapeParams>,
 ): Promise<ToolResult<BrowserScrapeDetails>> {
   const maxChars = resolveMaxChars(params.maxChars);
-  const { name, provider } = await createCapableProvider(params.provider, params.browser, "scrape");
+  const { name, provider } = await createCapableProvider(
+    params.provider,
+    params.browser,
+    scrapeCapabilities(params),
+  );
   const result = await scrapeWithSessionWhenNeeded(provider, params.url, {
     formats: ["markdown"],
     waitFor: params.waitFor,

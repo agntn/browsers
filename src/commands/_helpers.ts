@@ -40,17 +40,17 @@ export async function resolveAndCreate(
 }
 
 /**
- * Resolve a provider with `capability`, or terminate with a readable error.
+ * Resolve a provider with every flag in `capability`, or terminate with a readable error.
  *
  * @param {string | undefined} preferred Preferred provider name.
  * @param {string | undefined} browser Optional Cloudflare browser engine.
- * @param {ProviderCapability} capability Flag the provider has to set in `capabilities()`.
+ * @param {ProviderCapability | readonly ProviderCapability[]} capability Flags it must set.
  * @returns {Promise<{ name: string; provider: BrowserProvider }>} Resolved name and provider.
  */
 export async function resolveCapableProvider(
   preferred: string | undefined,
   browser: string | undefined,
-  capability: ProviderCapability,
+  capability: ProviderCapability | readonly ProviderCapability[],
 ): Promise<{ name: string; provider: BrowserProvider }> {
   try {
     return await createCapableProvider(preferred, browser, capability);

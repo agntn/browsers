@@ -155,6 +155,7 @@ class AnchorProvider implements BrowserProvider {
       statelessScreenshot: false,
       elementScreenshot: false,
       screenshotWaitFor: false,
+      scrapeWaitFor: false,
       crawl: false,
       pdf: false,
       links: false,

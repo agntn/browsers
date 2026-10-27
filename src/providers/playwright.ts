@@ -25,7 +25,7 @@ import {
   navigationFailure,
   normalizeError,
 } from "../core/errors.ts";
-import { assertUrl, assertUrlOrSession } from "../core/utils.ts";
+import { assertUrl, assertUrlOrSession, waitForMissMessage } from "../core/utils.ts";
 import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
 import type { Browser, Frame, Page } from "playwright-core";
@@ -146,10 +146,7 @@ async function waitForSelector(page: Page, selector: string, timeout = 25000): P
     await page.waitForSelector(selector, { timeout });
   } catch (error) {
     if (!(error instanceof Error) || error.name !== "TimeoutError") throw error;
-    throw new BrowserError(
-      `waitFor ${JSON.stringify(selector)} didn't show up within ${timeout / 1000}s. Check the selector against the page, or drop waitFor.`,
-      { cause: error },
-    );
+    throw new BrowserError(waitForMissMessage(selector, timeout), { cause: error });
   }
 }
 
@@ -321,6 +318,7 @@ class PlaywrightProvider implements BrowserProvider {
       statelessScreenshot: false,
       elementScreenshot: true,
       screenshotWaitFor: true,
+      scrapeWaitFor: true,
       crawl: true,
       pdf: true,
       links: true,

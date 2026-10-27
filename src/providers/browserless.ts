@@ -124,6 +124,7 @@ class BrowserlessProvider implements BrowserProvider {
       statelessScreenshot: true,
       elementScreenshot: true,
       screenshotWaitFor: true,
+      scrapeWaitFor: true,
       crawl: false,
       pdf: true,
       links: false,
@@ -192,14 +193,18 @@ class BrowserlessProvider implements BrowserProvider {
 
   async scrape(
     url: string,
-    _options?: ScrapeOptions,
+    options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
     assertUrl(url);
     try {
+      const body: Record<string, unknown> = { url };
+      if (options?.waitFor !== undefined) {
+        body.waitForSelector = { selector: options.waitFor, timeout: WAIT_FOR_TIMEOUT };
+      }
       const html = await this.client.postText(
         `${this.baseURL}/content?${this.tokenParam()}`,
-        { url },
+        body,
         { "Content-Type": "application/json" },
       );
       return rejectBlockPage({ url, html }, "browserless");

@@ -87,6 +87,11 @@ describe("browserless current session API", () => {
           res.end();
           return;
         }
+        if (req.method === "POST" && req.url === "/content?token=test") {
+          res.setHeader("Content-Type", "text/html");
+          res.end("<html><body><div class=quote>Late</div></body></html>");
+          return;
+        }
         if (serveCapture(req, res)) return;
         if (serveMeta(req, res)) return;
         res.statusCode = 404;
@@ -181,6 +186,18 @@ describe("browserless current session API", () => {
 
     expect(requests.map((request) => JSON.parse(request.body) as unknown)).toEqual([
       { url: "https://example.com", waitForSelector: { selector: "#ready", timeout: 25_000 } },
+    ]);
+  });
+
+  it("waits for the waitFor selector before reading the page", async () => {
+    const provider = await create("browserless", { apiKey: "test", baseURL });
+
+    await provider.scrape("https://example.com");
+    await provider.scrape("https://example.com", { waitFor: ".quote" });
+
+    expect(requests.map((request) => JSON.parse(request.body) as unknown)).toEqual([
+      { url: "https://example.com" },
+      { url: "https://example.com", waitForSelector: { selector: ".quote", timeout: 25_000 } },
     ]);
   });
 

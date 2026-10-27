@@ -16,8 +16,10 @@ import {
   browserSession,
   browserScreenshot,
   browserSearch,
+  errorMessage,
   listBrowserProviders,
   releaseBrowserSession,
+  sanitizeField,
 } from "../src/tool-operations";
 
 const previousApiKey = process.env.TOOLTEST_API_KEY;
@@ -854,6 +856,21 @@ describe("browser tool operations", () => {
     });
 
     expect(lines).toEqual(['- link "Say \\"hi\\" [31m now" description="bell"']);
+  });
+
+  it("drops bidi overrides, tag characters and line separators from a field", () => {
+    const field = "a \u202Eb\u2066c\u2069\u200Fd\uFEFFe\u2028f\u2029g \u{E0069}\u{E0067}h";
+
+    expect(sanitizeField(field)).toBe("a b c d e f g h");
+    expect(errorMessage(new Error(`No element matches \u202E#nottub`))).toBe(
+      "No element matches #nottub",
+    );
+  });
+
+  it("keeps the joiners that Persian words and emoji sequences need", () => {
+    const field = "می\u200Cخواهم 👩\u200D💻";
+
+    expect(sanitizeField(field)).toBe(field);
   });
 
   it("returns the accessibility outline with page metadata and cuts it at a line", async () => {

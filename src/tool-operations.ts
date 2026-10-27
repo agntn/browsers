@@ -159,8 +159,8 @@ export interface BrowserProviderStatus {
 
 export { DEFAULT_SCRAPE_MAX_CHARS, MAX_SCRAPE_MAX_CHARS };
 
-/* oxlint-disable-next-line no-control-regex */
-const UNSAFE_CONTROLS = /[\u0000-\u001F\u007F-\u009F]/gu;
+/** Controls, line separators and format marks like bidi; Persian and emoji keep ZWNJ and ZWJ. */
+const UNSAFE_CHARACTERS = /[\p{Cc}\p{Zl}\p{Zp}[\p{Cf}--[\u200C\u200D]]]/gv;
 
 function content(text: string): Array<{ type: "text"; text: string }> {
   return [{ type: "text", text }];
@@ -173,7 +173,7 @@ function content(text: string): Array<{ type: "text"; text: string }> {
  * @returns {string} A terminal safe single-line value.
  */
 export function sanitizeField(value: string): string {
-  return value.replace(UNSAFE_CONTROLS, " ").replaceAll(/ +/g, " ").trim();
+  return value.replace(UNSAFE_CHARACTERS, " ").replaceAll(/ +/g, " ").trim();
 }
 
 /**

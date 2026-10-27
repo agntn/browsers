@@ -54,6 +54,29 @@ function serveMeta(req: IncomingMessage, res: ServerResponse): boolean {
   return true;
 }
 
+/**
+ * Answers `/content` with a rendered page, and any wait for `#never` with Browserless's 408.
+ *
+ * @param {CapturedRequest} req Incoming request with its body read.
+ * @param {ServerResponse} res Response to write.
+ * @returns {boolean} Whether the request was one of those.
+ */
+function serveContent(req: Readonly<CapturedRequest>, res: ServerResponse): boolean {
+  if (req.method !== "POST") return false;
+  if (req.body.includes('"#never"')) {
+    res.statusCode = 408;
+    res.setHeader("Content-Type", "application/json");
+    res.end(
+      JSON.stringify({ error: 'Timeout of 25000ms reached waiting for DOM selector "#never"' }),
+    );
+    return true;
+  }
+  if (req.url !== "/content?token=test") return false;
+  res.setHeader("Content-Type", "text/html");
+  res.end("<html><body><div class=quote>Late</div></body></html>");
+  return true;
+}
+
 describe("browserless current session API", () => {
   let server: Server;
   let baseURL: string;
@@ -87,11 +110,7 @@ describe("browserless current session API", () => {
           res.end();
           return;
         }
-        if (req.method === "POST" && req.url === "/content?token=test") {
-          res.setHeader("Content-Type", "text/html");
-          res.end("<html><body><div class=quote>Late</div></body></html>");
-          return;
-        }
+        if (serveContent({ method: req.method, url: req.url, body }, res)) return;
         if (serveCapture(req, res)) return;
         if (serveMeta(req, res)) return;
         res.statusCode = 404;
@@ -198,6 +217,21 @@ describe("browserless current session API", () => {
     expect(requests.map((request) => JSON.parse(request.body) as unknown)).toEqual([
       { url: "https://example.com" },
       { url: "https://example.com", waitForSelector: { selector: ".quote", timeout: 25_000 } },
+    ]);
+  });
+
+  it("asks once when Browserless gives up on the waitFor selector", async () => {
+    const provider = await create("browserless", { apiKey: "test", baseURL });
+
+    await expect(
+      provider.scrape("https://example.com", { waitFor: "#never" }),
+    ).rejects.toMatchObject({ statusCode: 408 });
+    await expect(
+      provider.screenshot({ url: "https://example.com", waitFor: "#never" }),
+    ).rejects.toMatchObject({ statusCode: 408 });
+    expect(requests.map((request) => request.url)).toEqual([
+      "/content?token=test",
+      "/screenshot?token=test",
     ]);
   });
 

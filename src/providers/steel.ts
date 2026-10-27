@@ -20,6 +20,7 @@ import {
   isNotFoundError,
   assertNoSelector,
   assertNoWaitFor,
+  assertNoScrapeWaitFor,
   assertSessionId,
   assertUrlOrSession,
   imageMimeType,
@@ -72,7 +73,6 @@ function createScrapeBody(url: string, options?: ScrapeOptions): Record<string, 
     Object.hasOwn(STEEL_FORMATS, name) ? [STEEL_FORMATS[name as keyof typeof STEEL_FORMATS]] : [],
   );
   if (format?.length) body.format = format;
-  if (options.waitFor) body.waitFor = options.waitFor;
   if (options.headers) body.headers = options.headers;
   return body;
 }
@@ -164,6 +164,7 @@ class SteelProvider implements BrowserProvider {
       statelessScreenshot: false,
       elementScreenshot: false,
       screenshotWaitFor: false,
+      scrapeWaitFor: false,
       crawl: false,
       pdf: false,
       links: false,
@@ -274,6 +275,7 @@ class SteelProvider implements BrowserProvider {
   ): Promise<ScrapeResult> {
     assertUrl(url);
     try {
+      assertNoScrapeWaitFor(options?.waitFor, "steel");
       const res = await this.client.postJSON<SteelScrapeResponse>(
         `${this.baseURL}/v1/scrape`,
         createScrapeBody(url, options),

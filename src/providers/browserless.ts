@@ -14,8 +14,7 @@ import type {
   ProviderCapabilities,
 } from "../core/types.ts";
 import { rejectBlockPage } from "../core/block-page.ts";
-import { defaultClient } from "../core/client.ts";
-import type { Client } from "../core/client.ts";
+import { Client, defaultClient } from "../core/client.ts";
 import type { Browser, Page } from "playwright-core";
 import { AuthError, BrowserError, normalizeError, SessionNotFoundError } from "../core/errors.ts";
 import { assertUrl, assertUrlOrSession } from "../core/utils.ts";
@@ -38,8 +37,11 @@ interface BrowserlessSessionRecord {
 
 const browserlessSessionStores = new Map<string, Map<string, BrowserlessSessionRecord>>();
 
-/** Milliseconds Browserless waits for `waitFor`, under the client's 30 s so its error arrives. */
+/** Milliseconds Browserless waits for `waitFor` once the page has loaded. */
 const WAIT_FOR_TIMEOUT = 25_000;
+
+/** Room for a 30 s page load plus the wait, so Browserless answers before the client gives up. */
+const WAIT_CLIENT_TIMEOUT = 65_000;
 
 /**
  * The CDP connection navigate and evaluate share, per session. Browserless
@@ -91,6 +93,8 @@ function createSessionBody(options?: CreateSessionOptions): Record<string, unkno
 
 class BrowserlessProvider implements BrowserProvider {
   private readonly client: Client;
+  /** One try per waiting call: a 408 is Browserless giving up on the selector, not a blip. */
+  private readonly waitClient = new Client({ timeout: WAIT_CLIENT_TIMEOUT, maxRetries: 0 });
   private readonly baseURL: string;
   private readonly apiKey: string;
   private readonly sessionStoreKey: string;
@@ -124,6 +128,7 @@ class BrowserlessProvider implements BrowserProvider {
       statelessScreenshot: true,
       elementScreenshot: true,
       screenshotWaitFor: true,
+      scrapeWaitFor: true,
       crawl: false,
       pdf: true,
       links: false,
@@ -192,14 +197,18 @@ class BrowserlessProvider implements BrowserProvider {
 
   async scrape(
     url: string,
-    _options?: ScrapeOptions,
+    options?: ScrapeOptions,
     _session?: BrowserSession,
   ): Promise<ScrapeResult> {
     assertUrl(url);
     try {
-      const html = await this.client.postText(
+      const body: Record<string, unknown> = { url };
+      if (options?.waitFor !== undefined) {
+        body.waitForSelector = { selector: options.waitFor, timeout: WAIT_FOR_TIMEOUT };
+      }
+      const html = await this.clientFor(options?.waitFor).postText(
         `${this.baseURL}/content?${this.tokenParam()}`,
-        { url },
+        body,
         { "Content-Type": "application/json" },
       );
       return rejectBlockPage({ url, html }, "browserless");
@@ -222,7 +231,7 @@ class BrowserlessProvider implements BrowserProvider {
         body.waitForSelector = { selector: options.waitFor, timeout: WAIT_FOR_TIMEOUT };
       }
 
-      const png = await this.client.postRaw(
+      const png = await this.clientFor(options.waitFor).postRaw(
         `${this.baseURL}/screenshot?${this.tokenParam()}`,
         body,
         { "Content-Type": "application/json" },
@@ -235,6 +244,10 @@ class BrowserlessProvider implements BrowserProvider {
     } catch (error) {
       throw normalizeError(error, "browserless");
     }
+  }
+
+  private clientFor(waitFor: string | undefined): Client {
+    return waitFor === undefined ? this.client : this.waitClient;
   }
 
   private async page(session: BrowserSession): Promise<Page> {

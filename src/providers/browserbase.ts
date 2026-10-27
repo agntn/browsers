@@ -15,7 +15,12 @@ import { rejectBlockPage } from "../core/block-page.ts";
 import { defaultClient } from "../core/client.ts";
 import type { Client } from "../core/client.ts";
 import { AuthError, normalizeError } from "../core/errors.ts";
-import { assertUrl, isNotFoundError, notSupportedViaRest } from "../core/utils.ts";
+import {
+  assertNoScrapeWaitFor,
+  assertUrl,
+  isNotFoundError,
+  notSupportedViaRest,
+} from "../core/utils.ts";
 
 interface BrowserbaseSessionResponse {
   id: string;
@@ -90,6 +95,7 @@ class BrowserbaseProvider implements BrowserProvider {
       statelessScreenshot: false,
       elementScreenshot: false,
       screenshotWaitFor: false,
+      scrapeWaitFor: false,
       crawl: false,
       pdf: false,
       links: false,
@@ -206,6 +212,7 @@ class BrowserbaseProvider implements BrowserProvider {
   ): Promise<ScrapeResult> {
     assertUrl(url);
     try {
+      assertNoScrapeWaitFor(options?.waitFor, "browserbase");
       const [page, markdown] = await this.fetchPages(url, options?.formats);
       return rejectBlockPage(toScrapeResult(url, page, markdown), "browserbase");
     } catch (error) {

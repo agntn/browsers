@@ -328,6 +328,7 @@ class HyperbrowserProvider implements BrowserProvider {
         `${this.baseURL}/api/web/fetch`,
         body,
         this.headers(),
+        options?.signal,
       );
       assertFetched(res);
 
@@ -398,8 +399,9 @@ class HyperbrowserProvider implements BrowserProvider {
         `${this.baseURL}/api/web/crawl`,
         createCrawlBody(url, options),
         this.headers(),
+        options?.signal,
       );
-      return await this.finishCrawl(jobId, options?.timeout);
+      return await this.finishCrawl(jobId, options);
     } catch (error) {
       throw normalizeError(error, "hyperbrowser");
     }
@@ -407,31 +409,40 @@ class HyperbrowserProvider implements BrowserProvider {
 
   async resumeCrawl(jobId: string, options?: ResumeCrawlOptions): Promise<CrawlResult> {
     try {
-      return await this.finishCrawl(jobId, options?.timeout);
+      return await this.finishCrawl(jobId, options);
     } catch (error) {
       throw normalizeError(error, "hyperbrowser");
     }
   }
 
   /**
-   * Waits for a crawl job and reads the pages it completed.
+   * Waits for a crawl job and reads the pages it completed. Hyperbrowser has no endpoint that
+   * stops a crawl or extract job, so cancelling ends the wait while the job runs out on its own.
    *
    * @param {string} jobId Job ID the crawl started.
-   * @param {number} [timeout] Milliseconds to wait for the job.
+   * @param {ResumeCrawlOptions} [options] How long to wait for the job, and its cancellation.
    * @returns {Promise<CrawlResult>} The pages, or none while the job still runs.
    */
-  private async finishCrawl(jobId: string, timeout = JOB_TIMEOUT): Promise<CrawlResult> {
+  private async finishCrawl(
+    jobId: string,
+    options?: Readonly<ResumeCrawlOptions>,
+  ): Promise<CrawlResult> {
+    const signal = options?.signal;
     const job = await waitForJob(
       () =>
-        this.client.getJSON<{ status?: string }>(this.crawlURL(jobId, "/status"), this.headers()),
+        this.client.getJSON<{ status?: string }>(
+          this.crawlURL(jobId, "/status"),
+          this.headers(),
+          signal,
+        ),
       (current) => FINISHED_CRAWL_STATUSES.has(current.status ?? ""),
-      timeout,
+      { timeout: options?.timeout ?? JOB_TIMEOUT, signal },
     );
     if (!FINISHED_CRAWL_STATUSES.has(job.status ?? "")) {
       return { pages: [], totalFound: 0, jobId, status: "running" };
     }
 
-    const pages = (await this.crawlPages(jobId))
+    const pages = (await this.crawlPages(jobId, signal))
       .filter((page) => page.status === "completed")
       .map(crawlPage);
     return {
@@ -450,15 +461,17 @@ class HyperbrowserProvider implements BrowserProvider {
    * Reads every batch of a finished job. Batches count from 1; the API rejects 0.
    *
    * @param {string} jobId Job ID the crawl started.
+   * @param {AbortSignal} [signal] Cancellation.
    * @returns {Promise<HyperbrowserCrawlPage[]>} Pages in batch order.
    */
-  private async crawlPages(jobId: string): Promise<HyperbrowserCrawlPage[]> {
+  private async crawlPages(jobId: string, signal?: AbortSignal): Promise<HyperbrowserCrawlPage[]> {
     const pages: HyperbrowserCrawlPage[] = [];
     let batches = 1;
     for (let batch = 1; batch <= batches; batch += 1) {
       const res = await this.client.getJSON<HyperbrowserCrawlBatch>(
         `${this.crawlURL(jobId)}?page=${batch}`,
         this.headers(),
+        signal,
       );
       pages.push(...(res.data ?? []));
       batches = res.totalPageBatches ?? batch;
@@ -472,6 +485,7 @@ class HyperbrowserProvider implements BrowserProvider {
         `${this.baseURL}/api/web/search`,
         createSearchBody(query, options),
         this.headers(),
+        options?.signal,
       );
 
       const data = res.data as Record<string, unknown> | undefined;
@@ -492,6 +506,7 @@ class HyperbrowserProvider implements BrowserProvider {
     _session?: BrowserSession,
   ): Promise<ExtractResult> {
     assertUrl(url);
+    const signal = options?.signal;
     try {
       const body: Record<string, unknown> = { urls: [url] };
       if (options?.schema) body.schema = options.schema;
@@ -501,15 +516,17 @@ class HyperbrowserProvider implements BrowserProvider {
         `${this.baseURL}/api/extract`,
         body,
         this.headers(),
+        signal,
       );
       const job = await waitForJob(
         () =>
           this.client.getJSON<HyperbrowserExtractJob>(
             `${this.baseURL}/api/extract/${encodeURIComponent(jobId)}`,
             this.headers(),
+            signal,
           ),
         (current) => FINISHED_EXTRACT_STATUSES.has(current.status ?? ""),
-        options?.timeout ?? JOB_TIMEOUT,
+        { timeout: options?.timeout ?? JOB_TIMEOUT, signal },
       );
       return extractResult(url, jobId, job);
     } catch (error) {

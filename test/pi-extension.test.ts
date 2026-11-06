@@ -78,6 +78,9 @@ const plainTheme = {
   bold: (text: string) => text,
 };
 
+/** The abort signal Pi hands every call; read tools pass it on to the executor. */
+const hostSignal = new AbortController().signal;
+
 async function executeTool(
   tools: Readonly<Map<string, ToolDefinition>>,
   name: string,
@@ -86,7 +89,7 @@ async function executeTool(
   return requireTool(tools, name).execute(
     "test",
     params,
-    undefined,
+    hostSignal,
     undefined,
     {} as ExtensionToolContext,
   );
@@ -171,11 +174,10 @@ describe("browsers Pi extension", () => {
       maxChars: 5,
     });
 
-    expect(browserToolsMock.browserScrape).toHaveBeenCalledWith({
-      provider: "steel",
-      url: "https://example.test",
-      maxChars: 5,
-    });
+    expect(browserToolsMock.browserScrape).toHaveBeenCalledWith(
+      { provider: "steel", url: "https://example.test", maxChars: 5 },
+      { signal: hostSignal },
+    );
     expect(response).toEqual(result);
     expect(JSON.stringify(response).split("body")).toHaveLength(2);
   });
@@ -225,12 +227,10 @@ describe("browsers Pi extension", () => {
       schema,
     });
 
-    expect(browserToolsMock.browserExtract).toHaveBeenCalledWith({
-      provider: "cloudflare",
-      url: "https://example.test",
-      prompt: "Extract the title",
-      schema,
-    });
+    expect(browserToolsMock.browserExtract).toHaveBeenCalledWith(
+      { provider: "cloudflare", url: "https://example.test", prompt: "Extract the title", schema },
+      { signal: hostSignal },
+    );
   });
 
   it("returns the credential-free session result from the shared executor", async () => {

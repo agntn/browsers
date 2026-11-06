@@ -1,4 +1,5 @@
 import type {
+  AbortOptions,
   AccessibilityNode,
   AccessibilityTreeOptions,
   AccessibilityTreeResult,
@@ -69,6 +70,12 @@ interface CfCrawlJob {
   readonly status?: string;
   readonly records?: readonly CfCrawlRecord[];
   readonly cursor?: number | string | null;
+}
+
+/** One read of a crawl job: which slice of it, and what cancels the read. */
+interface CrawlRead {
+  readonly query?: Readonly<Record<string, string>>;
+  readonly signal?: AbortSignal;
 }
 
 interface CfSessionResult {
@@ -154,6 +161,24 @@ function pageMeta(meta?: CfPageMeta): Pick<ScrapeResult, "title" | "statusCode">
   return {
     ...(meta?.title ? { title: meta.title } : {}),
     ...(meta?.status === undefined ? {} : { statusCode: meta.status }),
+  };
+}
+
+/**
+ * The outputs a scrape got back, each only when Cloudflare sent it.
+ *
+ * @param {CfSnapshotResult} outputs Rendered outputs by format.
+ * @returns {Pick<ScrapeResult, "html" | "markdown" | "screenshot">} The fields Cloudflare filled.
+ */
+function pageOutputs(
+  outputs: CfSnapshotResult,
+): Pick<ScrapeResult, "html" | "markdown" | "screenshot"> {
+  return {
+    ...(outputs.content === undefined ? {} : { html: outputs.content }),
+    ...(outputs.markdown === undefined ? {} : { markdown: outputs.markdown }),
+    ...(outputs.screenshot === undefined
+      ? {}
+      : { screenshot: `data:image/png;base64,${outputs.screenshot}` }),
   };
 }
 
@@ -428,24 +453,18 @@ class CloudflareProvider implements BrowserProvider {
       if (snapshot) body.formats = formats;
       const res = await this.client.postJSON<
         CfPageResponse<CfSnapshotResult | CfContentResult | string>
-      >(this.browserEndpoint(snapshot ? "/snapshot" : `/${format}`), body, this.headers());
+      >(
+        this.browserEndpoint(snapshot ? "/snapshot" : `/${format}`),
+        body,
+        this.headers(),
+        options?.signal,
+      );
       const result = this.unwrap(res);
       const outputs: CfSnapshotResult = snapshot
         ? (result as CfSnapshotResult)
         : { [format]: typeof result === "string" ? result : result.content };
 
-      return rejectBlockPage(
-        {
-          url,
-          ...(outputs.content === undefined ? {} : { html: outputs.content }),
-          ...(outputs.markdown === undefined ? {} : { markdown: outputs.markdown }),
-          ...(outputs.screenshot === undefined
-            ? {}
-            : { screenshot: `data:image/png;base64,${outputs.screenshot}` }),
-          ...pageMeta(res.meta),
-        },
-        "cloudflare",
-      );
+      return rejectBlockPage({ url, ...pageOutputs(outputs), ...pageMeta(res.meta) }, "cloudflare");
     } catch (error) {
       throw this.fail(error);
     }
@@ -518,9 +537,13 @@ class CloudflareProvider implements BrowserProvider {
           this.browserEndpoint("/crawl"),
           createCrawlBody(url, options),
           this.headers(),
+          options?.signal,
         ),
       );
-      return await this.finishCrawl(jobId, options?.timeout);
+      return await this.finishCrawl(jobId, options).catch(async (error: unknown) => {
+        if (options?.signal?.aborted) await this.cancelCrawl(jobId);
+        throw error;
+      });
     } catch (error) {
       throw this.fail(error);
     }
@@ -528,28 +551,44 @@ class CloudflareProvider implements BrowserProvider {
 
   async resumeCrawl(jobId: string, options?: ResumeCrawlOptions): Promise<CrawlResult> {
     try {
-      return await this.finishCrawl(jobId, options?.timeout);
+      return await this.finishCrawl(jobId, options);
     } catch (error) {
       throw this.fail(error);
     }
   }
 
   /**
+   * Stops a job whose ID died with the cancelled call. A refusal for a finished job is ignored.
+   *
+   * @param {string} jobId Job ID the crawl started.
+   * @returns {Promise<void>} Resolves once Cloudflare answered or the request failed.
+   */
+  private async cancelCrawl(jobId: string): Promise<void> {
+    await this.client
+      .deleteJSON(this.browserEndpoint(`/crawl/${encodeURIComponent(jobId)}`), this.headers())
+      .catch(() => undefined);
+  }
+
+  /**
    * Waits for a crawl job and reads the pages it completed.
    *
    * @param {string} jobId Job ID the crawl started.
-   * @param {number} [timeout] Milliseconds to wait for the job.
+   * @param {ResumeCrawlOptions} [options] How long to wait for the job, and its cancellation.
    * @returns {Promise<CrawlResult>} The pages, or none while the job still runs.
    */
-  private async finishCrawl(jobId: string, timeout = JOB_TIMEOUT): Promise<CrawlResult> {
+  private async finishCrawl(
+    jobId: string,
+    options?: Readonly<ResumeCrawlOptions>,
+  ): Promise<CrawlResult> {
+    const signal = options?.signal;
     const job = await waitForJob(
-      () => this.crawlJob(jobId, { limit: "1" }),
+      () => this.crawlJob(jobId, { query: { limit: "1" }, signal }),
       (current) => current.status !== "running",
-      timeout,
+      { timeout: options?.timeout ?? JOB_TIMEOUT, signal },
     );
     if (job.status === "running") return { pages: [], totalFound: 0, jobId, status: "running" };
 
-    const records = await this.crawlRecords(jobId);
+    const records = await this.crawlRecords(jobId, signal);
     const pages = records.filter((record) => record.status === "completed").map(crawlPage);
     return {
       pages,
@@ -563,17 +602,18 @@ class CloudflareProvider implements BrowserProvider {
    * Reads one crawl job.
    *
    * @param {string} jobId Job ID the crawl started.
-   * @param {Readonly<Record<string, string>>} [query] Query parameters such as `limit` or `cursor`.
+   * @param {CrawlRead} [read] Query parameters such as `limit` or `cursor`, and cancellation.
    * @returns {Promise<CfCrawlJob>} The job with its status and records.
    */
-  private async crawlJob(
-    jobId: string,
-    query: Readonly<Record<string, string>> = {},
-  ): Promise<CfCrawlJob> {
+  private async crawlJob(jobId: string, read: Readonly<CrawlRead> = {}): Promise<CfCrawlJob> {
     return this.unwrap(
       await this.client.getJSON<CfEnvelope<CfCrawlJob>>(
-        this.browserEndpoint(`/crawl/${encodeURIComponent(jobId)}`, new URLSearchParams(query)),
+        this.browserEndpoint(
+          `/crawl/${encodeURIComponent(jobId)}`,
+          new URLSearchParams(read.query ?? {}),
+        ),
         this.headers(),
+        read.signal,
       ),
     );
   }
@@ -582,13 +622,15 @@ class CloudflareProvider implements BrowserProvider {
    * Reads every record of a finished job, following the cursor Cloudflare adds past 10 MB.
    *
    * @param {string} jobId Job ID the crawl started.
+   * @param {AbortSignal} [signal] Cancellation.
    * @returns {Promise<CfCrawlRecord[]>} Records in crawl order.
    */
-  private async crawlRecords(jobId: string): Promise<CfCrawlRecord[]> {
+  private async crawlRecords(jobId: string, signal?: AbortSignal): Promise<CfCrawlRecord[]> {
     const records: CfCrawlRecord[] = [];
     let cursor: string | undefined;
     do {
-      const job = await this.crawlJob(jobId, cursor === undefined ? {} : { cursor });
+      const query: Record<string, string> = cursor === undefined ? {} : { cursor };
+      const job = await this.crawlJob(jobId, { query, signal });
       records.push(...(job.records ?? []));
       const next = job.cursor === undefined || job.cursor === null ? undefined : String(job.cursor);
       cursor = next === cursor ? undefined : next;
@@ -621,13 +663,18 @@ class CloudflareProvider implements BrowserProvider {
     }
   }
 
-  async links(url: string, _session?: BrowserSession): Promise<LinksResult> {
+  async links(
+    url: string,
+    _session?: BrowserSession,
+    options?: Readonly<AbortOptions>,
+  ): Promise<LinksResult> {
     assertUrl(url);
     try {
       const res = await this.client.postJSON<CfEnvelope<string[]>>(
         this.browserEndpoint("/links"),
         { url },
         this.headers(),
+        options?.signal,
       );
       const result = this.unwrap(res);
       const rawLinks = Array.isArray(result) ? result : [];
@@ -652,6 +699,7 @@ class CloudflareProvider implements BrowserProvider {
         // JSON drops the options left undefined, so Cloudflare applies its own defaults.
         { url, root: options?.root, interestingOnly: options?.interestingOnly },
         this.headers(),
+        options?.signal,
       );
       return {
         url,
@@ -679,6 +727,7 @@ class CloudflareProvider implements BrowserProvider {
         this.browserEndpoint("/json"),
         body,
         this.headers(),
+        options?.signal,
       );
       const result = this.unwrap(res);
       return {

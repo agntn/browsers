@@ -45,10 +45,14 @@ export default defineConfig({
                 "WebSearchOptions",
               ],
             },
-            { from: "package", name: ["BrowserContext", "Frame", "Page"], package: "playwright" },
             {
               from: "package",
-              name: ["BrowserContext", "Frame", "Page"],
+              name: ["Browser", "BrowserContext", "Frame", "Page"],
+              package: "playwright",
+            },
+            {
+              from: "package",
+              name: ["Browser", "BrowserContext", "Frame", "Page"],
               package: "playwright-core",
             },
             {

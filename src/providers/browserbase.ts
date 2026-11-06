@@ -30,6 +30,12 @@ interface BrowserbaseSessionResponse {
   [key: string]: unknown;
 }
 
+/** One `/v1/fetch` call: the format it asks for and what cancels it. */
+interface PageFetch {
+  readonly format: "raw" | "markdown";
+  readonly signal?: AbortSignal;
+}
+
 interface BrowserbaseFetchResponse {
   statusCode?: number;
   contentType?: string;
@@ -181,22 +187,27 @@ class BrowserbaseProvider implements BrowserProvider {
     }
   }
 
-  private fetchPage(url: string, format: "raw" | "markdown"): Promise<BrowserbaseFetchResponse> {
+  private fetchPage(url: string, fetch: Readonly<PageFetch>): Promise<BrowserbaseFetchResponse> {
     return this.client.postJSON<BrowserbaseFetchResponse>(
       `${this.baseURL}/v1/fetch`,
-      { url, format },
+      { url, format: fetch.format },
       this.headers(),
+      fetch.signal,
     );
   }
 
   private async fetchPages(
     url: string,
-    formats: Readonly<NonNullable<ScrapeOptions["formats"]>> = [],
+    options?: ScrapeOptions,
   ): Promise<(BrowserbaseFetchResponse | undefined)[]> {
+    const formats = options?.formats ?? [];
+    const signal = options?.signal;
     const wantsHtml = formats.includes("html");
     const settled = await Promise.allSettled([
-      wantsHtml ? this.fetchPage(url, "raw") : undefined,
-      formats.includes("markdown") || !wantsHtml ? this.fetchPage(url, "markdown") : undefined,
+      wantsHtml ? this.fetchPage(url, { format: "raw", signal }) : undefined,
+      formats.includes("markdown") || !wantsHtml
+        ? this.fetchPage(url, { format: "markdown", signal })
+        : undefined,
     ]);
     const pages = settled.map((r) => (r.status === "fulfilled" ? r.value : undefined));
     if (pages.every((page) => !page)) {
@@ -213,7 +224,7 @@ class BrowserbaseProvider implements BrowserProvider {
     assertUrl(url);
     try {
       assertNoScrapeWaitFor(options?.waitFor, "browserbase");
-      const [page, markdown] = await this.fetchPages(url, options?.formats);
+      const [page, markdown] = await this.fetchPages(url, options);
       return rejectBlockPage(toScrapeResult(url, page, markdown), "browserbase");
     } catch (error) {
       throw normalizeError(error, "browserbase");

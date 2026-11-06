@@ -210,6 +210,7 @@ class BrowserlessProvider implements BrowserProvider {
         `${this.baseURL}/content?${this.tokenParam()}`,
         body,
         { "Content-Type": "application/json" },
+        options?.signal,
       );
       return rejectBlockPage({ url, html }, "browserless");
     } catch (error) {

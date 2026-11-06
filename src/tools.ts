@@ -115,7 +115,7 @@ export const scrapeTool = defineTool({
     positional: ["url"],
     short: shortProvider,
   },
-  execute: async (input) => (await loadOperations()).browserScrape(input),
+  execute: async (input, { signal }) => (await loadOperations()).browserScrape(input, { signal }),
 });
 
 export const sessionTool = defineTool({
@@ -272,7 +272,7 @@ export const extractTool = defineTool({
     { additionalProperties: false },
   ),
   cli: { positional: ["url"], short: shortProvider },
-  execute: async (input) => (await loadOperations()).browserExtract(input),
+  execute: async (input, { signal }) => (await loadOperations()).browserExtract(input, { signal }),
 });
 
 export const crawlTool = defineTool({
@@ -311,7 +311,7 @@ export const crawlTool = defineTool({
     { additionalProperties: false },
   ),
   cli: { positional: ["url"], short: shortProvider },
-  execute: async (input) => (await loadOperations()).browserCrawl(input),
+  execute: async (input, { signal }) => (await loadOperations()).browserCrawl(input, { signal }),
 });
 
 export const pdfTool = defineTool({
@@ -377,7 +377,7 @@ export const linksTool = defineTool({
     { additionalProperties: false },
   ),
   cli: { positional: ["url"], short: shortProvider },
-  execute: async (input) => (await loadOperations()).browserLinks(input),
+  execute: async (input, { signal }) => (await loadOperations()).browserLinks(input, { signal }),
 });
 
 export const accessibilityTool = defineTool({
@@ -419,7 +419,8 @@ export const accessibilityTool = defineTool({
     positional: ["url"],
     short: shortProvider,
   },
-  execute: async (input) => (await loadOperations()).browserAccessibility(input),
+  execute: async (input, { signal }) =>
+    (await loadOperations()).browserAccessibility(input, { signal }),
 });
 
 export const searchTool = defineTool({
@@ -448,7 +449,7 @@ export const searchTool = defineTool({
     { additionalProperties: false },
   ),
   cli: { rest: "query", short: { maxResults: "n" } },
-  execute: async (input) => (await loadOperations()).browserSearch(input),
+  execute: async (input, { signal }) => (await loadOperations()).browserSearch(input, { signal }),
 });
 
 export const capabilitiesTool = defineTool({

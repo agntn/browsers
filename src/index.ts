@@ -3,6 +3,7 @@ export { version } from "./version.ts";
 export { builtinProviders, type BrowserProviderName } from "./core/providers.ts";
 
 export type {
+  AbortOptions,
   BrowserSession,
   CloudflareBrowser,
   CreateSessionOptions,

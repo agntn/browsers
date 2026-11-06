@@ -23,12 +23,12 @@ vi.mock("../src/providers/kernel", () => {
 });
 
 describe("provider loading", () => {
-  it("answers listing and resolution from the manifest alone", () => {
+  it("answers listing and resolution from the manifest alone", async () => {
     process.env.KERNEL_API_KEY = "test";
     try {
       expect(providers()).toContain("kernel");
       expect(has("kernel")).toBe(true);
-      expect(resolveProvider("kernel")).toBe("kernel");
+      expect(await resolveProvider("kernel")).toBe("kernel");
     } finally {
       delete process.env.KERNEL_API_KEY;
     }

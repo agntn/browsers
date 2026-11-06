@@ -79,6 +79,7 @@
     "release": "pnpm build && pnpm test:run && changelogen --release --push"
   },
   "dependencies": {
+    "@agntn/credentials": "catalog:deps",
     "@agntn/tools": "catalog:deps",
     "@modelcontextprotocol/server": "catalog:deps",
     "playwright-core": "catalog:deps",

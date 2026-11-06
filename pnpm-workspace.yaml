@@ -21,6 +21,7 @@ catalog:
 # One version per name for the library and docs/, which reads the library from ../src.
 catalogs:
   deps:
+    "@agntn/credentials": 0.0.2
     "@agntn/tools": 0.3.0
     "@modelcontextprotocol/server": 2.4.0
     "@vueuse/core": 15.0.0

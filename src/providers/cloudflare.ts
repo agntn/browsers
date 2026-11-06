@@ -28,7 +28,12 @@ import type {
 import { rejectBlockPage } from "../core/block-page.ts";
 import { Client } from "../core/client.ts";
 import {
-  AuthError,
+  type CloudflareConfig,
+  type CloudflareCredentials,
+  isUnauthorized,
+  resolveCloudflareCredentials,
+} from "../core/cloudflare.ts";
+import {
   BrowserError,
   HTTPError,
   RateLimitError,
@@ -238,33 +243,63 @@ function createPdfBody(url: string, options?: PdfOptions): Record<string, unknow
   return body;
 }
 
+/**
+ * Headers of every Browser Run request.
+ *
+ * @param {CloudflareCredentials} credentials Token for this request.
+ * @returns {Record<string, string>} Authorization and JSON content type.
+ */
+function authHeaders(credentials: Readonly<CloudflareCredentials>): Record<string, string> {
+  return { Authorization: `Bearer ${credentials.token}`, "Content-Type": "application/json" };
+}
+
+/**
+ * Maps a failure for the caller without the account ID that every request path carries:
+ * the status, the path and Cloudflare's reason explain the failure, the account does not.
+ *
+ * @param {unknown} error Failure from a Cloudflare request.
+ * @param {string} accountId Account the request went to.
+ * @returns {BrowserError} The normalized error.
+ */
+function redactAccount(error: unknown, accountId: string): BrowserError {
+  const account = `/accounts/${encodeURIComponent(accountId)}/`;
+  if (error instanceof HTTPError && error.url.includes(account)) {
+    const url = error.url.replace(account, "/accounts/[account]/");
+    const body = error.body.replaceAll(accountId, "[account]");
+    return normalizeError(new HTTPError(error.statusCode, url, body), "cloudflare");
+  }
+  if (error instanceof RateLimitError && error.url.includes(account)) {
+    const url = error.url.replace(account, "/accounts/[account]/");
+    const body = error.body.replaceAll(accountId, "[account]");
+    return new RateLimitError(error.retryAfter, url, body, error.provider);
+  }
+  if (error instanceof TimeoutError && error.url.includes(account)) {
+    return new TimeoutError(error.timeout, error.url.replace(account, "/accounts/[account]/"));
+  }
+  if (error instanceof TransportError && error.url.includes(account)) {
+    const url = error.url.replace(account, "/accounts/[account]/");
+    return new TransportError(url, error.reason, error.code, { cause: error.cause });
+  }
+  return normalizeError(error, "cloudflare");
+}
+
+/** One Browser Run request: its URL for an account, and the request itself. */
+interface CfCall<T> {
+  readonly url: (accountId: string) => string;
+  readonly send: (url: string, headers: Readonly<Record<string, string>>) => Promise<T>;
+}
+
 class CloudflareProvider implements BrowserProvider {
   private readonly client: Client;
-  private readonly accountID: string;
-  private readonly apiToken: string;
+  private readonly config: CloudflareConfig;
   private readonly browser?: CloudflareBrowser;
+  /** Account of the last request, kept to scrub it from errors and to build CDP URLs. */
+  private account?: string;
 
   constructor(config: ProviderConfig) {
-    const apiToken = config.apiKey || process.env.CF_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN;
-    const accountID =
-      config.accountID || process.env.CF_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID;
-
-    if (!apiToken) {
-      throw new AuthError(
-        "Missing Cloudflare API token. Set CF_API_TOKEN (or CLOUDFLARE_API_TOKEN)",
-        "cloudflare",
-      );
-    }
-    if (!accountID) {
-      throw new AuthError(
-        "Missing Cloudflare account ID. Set CF_ACCOUNT_ID (or CLOUDFLARE_ACCOUNT_ID)",
-        "cloudflare",
-      );
-    }
-
     this.client = new Client({ timeout: REQUEST_TIMEOUT });
-    this.apiToken = apiToken;
-    this.accountID = accountID;
+    this.config = { token: config.apiKey, accountId: config.accountID };
+    this.account = config.accountID || undefined;
     this.browser = resolveCloudflareBrowser("cloudflare", config.browser);
   }
 
@@ -294,51 +329,62 @@ class CloudflareProvider implements BrowserProvider {
     };
   }
 
-  private base(): string {
+  private base(accountId: string): string {
     const product = this.browser ? "browser-run" : "browser-rendering";
-    return `https://api.cloudflare.com/client/v4/accounts/${this.accountID}/${product}`;
-  }
-
-  private browserEndpoint(path: string, params = new URLSearchParams()): string {
-    if (this.browser) params.set("browser", this.browser);
-    const query = params.toString();
-    return `${this.base()}${path}${query ? `?${query}` : ""}`;
+    return `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/${product}`;
   }
 
   /**
-   * Maps a failure for the caller without the account ID that every request path carries:
-   * the status, the path and Cloudflare's reason explain the failure, the account does not.
+   * The URL of a Browser Run route, as a function of the account the request resolves.
+   *
+   * @param {string} path Route under the product, such as `/content`.
+   * @param {Record<string, string>} [params] Query parameters. The browser engine joins them.
+   * @returns {(accountId: string) => string} The route's URL for an account.
+   */
+  private browserEndpoint(
+    path: string,
+    params: Readonly<Record<string, string>> = {},
+  ): (accountId: string) => string {
+    const query = new URLSearchParams(params);
+    if (this.browser) query.set("browser", this.browser);
+    const search = query.size > 0 ? `?${query.toString()}` : "";
+    return (accountId) => `${this.base(accountId)}${path}${search}`;
+  }
+
+  /**
+   * Send once, and once more with a fresh cf token when Cloudflare refuses the first with 401.
+   * A 401 means the request was not applied (RFC 9110, section 15.5.2), so a write is safe to
+   * resend. A configured or exported token fails at once, since a lookup hands it back unchanged.
+   *
+   * @param {CfCall<T>} call The route and the request.
+   * @returns {Promise<T>} Whatever the request returns.
+   */
+  private async request<T>(call: Readonly<CfCall<T>>): Promise<T> {
+    const first = await this.credentials(false);
+    try {
+      return await call.send(call.url(first.accountId), authHeaders(first));
+    } catch (error) {
+      if (!first.renewable || !isUnauthorized(error)) throw error;
+    }
+    const renewed = await this.credentials(true);
+    return call.send(call.url(renewed.accountId), authHeaders(renewed));
+  }
+
+  private async credentials(refresh: boolean): Promise<CloudflareCredentials> {
+    const credentials = await resolveCloudflareCredentials(this.config, refresh);
+    this.account = credentials.accountId;
+    return credentials;
+  }
+
+  /**
+   * Maps a failure for the caller, without the account once a request has resolved one.
    *
    * @param {unknown} error Failure from a Cloudflare request.
    * @returns {BrowserError} The normalized error.
    */
   private fail(error: unknown): BrowserError {
-    const account = `/accounts/${this.accountID}/`;
-    if (error instanceof HTTPError && error.url.includes(account)) {
-      const url = error.url.replace(account, "/accounts/[account]/");
-      const body = error.body.replaceAll(this.accountID, "[account]");
-      return normalizeError(new HTTPError(error.statusCode, url, body), "cloudflare");
-    }
-    if (error instanceof RateLimitError && error.url.includes(account)) {
-      const url = error.url.replace(account, "/accounts/[account]/");
-      const body = error.body.replaceAll(this.accountID, "[account]");
-      return new RateLimitError(error.retryAfter, url, body, error.provider);
-    }
-    if (error instanceof TimeoutError && error.url.includes(account)) {
-      return new TimeoutError(error.timeout, error.url.replace(account, "/accounts/[account]/"));
-    }
-    if (error instanceof TransportError && error.url.includes(account)) {
-      const url = error.url.replace(account, "/accounts/[account]/");
-      return new TransportError(url, error.reason, error.code, { cause: error.cause });
-    }
-    return normalizeError(error, "cloudflare");
-  }
-
-  private headers(): Record<string, string> {
-    return {
-      Authorization: `Bearer ${this.apiToken}`,
-      "Content-Type": "application/json",
-    };
+    if (this.account === undefined) return normalizeError(error, "cloudflare");
+    return redactAccount(error, this.account);
   }
 
   private unwrap<T>(response: CfEnvelope<T> | T): T {
@@ -360,13 +406,14 @@ class CloudflareProvider implements BrowserProvider {
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
-      const params = new URLSearchParams();
-      if (options?.timeout) params.set("keep_alive", String(options.timeout));
-      const res = await this.client.postJSON<CfEnvelope<CfSessionResult> | CfSessionResult>(
-        this.browserEndpoint("/devtools/browser", params),
-        {},
-        this.headers(),
-      );
+      const params: Record<string, string> = options?.timeout
+        ? { keep_alive: String(options.timeout) }
+        : {};
+      const res = await this.request({
+        url: this.browserEndpoint("/devtools/browser", params),
+        send: (url, headers) =>
+          this.client.postJSON<CfEnvelope<CfSessionResult> | CfSessionResult>(url, {}, headers),
+      });
       const result = this.unwrap(res);
 
       return {
@@ -383,10 +430,11 @@ class CloudflareProvider implements BrowserProvider {
 
   async getSession(sessionId: string): Promise<BrowserSession | null> {
     try {
-      const res = await this.client.getJSON<CfEnvelope<CfSessionResult> | CfSessionResult>(
-        this.browserEndpoint(`/devtools/browser/${sessionId}`),
-        this.headers(),
-      );
+      const res = await this.request({
+        url: this.browserEndpoint(`/devtools/browser/${sessionId}`),
+        send: (url, headers) =>
+          this.client.getJSON<CfEnvelope<CfSessionResult> | CfSessionResult>(url, headers),
+      });
       const result = this.unwrap(res);
       return {
         id: sessionId,
@@ -402,10 +450,11 @@ class CloudflareProvider implements BrowserProvider {
 
   async listSessions(): Promise<BrowserSession[]> {
     try {
-      const res = await this.client.getJSON<CfEnvelope<CfSessionResult[]> | CfSessionResult[]>(
-        this.browserEndpoint("/devtools/session"),
-        this.headers(),
-      );
+      const res = await this.request({
+        url: this.browserEndpoint("/devtools/session"),
+        send: (url, headers) =>
+          this.client.getJSON<CfEnvelope<CfSessionResult[]> | CfSessionResult[]>(url, headers),
+      });
       const sessions = this.unwrap(res);
       return (Array.isArray(sessions) ? sessions : []).map((s) => ({
         id: s.sessionId ?? "",
@@ -421,10 +470,10 @@ class CloudflareProvider implements BrowserProvider {
 
   async releaseSession(sessionId: string): Promise<void> {
     try {
-      await this.client.deleteJSON(
-        this.browserEndpoint(`/devtools/browser/${sessionId}`),
-        this.headers(),
-      );
+      await this.request({
+        url: this.browserEndpoint(`/devtools/browser/${sessionId}`),
+        send: (url, headers) => this.client.deleteJSON(url, headers),
+      });
     } catch (error) {
       throw this.fail(error);
     }
@@ -451,14 +500,17 @@ class CloudflareProvider implements BrowserProvider {
       const snapshot = formats.length > 1;
       const body = createScrapeBody(url, options);
       if (snapshot) body.formats = formats;
-      const res = await this.client.postJSON<
-        CfPageResponse<CfSnapshotResult | CfContentResult | string>
-      >(
-        this.browserEndpoint(snapshot ? "/snapshot" : `/${format}`),
-        body,
-        this.headers(),
-        options?.signal,
-      );
+      const signal = options?.signal;
+      const res = await this.request({
+        url: this.browserEndpoint(snapshot ? "/snapshot" : `/${format}`),
+        send: (target, headers) =>
+          this.client.postJSON<CfPageResponse<CfSnapshotResult | CfContentResult | string>>(
+            target,
+            body,
+            headers,
+            signal,
+          ),
+      });
       const result = this.unwrap(res);
       const outputs: CfSnapshotResult = snapshot
         ? (result as CfSnapshotResult)
@@ -477,11 +529,11 @@ class CloudflareProvider implements BrowserProvider {
     try {
       assertUrlOrSession(options.url, session, "cloudflare", "screenshot");
 
-      const res = await this.client.postResponse(
-        this.browserEndpoint("/screenshot"),
-        createScreenshotBody(options, session),
-        this.headers(),
-      );
+      const body = createScreenshotBody(options, session);
+      const res = await this.request({
+        url: this.browserEndpoint("/screenshot"),
+        send: (url, headers) => this.client.postResponse(url, body, headers),
+      });
 
       const contentType = res.headers.get("content-type") ?? "";
       if (contentType.includes("image")) {
@@ -514,15 +566,16 @@ class CloudflareProvider implements BrowserProvider {
 
   /**
    * The session's CDP WebSocket, built from the account when Cloudflare didn't send one.
-   * Connecting needs the `Authorization: Bearer` header with the API token.
+   * Without one, the account is known only after a request resolved it. Connecting needs the
+   * `Authorization: Bearer` header with the API token.
    *
    * @param {BrowserSession} session Session to connect to.
    * @returns {string | undefined} The WebSocket URL, or undefined without a session ID.
    */
   getCdpUrl(session: BrowserSession): string | undefined {
     if (session.cdpUrl) return session.cdpUrl;
-    if (!session.id) return undefined;
-    return `${this.base().replace(/^https:/, "wss:")}/devtools/browser/${session.id}`;
+    if (!session.id || this.account === undefined) return undefined;
+    return `${this.base(this.account).replace(/^https:/, "wss:")}/devtools/browser/${session.id}`;
   }
 
   /**
@@ -540,12 +593,13 @@ class CloudflareProvider implements BrowserProvider {
   ): Promise<CrawlResult> {
     assertUrl(url);
     try {
+      const body = createCrawlBody(url, options);
       const jobId = this.unwrap(
-        await this.client.postJSON<CfEnvelope<string>>(
-          this.browserEndpoint("/crawl"),
-          createCrawlBody(url, options),
-          this.headers(),
-        ),
+        await this.request({
+          url: this.browserEndpoint("/crawl"),
+          send: (target, headers) =>
+            this.client.postJSON<CfEnvelope<string>>(target, body, headers),
+        }),
       );
       return await this.finishCrawl(jobId, options).catch(async (error: unknown) => {
         if (options?.signal?.aborted) await this.cancelCrawl(jobId);
@@ -571,9 +625,10 @@ class CloudflareProvider implements BrowserProvider {
    * @returns {Promise<void>} Resolves once Cloudflare answered or the request failed.
    */
   private async cancelCrawl(jobId: string): Promise<void> {
-    await this.client
-      .deleteJSON(this.browserEndpoint(`/crawl/${encodeURIComponent(jobId)}`), this.headers())
-      .catch(() => undefined);
+    await this.request({
+      url: this.browserEndpoint(`/crawl/${encodeURIComponent(jobId)}`),
+      send: (url, headers) => this.client.deleteJSON(url, headers),
+    }).catch(() => undefined);
   }
 
   /**
@@ -613,15 +668,12 @@ class CloudflareProvider implements BrowserProvider {
    * @returns {Promise<CfCrawlJob>} The job with its status and records.
    */
   private async crawlJob(jobId: string, read: Readonly<CrawlRead> = {}): Promise<CfCrawlJob> {
+    const signal = read.signal;
     return this.unwrap(
-      await this.client.getJSON<CfEnvelope<CfCrawlJob>>(
-        this.browserEndpoint(
-          `/crawl/${encodeURIComponent(jobId)}`,
-          new URLSearchParams(read.query ?? {}),
-        ),
-        this.headers(),
-        read.signal,
-      ),
+      await this.request({
+        url: this.browserEndpoint(`/crawl/${encodeURIComponent(jobId)}`, read.query),
+        send: (url, headers) => this.client.getJSON<CfEnvelope<CfCrawlJob>>(url, headers, signal),
+      }),
     );
   }
 
@@ -648,11 +700,11 @@ class CloudflareProvider implements BrowserProvider {
   async pdf(url: string, options?: PdfOptions, _session?: BrowserSession): Promise<PdfResult> {
     assertUrl(url);
     try {
-      const res = await this.client.postResponse(
-        this.browserEndpoint("/pdf"),
-        createPdfBody(url, options),
-        this.headers(),
-      );
+      const body = createPdfBody(url, options);
+      const res = await this.request({
+        url: this.browserEndpoint("/pdf"),
+        send: (target, headers) => this.client.postResponse(target, body, headers),
+      });
 
       const contentType = res.headers.get("content-type") ?? "";
       if (contentType.includes("pdf")) {
@@ -677,12 +729,12 @@ class CloudflareProvider implements BrowserProvider {
   ): Promise<LinksResult> {
     assertUrl(url);
     try {
-      const res = await this.client.postJSON<CfEnvelope<string[]>>(
-        this.browserEndpoint("/links"),
-        { url },
-        this.headers(),
-        options?.signal,
-      );
+      const signal = options?.signal;
+      const res = await this.request({
+        url: this.browserEndpoint("/links"),
+        send: (target, headers) =>
+          this.client.postJSON<CfEnvelope<string[]>>(target, { url }, headers, signal),
+      });
       const result = this.unwrap(res);
       const rawLinks = Array.isArray(result) ? result : [];
       return {
@@ -701,13 +753,14 @@ class CloudflareProvider implements BrowserProvider {
   ): Promise<AccessibilityTreeResult> {
     assertUrl(url);
     try {
-      const res = await this.client.postJSON<CfAccessibilityTreeResponse>(
-        this.browserEndpoint("/accessibilityTree"),
-        // JSON drops the options left undefined, so Cloudflare applies its own defaults.
-        { url, root: options?.root, interestingOnly: options?.interestingOnly },
-        this.headers(),
-        options?.signal,
-      );
+      const signal = options?.signal;
+      // JSON drops the options left undefined, so Cloudflare applies its own defaults.
+      const body = { url, root: options?.root, interestingOnly: options?.interestingOnly };
+      const res = await this.request({
+        url: this.browserEndpoint("/accessibilityTree"),
+        send: (target, headers) =>
+          this.client.postJSON<CfAccessibilityTreeResponse>(target, body, headers, signal),
+      });
       return {
         url,
         ...pageMeta(res.meta),
@@ -730,12 +783,12 @@ class CloudflareProvider implements BrowserProvider {
       if (options?.schema)
         body.response_format = { type: "json_schema", json_schema: options.schema };
 
-      const res = await this.client.postJSON<CfEnvelope<Record<string, unknown>>>(
-        this.browserEndpoint("/json"),
-        body,
-        this.headers(),
-        options?.signal,
-      );
+      const signal = options?.signal;
+      const res = await this.request({
+        url: this.browserEndpoint("/json"),
+        send: (target, headers) =>
+          this.client.postJSON<CfEnvelope<Record<string, unknown>>>(target, body, headers, signal),
+      });
       const result = this.unwrap(res);
       return {
         url,
@@ -750,10 +803,11 @@ class CloudflareProvider implements BrowserProvider {
   async checkAvailability(): Promise<void> {
     try {
       this.unwrap(
-        await this.client.getJSON<CfEnvelope<unknown[]> | unknown[]>(
-          `${this.base()}/devtools/session`,
-          this.headers(),
-        ),
+        await this.request({
+          url: (accountId) => `${this.base(accountId)}/devtools/session`,
+          send: (url, headers) =>
+            this.client.getJSON<CfEnvelope<unknown[]> | unknown[]>(url, headers),
+        }),
       );
     } catch (error) {
       throw this.fail(error);

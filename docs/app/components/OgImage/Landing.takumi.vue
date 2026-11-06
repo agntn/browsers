@@ -16,7 +16,7 @@ const TAGLINE =
 /** The same three readouts as the hero, counted from the same registry. */
 const METRICS = [
   { label: "Providers", value: String(PROVIDERS.length), unit: "", note: `${OPERATIONS.length} flags each`, accent: false },
-  { label: "Agent tools", value: String(browserToolNames.length), unit: "", note: "the same on MCP, Pi and OMP", accent: false },
+  { label: "Agent tools", value: String(browserToolNames.length), unit: "", note: "the same on every host", accent: false },
   { label: "Keys to start", value: "0", unit: "", note: PROVIDERS.filter((provider) => provider.keyless).map((provider) => provider.name).join(", ") + " runs here", accent: true },
 ];
 

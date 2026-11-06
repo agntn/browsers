@@ -22,7 +22,7 @@ const rows = browserToolNames.map((name) => ({
     <span class="console-cross console-cross-br" aria-hidden="true">+</span>
     <header :class="ROSTER_CLASS.bar">
       <span :class="ROSTER_CLASS.title">browsers mcp · tools/list</span>
-      <span :class="ROSTER_CLASS.meta">{{ rows.length }} tools · same on MCP, Pi and OMP</span>
+      <span :class="ROSTER_CLASS.meta">{{ rows.length }} tools · same on MCP, Pi, OMP and AI SDK</span>
     </header>
     <div class="roster-ruler" aria-hidden="true" />
     <ul class="tools-rows">

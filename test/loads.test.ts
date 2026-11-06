@@ -107,6 +107,15 @@ describe("package entries", () => {
     expect(loadedProviders(result.loaded)).toEqual([]);
   });
 
+  it("importing the AI SDK entry loads no provider, no MCP SDK and no executor", () => {
+    const result = evaluate('await import("./src/ai.ts")');
+
+    expect(result.status).toBe(0);
+    expect(loadedHeavy(result.loaded)).toEqual([]);
+    expect(loadedProviders(result.loaded)).toEqual([]);
+    expect(result.loaded.some((url) => url.endsWith("/src/tool-operations.ts"))).toBe(false);
+  });
+
   it("importing the executors loads no provider and no HTTP client", () => {
     const result = evaluate('await import("./src/tool-operations.ts")');
 

@@ -43,7 +43,7 @@ const names = (list: typeof PROVIDERS) => list.map((provider) => provider.name).
     <LandingFeature
       :title="`${spellOutCapital(browserToolNames.length)} tools, one executor`"
       to="/guide/agents"
-      link="MCP, Pi and OMP"
+      link="MCP, Pi, OMP and AI SDK"
       :checks="[
         `A scrape stops at ${DEFAULT_SCRAPE_MAX_CHARS.toLocaleString('en-US')} characters unless you pass maxChars, and says how much it cut`,
         `Links come ${DEFAULT_LINKS_LIMIT} at a time, with the offset to ask for next`,

@@ -20,7 +20,7 @@ Steel scrapes in one HTTP call. Kernel wants a live session first. Browserbase h
 - ⚡ **Stateless where the vendor is.** Steel, Browserbase, Browserless, Hyperbrowser, Cloudflare and Playwright scrape without you opening a session. Kernel will not.
 - 📸 **The extras follow the backend.** PDFs, crawls, links, AI extract, search. Anchor will not scrape. Hyperbrowser will search.
 - 🏷️ **`capabilities()` is the list.** Navigate is true on Kernel, Browserless and Playwright. False on Steel. Read the flag.
-- 🤖 **One set of tools for people and models.** The CLI runs the twelve tools MCP, Pi and OMP get. Plus the library. Five surfaces, one list.
+- 🤖 **One set of tools for people and models.** The CLI, MCP, Pi, OMP and the AI SDK get the same tools. Plus the library. Six surfaces, one list.
 - 📏 **Agent scrape and crawl have a ceiling.** 20 000 characters unless you pass `maxChars`, 200 000 at most. A crawl shares it across pages.
 - ⏳ **A slow crawl keeps its job.** Cloudflare and Hyperbrowser wait two minutes, then hand back the job ID. Pass it as `jobId` with the same provider and browser, or `--job-id` in the CLI, and you wait for that job again. No second crawl.
 - 🔗 **Agent links come in pages.** 500 per call unless you pass `limit`, 5 000 at most. The answer counts the rest and names the `offset` to ask for next. The CLI pages too. Same `--limit`, same `--offset`.
@@ -212,6 +212,29 @@ Pass `selector` and you get one element instead of the page. Cloudflare, Browser
 `waitFor` holds the shot until a CSS selector shows up, so a page that fills itself in late stops coming back half built. Same three providers, same flat no from the rest.
 
 `browsers_scrape` takes `waitFor` too. Kernel joins the club there, since it runs Playwright inside the session anyway. Steel, Browserbase and Hyperbrowser have nothing to wait with, so they refuse before a single request. Used to be they'd hand back the empty skeleton and call it a scrape.
+
+### AI SDK
+
+Give your model browser tools without writing wrappers. One import, every tool.
+
+```bash
+pnpm add @agntn/browsers ai @ai-sdk/anthropic
+```
+
+```ts
+import { anthropic } from "@ai-sdk/anthropic";
+import { browsersAiTools } from "@agntn/browsers/ai";
+import { generateText, isStepCount } from "ai";
+
+const { text } = await generateText({
+  model: anthropic("claude-sonnet-5-5"),
+  tools: browsersAiTools,
+  stopWhen: isStepCount(5),
+  prompt: "Which browser providers can I use right now?",
+});
+```
+
+The model gets the same answers as MCP. For errors, images and the disk, see the [Agents guide](https://browsers.agntn.dev/guide/agents#ai-sdk).
 
 ## 🚫 What this does not do
 

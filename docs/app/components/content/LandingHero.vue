@@ -47,7 +47,7 @@ const keyless = PROVIDERS.filter((provider) => provider.keyless);
         <div>
           <dt>Agent tools</dt>
           <dd>{{ browserToolNames.length }}</dd>
-          <dd class="hero-metric-sub">the same on MCP, Pi and OMP</dd>
+          <dd class="hero-metric-sub">the same on every host</dd>
         </div>
         <div>
           <dt>Keys to start</dt>

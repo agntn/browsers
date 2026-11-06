@@ -1,10 +1,17 @@
 /**
- * The browser tools, declared once for MCP, Pi, OMP and the CLI. Executors load on the first
- * call. `Type` comes from `@agntn/tools`, never a bare `typebox`: OMP rewrites that import to its
- * own facade, and validation then accepts any value.
+ * The browser tools, declared once for MCP, Pi, OMP, the AI SDK and the CLI. Executors load on
+ * the first call. `Type` comes from `@agntn/tools`, never a bare `typebox`: OMP rewrites that
+ * import to its own facade, and validation then accepts any value.
  */
 
-import { defineTool, type TInteger, type TOptional, type TString, Type } from "@agntn/tools";
+import {
+  defineTool,
+  type TInteger,
+  type TOptional,
+  type TString,
+  type ToolDefinition,
+  Type,
+} from "@agntn/tools";
 import {
   browserProviderNames,
   browserToolDescriptions,
@@ -468,7 +475,7 @@ export const capabilitiesTool = defineTool({
   execute: async (input) => (await loadOperations()).browserCapabilities(input),
 });
 
-/** Every browser tool, in the order MCP lists them. */
+/** Every browser tool in the order MCP lists them, each keeping its literal name for `toAiTools`. */
 export const browserTools = [
   scrapeTool,
   sessionTool,
@@ -482,4 +489,4 @@ export const browserTools = [
   accessibilityTool,
   searchTool,
   capabilitiesTool,
-] as const;
+] as const satisfies readonly ToolDefinition[];

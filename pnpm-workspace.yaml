@@ -46,7 +46,6 @@ catalogs:
     "@oh-my-pi/pi-coding-agent": 18.4.12
     "@types/node": 26.6.6
     ai: 7.0.163
-    changelogen: 0.6.2
     obuild: 0.4.43
     shiki: 4.5.0
     tsx: 4.22.5

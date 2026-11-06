@@ -30,6 +30,12 @@ interface BrowserbaseSessionResponse {
   [key: string]: unknown;
 }
 
+/** One `/v1/fetch` call: the format it asks for and what cancels it. */
+interface PageFetch {
+  readonly format: "raw" | "markdown";
+  readonly signal?: AbortSignal;
+}
+
 interface BrowserbaseFetchResponse {
   statusCode?: number;
   contentType?: string;
@@ -181,23 +187,35 @@ class BrowserbaseProvider implements BrowserProvider {
     }
   }
 
-  private fetchPage(url: string, format: "raw" | "markdown"): Promise<BrowserbaseFetchResponse> {
+  private fetchPage(url: string, fetch: Readonly<PageFetch>): Promise<BrowserbaseFetchResponse> {
     return this.client.postJSON<BrowserbaseFetchResponse>(
       `${this.baseURL}/v1/fetch`,
-      { url, format },
+      { url, format: fetch.format },
       this.headers(),
+      fetch.signal,
     );
   }
 
+  /**
+   * Both formats at once. An abort fails the scrape even after one of them came back.
+   *
+   * @param {string} url Page to fetch.
+   * @param {ScrapeOptions} [options] Formats wanted and cancellation.
+   * @returns {Promise<(BrowserbaseFetchResponse | undefined)[]>} The raw page and the markdown.
+   */
   private async fetchPages(
     url: string,
-    formats: Readonly<NonNullable<ScrapeOptions["formats"]>> = [],
+    options?: ScrapeOptions,
   ): Promise<(BrowserbaseFetchResponse | undefined)[]> {
+    const { formats = [], signal } = options ?? {};
     const wantsHtml = formats.includes("html");
     const settled = await Promise.allSettled([
-      wantsHtml ? this.fetchPage(url, "raw") : undefined,
-      formats.includes("markdown") || !wantsHtml ? this.fetchPage(url, "markdown") : undefined,
+      wantsHtml ? this.fetchPage(url, { format: "raw", signal }) : undefined,
+      formats.includes("markdown") || !wantsHtml
+        ? this.fetchPage(url, { format: "markdown", signal })
+        : undefined,
     ]);
+    signal?.throwIfAborted();
     const pages = settled.map((r) => (r.status === "fulfilled" ? r.value : undefined));
     if (pages.every((page) => !page)) {
       throw settled.find((r): r is PromiseRejectedResult => r.status === "rejected")?.reason;
@@ -213,7 +231,7 @@ class BrowserbaseProvider implements BrowserProvider {
     assertUrl(url);
     try {
       assertNoScrapeWaitFor(options?.waitFor, "browserbase");
-      const [page, markdown] = await this.fetchPages(url, options?.formats);
+      const [page, markdown] = await this.fetchPages(url, options);
       return rejectBlockPage(toScrapeResult(url, page, markdown), "browserbase");
     } catch (error) {
       throw normalizeError(error, "browserbase");

@@ -280,6 +280,7 @@ class SteelProvider implements BrowserProvider {
         `${this.baseURL}/v1/scrape`,
         createScrapeBody(url, options),
         this.headers(),
+        options?.signal,
       );
       return toScrapeResult(url, res);
     } catch (error) {

@@ -36,7 +36,13 @@ export interface ScrapeResult {
   metadata?: Record<string, unknown>;
 }
 
-export interface ScrapeOptions {
+/** Cancellation for one provider call. */
+export interface AbortOptions {
+  /** Stops the call's requests and temporary browser, and its job where the vendor allows. */
+  signal?: AbortSignal;
+}
+
+export interface ScrapeOptions extends AbortOptions {
   formats?: ("html" | "markdown" | "text" | "cleanedHtml")[];
   waitFor?: string;
   waitForNetworkIdle?: boolean;
@@ -89,7 +95,7 @@ export interface CrawlPage {
   depth?: number;
 }
 
-export interface CrawlOptions {
+export interface CrawlOptions extends AbortOptions {
   maxDepth?: number;
   maxPages?: number;
   sameDomain?: boolean;
@@ -98,7 +104,8 @@ export interface CrawlOptions {
   timeout?: number;
 }
 
-export type ResumeCrawlOptions = Pick<CrawlOptions, "timeout">;
+/** Aborting `signal` stops the wait, never the job: its ID already belongs to the caller. */
+export type ResumeCrawlOptions = Pick<CrawlOptions, "timeout" | "signal">;
 
 export interface PdfResult {
   data: string;
@@ -121,7 +128,7 @@ export interface WebSearchResult {
   publishedDate?: string;
 }
 
-export interface WebSearchOptions {
+export interface WebSearchOptions extends AbortOptions {
   maxResults?: number;
   includeDomains?: string[];
 }
@@ -133,7 +140,7 @@ export interface ExtractResult {
   usage?: { input?: number; output?: number };
 }
 
-export interface ExtractOptions {
+export interface ExtractOptions extends AbortOptions {
   schema?: Record<string, unknown>;
   prompt?: string;
   timeout?: number;
@@ -164,7 +171,7 @@ export interface AccessibilityNode {
   readonly [property: string]: unknown;
 }
 
-export interface AccessibilityTreeOptions {
+export interface AccessibilityTreeOptions extends AbortOptions {
   /** CSS selector of the element whose subtree to read instead of the whole page. */
   root?: string;
   /**
@@ -230,7 +237,11 @@ export interface BrowserProvider {
   pdf?(url: string, options?: PdfOptions, session?: BrowserSession): Promise<PdfResult>;
   search?(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]>;
   extract?(url: string, options?: ExtractOptions, session?: BrowserSession): Promise<ExtractResult>;
-  links?(url: string, session?: BrowserSession): Promise<LinksResult>;
+  links?(
+    url: string,
+    session?: BrowserSession,
+    options?: Readonly<AbortOptions>,
+  ): Promise<LinksResult>;
   accessibilityTree?(
     url: string,
     options?: Readonly<AccessibilityTreeOptions>,

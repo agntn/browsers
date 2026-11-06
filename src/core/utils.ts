@@ -168,6 +168,7 @@ export function assertUrl(url: string): void {
 
 /**
  * Scrape one URL, opening a temporary session when the provider cannot scrape statelessly.
+ * The create gets no signal: a cut one can leave a browser with no ID to release.
  *
  * @param {BrowserProvider} provider Resolved provider.
  * @param {string} url Page to scrape.
@@ -191,6 +192,7 @@ export async function scrapeWithSessionWhenNeeded(
 
   const session = await provider.createSession();
   try {
+    options?.signal?.throwIfAborted();
     return await provider.scrape(url, options, session);
   } finally {
     await provider.releaseSession(session.id).catch(() => undefined);
@@ -292,22 +294,52 @@ export const JOB_TIMEOUT = 120_000;
 export const JOB_POLL_INTERVAL = 2_000;
 
 /**
+ * Waits `ms`, or rejects with the signal's reason. Global timers, so fake timers still apply.
+ *
+ * @param {number} ms Milliseconds to wait.
+ * @param {AbortSignal} [signal] Cancellation.
+ * @returns {Promise<void>} Resolves once the time is up.
+ */
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    signal?.throwIfAborted();
+    const stop = (): void => {
+      clearTimeout(timer);
+      reject(signal?.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", stop);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", stop, { once: true });
+  });
+}
+
+/** How long a job is awaited and what stops the wait early. */
+export interface JobWait {
+  /** Milliseconds to wait in total. */
+  readonly timeout: number;
+  /** Ends the pause between two reads too, not only a read in flight. */
+  readonly signal?: AbortSignal;
+}
+
+/**
  * Reads a job until `done` accepts it or the timeout leaves no room for another read.
  *
  * @param {() => Promise<T>} read Reads the job once.
  * @param {(job: T) => boolean} done Whether the job has finished.
- * @param {number} timeout Milliseconds to wait in total.
+ * @param {JobWait} wait Timeout and cancellation.
  * @returns {Promise<T>} The last job read, finished or not.
  */
 export async function waitForJob<T>(
   read: () => Promise<T>,
   done: (job: T) => boolean,
-  timeout: number,
+  wait: Readonly<JobWait>,
 ): Promise<T> {
-  const deadline = Date.now() + timeout;
+  const deadline = Date.now() + wait.timeout;
   let job = await read();
   while (!done(job) && Date.now() + JOB_POLL_INTERVAL <= deadline) {
-    await new Promise((resolve) => setTimeout(resolve, JOB_POLL_INTERVAL));
+    await pause(JOB_POLL_INTERVAL, wait.signal);
     job = await read();
   }
   return job;

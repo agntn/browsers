@@ -68,6 +68,12 @@ const PROXY_FAILURE =
 /** The start of a 5xx answer to `page.goto`, which may be the proxy's and not the site's. */
 type ServerError = Readonly<{ status: number; text: string }>;
 
+/** Playwright code for `/playwright/execute`, and what cancels the request. */
+interface KernelExecution {
+  readonly code: string;
+  readonly signal?: AbortSignal;
+}
+
 /**
  * Playwright code that opens `url` and keeps the start of a 5xx answer for `rejectProxyFailure`.
  *
@@ -224,12 +230,12 @@ class KernelProvider implements BrowserProvider {
     assertUrl(url);
     try {
       assertSessionId(session?.id, "kernel", "scrape");
-      const waitFor = options?.waitFor;
+      const { waitFor, signal } = options ?? {};
 
-      const result = await this.evaluate(
-        `${gotoScript(url, "networkidle")} ${waitForScript(waitFor)} return { serverError, missed, html: await page.content(), title: await page.title() }`,
-        session!,
-      );
+      const result = await this.execute(session!, {
+        code: `${gotoScript(url, "networkidle")} ${waitForScript(waitFor)} return { serverError, missed, html: await page.content(), title: await page.title() }`,
+        signal,
+      });
 
       const data = result.value as
         | { serverError?: ServerError; missed?: boolean; html?: string; title?: string }
@@ -277,6 +283,20 @@ class KernelProvider implements BrowserProvider {
   }
 
   async evaluate(script: string, session: BrowserSession): Promise<EvaluateResult> {
+    return this.execute(session, { code: script });
+  }
+
+  /**
+   * Runs Playwright code in the session's browser.
+   *
+   * @param {BrowserSession} session Session whose browser runs the code.
+   * @param {KernelExecution} execution The code and what cancels the request.
+   * @returns {Promise<EvaluateResult>} The value the code returned, with its output.
+   */
+  private async execute(
+    session: BrowserSession,
+    execution: Readonly<KernelExecution>,
+  ): Promise<EvaluateResult> {
     try {
       const res = await this.executeClient.postJSON<{
         success: boolean;
@@ -286,8 +306,9 @@ class KernelProvider implements BrowserProvider {
         stderr?: string;
       }>(
         `${this.baseURL}/browsers/${session.id}/playwright/execute`,
-        { code: script },
+        { code: execution.code },
         this.headers(),
+        execution.signal,
       );
       if (!res.success) throw new BrowserError(res.error ?? "Kernel Playwright execution failed");
       const logs = [res.stdout, res.stderr].filter((line): line is string => Boolean(line));

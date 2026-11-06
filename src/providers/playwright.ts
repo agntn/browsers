@@ -1,4 +1,5 @@
 import type {
+  AbortOptions,
   BrowserProvider,
   BrowserSession,
   CreateSessionOptions,
@@ -68,6 +69,40 @@ const playwrightSessions = new Map<string, PlaywrightSessionRecord>();
 interface PageLease {
   readonly page: Page;
   readonly browser?: Browser;
+}
+
+/** The page an operation runs on: the session's, or a fresh browser's when there is none. */
+interface PageTarget {
+  readonly session?: BrowserSession;
+  /** Closes the fresh browser, which stops its page; a session's browser is the caller's. */
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * Closes the browser a lease launched, if any, after a failure that already says what went wrong.
+ *
+ * @param {PageLease} [lease] Page and the browser launched for it.
+ * @returns {Promise<void>} Resolves once the browser is closed or failed to close.
+ */
+async function closeQuietly(lease?: Readonly<PageLease>): Promise<void> {
+  await lease?.browser?.close().catch(() => {});
+}
+
+/**
+ * Closes the lease's own browser when the signal aborts.
+ *
+ * @param {PageLease} lease Page and the browser launched for it, if any.
+ * @param {AbortSignal} [signal] Cancellation.
+ * @returns {() => void} Removes the listener once the operation settles.
+ */
+function closeOnAbort(lease: Readonly<PageLease>, signal?: AbortSignal): () => void {
+  const browser = lease.browser;
+  if (!browser || !signal) return () => {};
+  const close = (): void => {
+    void browser.close().catch(() => {});
+  };
+  signal.addEventListener("abort", close, { once: true });
+  return () => signal.removeEventListener("abort", close);
 }
 
 function normalizePlaywrightError(error: unknown): BrowserError {
@@ -248,6 +283,7 @@ interface CrawlSettings {
   readonly maxPages: number;
   readonly maxDepth: number;
   readonly sameDomain: boolean;
+  readonly signal?: AbortSignal;
 }
 
 function resolveCrawlSettings(options?: CrawlOptions): CrawlSettings {
@@ -255,6 +291,7 @@ function resolveCrawlSettings(options?: CrawlOptions): CrawlSettings {
     maxPages: options?.maxPages ?? 10,
     maxDepth: options?.maxDepth ?? 2,
     sameDomain: options?.sameDomain ?? true,
+    signal: options?.signal,
   };
 }
 
@@ -264,7 +301,7 @@ async function crawlPage(
   baseHostname: string,
   options?: CrawlOptions,
 ): Promise<CrawlResult> {
-  const { maxPages, maxDepth, sameDomain } = resolveCrawlSettings(options);
+  const { maxPages, maxDepth, sameDomain, signal } = resolveCrawlSettings(options);
   const visited = new Set<string>();
   const pages: CrawlPage[] = [];
   const queue: Array<{ url: string; depth: number }> = [{ url, depth: 0 }];
@@ -283,6 +320,7 @@ async function crawlPage(
   }
 
   while (queue.length > 0 && visited.size < maxPages) {
+    signal?.throwIfAborted();
     const next = queue.shift();
     if (!next) break;
     if (visited.has(next.url) || next.depth > maxDepth) continue;
@@ -347,19 +385,35 @@ class PlaywrightProvider implements BrowserProvider {
     return { browser, page: await browser.newPage() };
   }
 
+  /**
+   * Runs `operation` on a page and closes the browser it launched. An abort fails the call even
+   * when the operation swallowed the closed page, as a crawl does, instead of passing it as done.
+   *
+   * @param {PageTarget} target The session to use, or none for a fresh browser, and cancellation.
+   * @param {(page: Page) => Promise<T>} operation Work on the page.
+   * @returns {Promise<T>} What the operation returned.
+   */
   private async withPage<T>(
-    session: BrowserSession | undefined,
+    target: Readonly<PageTarget>,
     operation: (page: Page) => Promise<T>,
   ): Promise<T> {
+    const { session, signal } = target;
     let lease: PageLease | undefined;
+    let release = (): void => {};
     try {
+      signal?.throwIfAborted();
       lease = await this.acquirePage(session);
+      signal?.throwIfAborted();
+      release = closeOnAbort(lease, signal);
       const result = await operation(lease.page);
+      signal?.throwIfAborted();
       if (lease.browser) await lease.browser.close();
       return result;
     } catch (error) {
-      if (lease?.browser) await lease.browser.close().catch(() => {});
-      throw normalizeError(error, "playwright");
+      await closeQuietly(lease);
+      throw normalizeError(signal?.aborted ? signal.reason : error, "playwright");
+    } finally {
+      release();
     }
   }
 
@@ -408,7 +462,7 @@ class PlaywrightProvider implements BrowserProvider {
     session?: BrowserSession,
   ): Promise<ScrapeResult> {
     assertUrl(url);
-    return this.withPage(session, async (page) =>
+    return this.withPage({ session, signal: options?.signal }, async (page) =>
       rejectBlockPage(await scrapePage(page, url, options), "playwright"),
     );
   }
@@ -473,18 +527,26 @@ class PlaywrightProvider implements BrowserProvider {
 
   async pdf(url: string, options?: PdfOptions, session?: BrowserSession): Promise<PdfResult> {
     assertUrl(url);
-    return this.withPage(session, (page) => renderPdf(page, url, options, session !== undefined));
+    return this.withPage({ session }, (page) =>
+      renderPdf(page, url, options, session !== undefined),
+    );
   }
 
-  async links(url: string, session?: BrowserSession): Promise<LinksResult> {
+  async links(
+    url: string,
+    session?: BrowserSession,
+    options?: Readonly<AbortOptions>,
+  ): Promise<LinksResult> {
     assertUrl(url);
-    return this.withPage(session, (page) => readLinks(page, url));
+    return this.withPage({ session, signal: options?.signal }, (page) => readLinks(page, url));
   }
 
   async crawl(url: string, options?: CrawlOptions, session?: BrowserSession): Promise<CrawlResult> {
     assertUrl(url);
     const baseHostname = new URL(url).hostname;
-    return this.withPage(session, (page) => crawlPage(page, url, baseHostname, options));
+    return this.withPage({ session, signal: options?.signal }, (page) =>
+      crawlPage(page, url, baseHostname, options),
+    );
   }
 
   async checkAvailability(): Promise<void> {

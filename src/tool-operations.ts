@@ -17,6 +17,7 @@ import {
   scrapeCapabilities,
 } from "./core/resolve.ts";
 import type {
+  AbortOptions,
   AccessibilityNode,
   AccessibilityTreeResult,
   CrawlPage,
@@ -216,10 +217,12 @@ function resolveLinksOffset(value?: number): number {
  * Scrapes one URL and bounds the normalized text returned to the model.
  *
  * @param params - Scrape arguments.
+ * @param options - Cancellation, which also releases a temporary session.
  * @returns {Promise<ToolResult<BrowserScrapeDetails>>} Bounded page content and scrape metadata.
  */
 export async function browserScrape(
   params: Readonly<BrowserScrapeParams>,
+  options?: Readonly<AbortOptions>,
 ): Promise<ToolResult<BrowserScrapeDetails>> {
   const maxChars = resolveMaxChars(params.maxChars);
   const { name, provider } = await createCapableProvider(
@@ -231,6 +234,7 @@ export async function browserScrape(
     formats: ["markdown"],
     waitFor: params.waitFor,
     maxChars,
+    signal: options?.signal,
   });
   const rawContent = result.text || result.markdown || result.html || "No content extracted";
   const body = rawContent.slice(0, maxChars);
@@ -505,15 +509,18 @@ async function writeNewFile(file: string, data: string): Promise<string> {
  * Extracts structured data from one page through a capable provider.
  *
  * @param params - Extraction arguments.
+ * @param options - Cancellation.
  * @returns {Promise<ToolResult<{ url: string; provider: string; data: unknown }>>} Extracted data and provider metadata.
  */
 export async function browserExtract(
   params: Readonly<BrowserExtractParams>,
+  options?: Readonly<AbortOptions>,
 ): Promise<ToolResult<{ url: string; provider: string; data: unknown }>> {
   const { name, provider } = await createProvider(params.provider, params.browser, "extract");
   const result = await provider.extract(params.url, {
     prompt: params.prompt,
     schema: params.schema ? { ...params.schema } : undefined,
+    signal: options?.signal,
   });
   return {
     content: content(
@@ -560,14 +567,16 @@ function crawlPageLines(pages: readonly CrawlPageContent[], maxChars: number): s
  * pages may keep only the header.
  *
  * @param params - Crawl arguments.
+ * @param options - Cancellation. It stops a crawl this call started where the provider can.
  * @returns {Promise<ToolResult<{ jobId?: string; pages: number }>>} Page content, crawl job identity and page count.
  */
 export async function browserCrawl(
   params: Readonly<BrowserCrawlParams>,
+  options?: Readonly<AbortOptions>,
 ): Promise<ToolResult<{ jobId?: string; pages: number }>> {
   const maxChars = resolveMaxChars(params.maxChars);
   const { name, read } = await createCrawl(params, params.provider, params.browser);
-  const result = await read({ maxPages: params.maxPages ?? 10 });
+  const result = await read({ maxPages: params.maxPages ?? 10, signal: options?.signal });
   const lines = [`[provider=${name}] Crawled ${result.pages.length} pages.`];
   if (result.jobId) {
     lines.push(`Job ID: ${sanitizeField(result.jobId)} (status: ${result.status})`);
@@ -639,13 +648,15 @@ export interface BrowserLinksDetails {
  * Reads the unique links of one page through a capable provider, in order of first appearance.
  *
  * @param params - Link extraction arguments.
+ * @param options - Cancellation.
  * @returns {Promise<{ provider: string; links: string[] }>} The provider used and every unique link.
  */
 export async function readLinks(
   params: Readonly<BrowserUrlParams>,
+  options?: Readonly<AbortOptions>,
 ): Promise<{ provider: string; links: string[] }> {
   const { name, provider } = await createProvider(params.provider, params.browser, "links");
-  const result = await provider.links(params.url);
+  const result = await provider.links(params.url, undefined, { signal: options?.signal });
   return {
     provider: name,
     links: [...new Set(result.links.map((link) => sanitizeField(link.href)))],
@@ -656,14 +667,16 @@ export async function readLinks(
  * Extracts one bounded page of links from a page through a capable provider.
  *
  * @param params - Link extraction arguments with the page bounds.
+ * @param options - Cancellation.
  * @returns {Promise<ToolResult<BrowserLinksDetails>>} Links from `offset`, the total and the next offset.
  */
 export async function browserLinks(
   params: Readonly<BrowserLinksParams>,
+  options?: Readonly<AbortOptions>,
 ): Promise<ToolResult<BrowserLinksDetails>> {
   const limit = resolveLinksLimit(params.limit);
   const offset = resolveLinksOffset(params.offset);
-  const { provider, links: all } = await readLinks(params);
+  const { provider, links: all } = await readLinks(params, options);
   const total = all.length;
   const links = all.slice(offset, offset + limit);
   const end = offset + links.length;
@@ -845,11 +858,13 @@ export function accessibilityOutline(tree: AccessibilityNode): string[] {
  * Reads the accessibility tree of one page through a capable provider.
  *
  * @param params - Page, subtree and provider arguments.
+ * @param options - Cancellation.
  * @returns {Promise<{ provider: string; result: AccessibilityTreeResult; tree: AccessibilityNode }>} The provider used, its result and the tree.
  * @throws {InvalidInputError} When `root` gives no tree.
  */
 export async function readAccessibilityTree(
   params: Readonly<Omit<BrowserAccessibilityParams, "maxChars">>,
+  options?: Readonly<AbortOptions>,
 ): Promise<{ provider: string; result: AccessibilityTreeResult; tree: AccessibilityNode }> {
   const { name, provider } = await createProvider(
     params.provider,
@@ -859,6 +874,7 @@ export async function readAccessibilityTree(
   const result = await provider.accessibilityTree(params.url, {
     root: params.root,
     interestingOnly: params.interestingOnly,
+    signal: options?.signal,
   });
   if (result.tree === null) {
     const url = sanitizeField(params.url);
@@ -880,13 +896,15 @@ export async function readAccessibilityTree(
  * a line break where one fits.
  *
  * @param params - Accessibility tree arguments.
+ * @param options - Cancellation.
  * @returns {Promise<ToolResult<BrowserAccessibilityDetails>>} The outline and page metadata.
  */
 export async function browserAccessibility(
   params: Readonly<BrowserAccessibilityParams>,
+  options?: Readonly<AbortOptions>,
 ): Promise<ToolResult<BrowserAccessibilityDetails>> {
   const maxChars = resolveMaxChars(params.maxChars);
-  const { provider, result, tree } = await readAccessibilityTree(params);
+  const { provider, result, tree } = await readAccessibilityTree(params, options);
   const lines = accessibilityOutline(tree);
   const outline = lines.join("\n");
   let body = outline;
@@ -918,14 +936,16 @@ export async function browserAccessibility(
  * Searches the web through Hyperbrowser.
  *
  * @param params - Search arguments.
+ * @param options - Cancellation.
  * @returns {Promise<ToolResult<{ results: Array<{ url: string; title: string; snippet: string }> }>>} Normalized search results.
  */
 export async function browserSearch(
   params: Readonly<BrowserSearchParams>,
+  options?: Readonly<AbortOptions>,
 ): Promise<ToolResult<{ results: Array<{ url: string; title: string; snippet: string }> }>> {
   const maxResults = resolveSearchMaxResults(params.maxResults);
   const { name, provider } = await createProvider("hyperbrowser", undefined, "search");
-  const results = await provider.search(params.query, { maxResults });
+  const results = await provider.search(params.query, { maxResults, signal: options?.signal });
   const rows = results.slice(0, maxResults).map((result) => ({
     url: result.url,
     title: result.title,

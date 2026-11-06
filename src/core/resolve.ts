@@ -293,5 +293,9 @@ export async function createCrawl(
     throw new InvalidInputError("Pass the provider whose crawl returned the job ID.");
   }
   const { name, provider } = await createProvider(preferred, browser, "resumeCrawl");
-  return { name, read: (options) => provider.resumeCrawl(jobId, { timeout: options?.timeout }) };
+  return {
+    name,
+    read: (options) =>
+      provider.resumeCrawl(jobId, { timeout: options?.timeout, signal: options?.signal }),
+  };
 }

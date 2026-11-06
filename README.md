@@ -218,7 +218,7 @@ Want a ninth? A class that implements `BrowserProvider`, an exported `factory`, 
 ## 🛠️ Development
 
 ```bash
-pnpm install
+pnpm install      # docs/ too: one workspace, one lockfile
 pnpm lint         # builds first, then vp lint and vp fmt --check
 pnpm lint:fix
 pnpm typecheck    # tsc, the build config, a build, then the extensions

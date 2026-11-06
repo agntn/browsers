@@ -20,7 +20,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 - `extensions/pi/browsers.ts` - Pi agent tools
 - `extensions/omp/browsers.ts` - OMP agent tools
 - `extensions/shared/tui.ts` - terminal rendering shared by Pi and OMP
-- `docs/` - the browsers.agntn.dev site, its own pnpm project, outside the root lint; `docs/AGENTS.md` has its rules
+- `docs/` - the browsers.agntn.dev site, a member of the root pnpm workspace, outside the root lint; `docs/AGENTS.md` has its rules
 - `build.config.ts` - obuild config: one bundle with an input per provider file, and the hook that inlines typebox
 - `vite.config.ts` - Vite+ config for `vp test`, `vp lint` and `vp fmt`; lint and fmt spread the shared `@agntn/ox` policy
 

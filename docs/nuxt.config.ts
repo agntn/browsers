@@ -1,25 +1,17 @@
 import { resolve } from "node:path";
 import { browsersTheme } from "./shiki-theme";
 
-/** Bundled from the checkout's sources: a deploy needs neither dist/ nor the root node_modules. */
+/** Bundled from the checkout's sources: no dist/, and a bare import there resolves from the repo root. */
 const librarySource = resolve(import.meta.dirname, "../src");
-/** `src/version.ts` reads `../package.json`, so dev has to be allowed the whole repo, not `src/` alone. */
-const repoRoot = resolve(import.meta.dirname, "..");
 
 export default defineNuxtConfig({
   extends: ["docus"],
-  /** The repo root is its own pnpm workspace; Nuxt must not treat it as this site's. */
-  workspaceDir: import.meta.dirname,
   alias: {
     /** Tool names, labels, descriptions and output bounds. The file imports nothing, so the page can. */
     "#tool-contract": resolve(librarySource, "tool-contract.ts"),
   },
   vite: {
     build: { target: "es2024" },
-    server: {
-      /** Dev serves the library from outside the workspace, which Vite refuses without this. */
-      fs: { allow: [repoRoot] },
-    },
   },
   devtools: { enabled: false },
   telemetry: false,

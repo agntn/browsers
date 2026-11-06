@@ -17,7 +17,7 @@ export default defineConfig({
     include: ["test/**/*.test.ts"],
     setupFiles: ["test/setup.ts"],
   },
-  fmt: { ...oxfmt, ignorePatterns: ["CHANGELOG.md", "docs"] },
+  fmt: { ...oxfmt, ignorePatterns: ["docs"] },
   /** Keep mutable public request types source-compatible while applying the shared policy elsewhere. */
   lint: {
     ...oxlint,

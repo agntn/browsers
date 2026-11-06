@@ -59,10 +59,18 @@ afterEach(() => {
 
 const page = { url: "https://example.test/", provider: "cloudflare" };
 
-const readTools: ReadonlyArray<{ tool: ToolDefinition; args: Record<string, unknown> }> = [
+/* A crawl job Cloudflare accepted, whose status read never answers. */
+const acceptedCrawl = ({ method }: Call): unknown =>
+  method === "POST" ? { success: true, result: "job-1" } : undefined;
+
+const readTools: ReadonlyArray<{
+  tool: ToolDefinition;
+  args: Record<string, unknown>;
+  answer?: (call: Call) => unknown;
+}> = [
   { tool: scrapeTool, args: page },
   { tool: extractTool, args: { ...page, prompt: "Title" } },
-  { tool: crawlTool, args: page },
+  { tool: crawlTool, args: page, answer: acceptedCrawl },
   { tool: linksTool, args: page },
   { tool: accessibilityTool, args: page },
   { tool: searchTool, args: { query: "browsers" } },
@@ -70,20 +78,21 @@ const readTools: ReadonlyArray<{ tool: ToolDefinition; args: Record<string, unkn
 
 describe("cancelling a read tool", () => {
   it.each(readTools)(
-    "$tool.name aborts the provider request it started",
-    async ({ tool, args }) => {
+    "$tool.name aborts the provider request in flight",
+    async ({ tool, args, answer }) => {
       vi.stubEnv("CLOUDFLARE_API_TOKEN", "token");
       vi.stubEnv("CLOUDFLARE_ACCOUNT_ID", "test-account");
       vi.stubEnv("HYPERBROWSER_API_KEY", "key");
-      const calls = stubFetch(() => undefined);
+      const calls = stubFetch(answer ?? (() => undefined));
       const controller = new AbortController();
 
       const call = invokeTool(tool, args, { signal: controller.signal });
-      await vi.waitFor(() => expect(calls).toHaveLength(1));
+      await vi.waitFor(() => expect(calls.at(-1)?.signal).toBeDefined());
+      const inFlight = calls.at(-1);
       controller.abort();
 
       await expect(call).rejects.toThrow();
-      expect(calls[0]?.signal?.aborted).toBe(true);
+      expect(inFlight?.signal?.aborted).toBe(true);
     },
   );
 });
@@ -147,6 +156,40 @@ describe("cancelling a provider job", () => {
       `GET ${CF_CRAWL}/job-1?limit=1`,
       `DELETE ${CF_CRAWL}/job-1`,
     ]);
+  });
+
+  it("cancels the Cloudflare job whose create was still answering at the abort", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    let accept!: () => void;
+    const accepted = new Promise<void>((resolve) => {
+      accept = resolve;
+    });
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push(`${init?.method ?? "GET"} ${url}`);
+        if (init?.method !== "POST") return Response.json({ success: true, result: {} });
+        const signal = init.signal;
+        await new Promise<void>((resolve, reject) => {
+          void accepted.then(resolve);
+          signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+        });
+        return Response.json({ success: true, result: "job-1" });
+      }),
+    );
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", { apiKey: "token", accountID: "test-account" });
+    const controller = new AbortController();
+
+    const crawl = provider.crawl?.("https://example.test/", { signal: controller.signal });
+    const outcome = expect(crawl).rejects.toThrow("This operation was aborted");
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    controller.abort();
+    accept();
+    await outcome;
+
+    expect(calls).toEqual([`POST ${CF_CRAWL}`, `DELETE ${CF_CRAWL}/job-1`]);
   });
 
   it("leaves a resumed Cloudflare job running, since its ID is the caller's", async () => {

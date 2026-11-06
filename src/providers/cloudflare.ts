@@ -525,6 +525,14 @@ class CloudflareProvider implements BrowserProvider {
     return `${this.base().replace(/^https:/, "wss:")}/devtools/browser/${session.id}`;
   }
 
+  /**
+   * The create goes out without the signal: a cut answer would leave a job with no ID to cancel.
+   *
+   * @param {string} url Page to start from.
+   * @param {CrawlOptions} [options] Depth, page limit, formats, timeout and cancellation.
+   * @param {BrowserSession} [_session] Unused, the job needs no session.
+   * @returns {Promise<CrawlResult>} The pages, or the job ID while it still runs.
+   */
   async crawl(
     url: string,
     options?: CrawlOptions,
@@ -537,7 +545,6 @@ class CloudflareProvider implements BrowserProvider {
           this.browserEndpoint("/crawl"),
           createCrawlBody(url, options),
           this.headers(),
-          options?.signal,
         ),
       );
       return await this.finishCrawl(jobId, options).catch(async (error: unknown) => {

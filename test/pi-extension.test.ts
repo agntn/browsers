@@ -34,14 +34,14 @@ type ExecutableTool = {
   ) => Promise<AgentToolResult<unknown>>;
 };
 
-function registerTools(): Map<string, ToolDefinition> {
+async function registerTools(): Promise<Map<string, ToolDefinition>> {
   const tools = new Map<string, ToolDefinition>();
   const api = {
     registerTool(tool: ToolDefinition) {
       tools.set(tool.name, tool);
     },
   };
-  browsersExtension(api as unknown as ExtensionAPI);
+  await browsersExtension(api as unknown as ExtensionAPI);
   return tools;
 }
 
@@ -99,12 +99,12 @@ describe("browsers Pi extension", () => {
 
   it("loads current shared operations instead of a potentially stale build", () => {
     expect(fileURLToPath(resolveBrowsersModuleUrl())).toBe(
-      fileURLToPath(new URL("../src/tool-operations.ts", import.meta.url)),
+      fileURLToPath(new URL("../src/tools.ts", import.meta.url)),
     );
   });
 
-  it("registers the complete browser tool surface", () => {
-    expect([...registerTools().keys()]).toEqual([
+  it("registers the complete browser tool surface", async () => {
+    expect([...(await registerTools()).keys()]).toEqual([
       "browsers_scrape",
       "browsers_session",
       "browsers_release",
@@ -120,9 +120,9 @@ describe("browsers Pi extension", () => {
     ]);
   });
 
-  it("does not tell the model to drive a session it cannot use", () => {
-    const session = registerTools().get("browsers_session");
-    const capabilities = registerTools().get("browsers_capabilities");
+  it("does not tell the model to drive a session it cannot use", async () => {
+    const session = (await registerTools()).get("browsers_session");
+    const capabilities = (await registerTools()).get("browsers_capabilities");
     const sessionCopy = [session?.promptSnippet, ...(session?.promptGuidelines ?? [])].join(" ");
     const capabilitiesCopy = (capabilities?.promptGuidelines ?? []).join(" ");
 
@@ -131,15 +131,15 @@ describe("browsers Pi extension", () => {
     expect(capabilitiesCopy).not.toMatch(/no REST navigate\/evaluate/);
   });
 
-  it("registers custom call and result renderers for every tool", () => {
-    for (const tool of registerTools().values()) {
+  it("registers custom call and result renderers for every tool", async () => {
+    for (const tool of (await registerTools()).values()) {
       expect(typeof tool.renderCall).toBe("function");
       expect(typeof tool.renderResult).toBe("function");
     }
   });
 
-  it("adapts Pi call state and error context to the shared renderer", () => {
-    const tool = registerTools().get("browsers_links");
+  it("adapts Pi call state and error context to the shared renderer", async () => {
+    const tool = (await registerTools()).get("browsers_links");
     if (!tool?.renderCall || !tool.renderResult) throw new Error("Missing browser link renderers");
 
     const call: unknown = Reflect.apply(tool.renderCall, tool, [
@@ -165,7 +165,7 @@ describe("browsers Pi extension", () => {
     };
     browserToolsMock.browserScrape.mockResolvedValue(result);
 
-    const response = await executeTool(registerTools(), "browsers_scrape", {
+    const response = await executeTool(await registerTools(), "browsers_scrape", {
       provider: "steel",
       url: "https://example.test",
       maxChars: 5,
@@ -180,8 +180,8 @@ describe("browsers Pi extension", () => {
     expect(JSON.stringify(response).split("body")).toHaveLength(2);
   });
 
-  it("keeps the shared scrape bounds in the Pi schema", () => {
-    expect(registerTools().get("browsers_scrape")?.parameters).toMatchObject({
+  it("keeps the shared scrape bounds in the Pi schema", async () => {
+    expect((await registerTools()).get("browsers_scrape")?.parameters).toMatchObject({
       properties: {
         browser: { const: "kitesurf" },
         maxChars: {
@@ -207,7 +207,7 @@ describe("browsers Pi extension", () => {
         data: { title: "Example" },
       },
     });
-    const tools = registerTools();
+    const tools = await registerTools();
 
     expect(tools.get("browsers_extract")?.parameters).toMatchObject({
       properties: {
@@ -242,7 +242,7 @@ describe("browsers Pi extension", () => {
     };
     browserToolsMock.browserSession.mockResolvedValue(result);
 
-    const response = await executeTool(registerTools(), "browsers_session", {
+    const response = await executeTool(await registerTools(), "browsers_session", {
       provider: "steel",
     });
 

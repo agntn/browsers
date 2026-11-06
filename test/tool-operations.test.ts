@@ -16,8 +16,8 @@ import {
   browserSession,
   browserScreenshot,
   browserSearch,
-  errorMessage,
   listBrowserProviders,
+  listBrowserSessions,
   releaseBrowserSession,
   sanitizeField,
 } from "../src/tool-operations";
@@ -27,6 +27,7 @@ const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0
 const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]);
 const PDF_BYTES = Buffer.from("%PDF-1.7\n%%EOF\n");
 let statelessScrape = true;
+let statelessScreenshot = true;
 const createSession = vi.fn<BrowserProvider["createSession"]>().mockResolvedValue({
   id: "session-1",
   provider: "tooltest",
@@ -35,6 +36,7 @@ const createSession = vi.fn<BrowserProvider["createSession"]>().mockResolvedValu
   metadata: { token: "secret" },
 });
 const releaseSession = vi.fn<(sessionId: string) => Promise<void>>().mockResolvedValue(undefined);
+const listSessions = vi.fn<BrowserProvider["listSessions"]>().mockResolvedValue([]);
 const scrape = vi.fn<BrowserProvider["scrape"]>();
 const screenshot = vi.fn<BrowserProvider["screenshot"]>();
 const links = vi.fn<NonNullable<BrowserProvider["links"]>>();
@@ -55,7 +57,7 @@ function toolTestProvider(): BrowserProvider {
       sessions: true,
       cdp: true,
       statelessScrape,
-      statelessScreenshot: true,
+      statelessScreenshot,
       elementScreenshot: true,
       screenshotWaitFor: true,
       crawl: true,
@@ -67,7 +69,7 @@ function toolTestProvider(): BrowserProvider {
     }),
     createSession,
     getSession: vi.fn().mockResolvedValue(null),
-    listSessions: vi.fn().mockResolvedValue([]),
+    listSessions,
     releaseSession,
     scrape,
     screenshot,
@@ -102,6 +104,8 @@ afterEach(() => {
   vi.unstubAllEnvs();
   releaseSession.mockReset().mockResolvedValue(undefined);
   statelessScrape = true;
+  statelessScreenshot = true;
+  listSessions.mockReset().mockResolvedValue([]);
   if (previousApiKey === undefined) delete process.env.TOOLTEST_API_KEY;
   else process.env.TOOLTEST_API_KEY = previousApiKey;
 });
@@ -212,6 +216,44 @@ describe("browser tool operations", () => {
 
     expect(releaseSession).toHaveBeenCalledWith("session-1");
     expect(result.details).toEqual({ released: true });
+  });
+
+  it("lists active sessions by ID, without their connection URLs", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    listSessions.mockResolvedValueOnce([
+      {
+        id: "session-1",
+        provider: "tooltest",
+        createdAt: 1_000,
+        cdpUrl: "wss://example.test?token=secret",
+      },
+      { id: "session-2\u001B[31m", provider: "tooltest", createdAt: 2_000 },
+    ]);
+
+    const result = await listBrowserSessions({ provider: "tooltest" });
+
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: "[provider=tooltest] 2 active sessions:\nsession-1\nsession-2 [31m",
+      },
+    ]);
+    expect(result.details.sessions.map((session) => session.id)).toEqual([
+      "session-1",
+      "session-2\u001B[31m",
+    ]);
+    expect(JSON.stringify(result)).not.toContain("token=secret");
+  });
+
+  it("says so when a provider has no active session", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+
+    const result = await listBrowserSessions({ provider: "tooltest" });
+
+    expect(result.content).toEqual([
+      { type: "text", text: "[provider=tooltest] No active sessions." },
+    ]);
+    expect(result.details).toEqual({ sessions: [] });
   });
 
   it("returns every crawled page with its content under one budget", async () => {
@@ -487,6 +529,33 @@ describe("browser tool operations", () => {
       bytes: 6,
       saved: false,
     });
+  });
+
+  it("gives providers that need a session for a screenshot a temporary one", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    statelessScreenshot = false;
+    screenshot.mockResolvedValue({ data: PNG_BYTES.toString("base64"), mimeType: "image/png" });
+
+    const result = await browserScreenshot({ provider: "tooltest", url: "https://example.test" });
+
+    expect(createSession).toHaveBeenCalledOnce();
+    expect(screenshot).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.test" }),
+      expect.objectContaining({ id: "session-1" }),
+    );
+    expect(releaseSession).toHaveBeenCalledWith("session-1");
+    expect(result.details).toMatchObject({ mimeType: "image/png", saved: false });
+  });
+
+  it("releases the temporary screenshot session when the capture fails", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    statelessScreenshot = false;
+    screenshot.mockRejectedValueOnce(new Error("capture failed"));
+
+    await expect(
+      browserScreenshot({ provider: "tooltest", url: "https://example.test" }),
+    ).rejects.toThrow("capture failed");
+    expect(releaseSession).toHaveBeenCalledWith("session-1");
   });
 
   it("asks for the full page when fullPage is left out", async () => {
@@ -862,9 +931,6 @@ describe("browser tool operations", () => {
     const field = "a \u202Eb\u2066c\u2069\u200Fd\uFEFFe\u2028f\u2029g \u{E0069}\u{E0067}h";
 
     expect(sanitizeField(field)).toBe("a b c d e f g h");
-    expect(errorMessage(new Error(`No element matches \u202E#nottub`))).toBe(
-      "No element matches #nottub",
-    );
   });
 
   it("keeps the joiners that Persian words and emoji sequences need", () => {

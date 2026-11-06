@@ -6,9 +6,6 @@ const providerInputs = readdirSync(new URL("src/providers/", import.meta.url))
   .filter((file) => file.endsWith(".ts") && file !== "index.ts")
   .map((file) => `./src/providers/${file}`);
 
-/** typebox stays inline, since every MCP spawn parses it slower from node_modules. */
-const typeboxId = /^typebox(?:\/|$)/u;
-
 export default defineBuildConfig({
   entries: [
     {
@@ -18,6 +15,8 @@ export default defineBuildConfig({
         "./src/index.ts",
         "./src/cli.ts",
         "./src/mcp.ts",
+        "./src/mcp-stdio.ts",
+        "./src/tools.ts",
         "./src/tool-operations.ts",
         ...providerInputs,
       ],
@@ -25,19 +24,4 @@ export default defineBuildConfig({
       dts: { sourcemap: false },
     },
   ],
-  hooks: {
-    /**
-     * obuild marks the typebox peer external by name and by subpath, and both have to go.
-     *
-     * @param config - The rolldown options obuild hands over.
-     */
-    rolldownConfig(config) {
-      if (!Array.isArray(config.external)) return;
-      config.external = config.external.filter((entry) =>
-        typeof entry === "string"
-          ? !typeboxId.test(entry)
-          : !(entry instanceof RegExp && entry.test("typebox/value")),
-      );
-    },
-  },
 });

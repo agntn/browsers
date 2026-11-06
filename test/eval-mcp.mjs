@@ -1,9 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import {
-  getDefaultEnvironment,
-  StdioClientTransport,
-} from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Client } from "@modelcontextprotocol/client";
+import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { browserToolNames } from "../src/tool-contract.ts";
 
 /** `BROWSERS_DIST=1` keeps the bundle; a checkout would otherwise serve the live source. */

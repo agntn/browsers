@@ -12,7 +12,6 @@ const heavy = {
   sdk: "/node_modules/@modelcontextprotocol/",
   typebox: "/node_modules/typebox/",
   server: "/src/mcp.ts",
-  schemas: "/src/tool-schemas.ts",
 };
 
 interface Run {
@@ -65,11 +64,11 @@ function loadedHeavy(loaded: readonly string[]): string[] {
 
 describe("CLI usage paths", () => {
   it.each([
-    { args: ["--help"], anchor: /USAGE.*browsers scrape\|/ },
-    { args: ["-h"], anchor: /USAGE.*browsers scrape\|/ },
+    { args: ["--help"], anchor: /USAGE browsers <command>/ },
+    { args: ["-h"], anchor: /USAGE browsers <command>/ },
     { args: ["--version"], anchor: /^\d+\.\d+\.\d+/ },
-    { args: ["scrape", "--help"], anchor: /USAGE.*browsers scrape/ },
-    { args: ["mcp", "--help"], anchor: /USAGE.*browsers mcp/ },
+    { args: ["scrape", "--help"], anchor: /USAGE browsers scrape/ },
+    { args: ["mcp", "--help"], anchor: /USAGE browsers mcp/ },
   ])("browsers $args loads no provider, no SDK and no TypeBox", ({ args, anchor }) => {
     const result = cli(...args);
 

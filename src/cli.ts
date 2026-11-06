@@ -1,85 +1,74 @@
 #!/usr/bin/env node
 
+/** Browsers CLI: a command per browser tool, `sessions`, and `mcp`, which serves the tools. */
 import { existsSync } from "node:fs";
 import { sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineCommand, runMain } from "citty";
-import { normalizeMainArgs } from "./cli-args.ts";
-import type McpCommand from "./commands/mcp.ts";
+import { runCli } from "@agntn/tools/cli";
+import { isRefusal, normalizeSessionWords, sessionsCommand } from "./cli-commands.ts";
+import type { serveStdio } from "./mcp-stdio.ts";
+import { browserTools } from "./tools.ts";
 import { version } from "./version.ts";
 
-/** The same file from `src/cli.ts` and `dist/cli.mjs`; the npm package does not ship it. */
-const sourceMcpCommand = new URL("../src/commands/mcp.ts", import.meta.url);
-const sourceMcpCommandPath = fileURLToPath(sourceMcpCommand);
+/** The same file from `src/cli.ts` and `dist/cli.mjs`; the npm package ships only `dist`. */
+const sourceStdio = new URL("../src/mcp-stdio.ts", import.meta.url);
+const sourceStdioPath = fileURLToPath(sourceStdio);
 
 /**
  * Narrows the module a runtime URL import returned, which TypeScript types as `any`.
  *
  * @param value - The imported module namespace.
- * @returns {value is { default: typeof McpCommand }} Whether it exports a default command.
+ * @returns {value is { serveStdio: typeof serveStdio }} Whether it exports the server.
  */
-function isCommandModule(value: unknown): value is { default: typeof McpCommand } {
-  return typeof value === "object" && value !== null && "default" in value;
+function isStdioModule(value: unknown): value is { serveStdio: typeof serveStdio } {
+  return typeof value === "object" && value !== null && "serveStdio" in value;
 }
 
 /**
- * The source needs `typebox`, a devDependency, so without it the bin keeps the bundle.
+ * In a checkout the server runs from `src/`, so a change needs a restart, not `pnpm build`.
+ * `node_modules`, a Node without type stripping and `BROWSERS_DIST=1` keep the bundle.
  *
- * @returns {boolean} Whether `typebox` resolves from this package.
+ * @returns {Promise<typeof serveStdio>} What starts the stdio server.
  */
-function hasSourceDependencies(): boolean {
-  try {
-    import.meta.resolve("typebox");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Loads the MCP command. A built bin inside a checkout runs the live source, as the Pi and
- * OMP extensions do, so a local server needs a restart after a change instead of `pnpm build`.
- * Node never strips types under `node_modules` or with `--no-strip-types`, so a git install
- * that ships `src` and a Node run with that flag keep the bundle. `BROWSERS_DIST=1` keeps it
- * everywhere, for tests of the built output.
- *
- * @returns {Promise<typeof McpCommand>} The citty command that starts the stdio server.
- */
-async function loadMcpCommand(): Promise<typeof McpCommand> {
+async function loadServer(): Promise<typeof serveStdio> {
   const fromSource =
     !import.meta.url.endsWith(".ts") &&
     process.env.BROWSERS_DIST !== "1" &&
     Boolean(process.features.typescript) &&
-    !sourceMcpCommandPath.includes(`${sep}node_modules${sep}`) &&
-    existsSync(sourceMcpCommandPath) &&
-    hasSourceDependencies();
-  if (!fromSource) return (await import("./commands/mcp.ts")).default;
-  const module: unknown = await import(sourceMcpCommand.href);
-  if (!isCommandModule(module)) {
-    throw new TypeError(`${sourceMcpCommandPath} has no default command`);
-  }
-  return module.default;
+    !sourceStdioPath.includes(`${sep}node_modules${sep}`) &&
+    existsSync(sourceStdioPath);
+  if (!fromSource) return (await import("./mcp-stdio.ts")).serveStdio;
+  const module: unknown = await import(sourceStdio.href);
+  if (!isStdioModule(module)) throw new TypeError(`${sourceStdioPath} has no serveStdio`);
+  return module.serveStdio;
 }
 
-const main = defineCommand({
-  meta: {
-    name: "browsers",
-    version,
-    description: "Unified browser-as-a-service provider for agents and CLI",
-  },
-  subCommands: {
-    scrape: () => import("./commands/scrape.ts").then((m) => m.default),
-    screenshot: () => import("./commands/screenshot.ts").then((m) => m.default),
-    crawl: () => import("./commands/crawl.ts").then((m) => m.default),
-    pdf: () => import("./commands/pdf.ts").then((m) => m.default),
-    links: () => import("./commands/links.ts").then((m) => m.default),
-    accessibility: () => import("./commands/accessibility.ts").then((m) => m.default),
-    search: () => import("./commands/search.ts").then((m) => m.default),
-    extract: () => import("./commands/extract.ts").then((m) => m.default),
-    session: () => import("./commands/session.ts").then((m) => m.default),
-    providers: () => import("./commands/providers.ts").then((m) => m.default),
-    mcp: loadMcpCommand,
-  },
-});
+/**
+ * `mcp` alone or with option terminators starts the server; `mcp --help` stays with `runCli`.
+ *
+ * @param args - Every argument after the bin.
+ * @returns {boolean} Whether the line starts the stdio server.
+ */
+function servesStdio(args: readonly string[]): boolean {
+  const [command, ...rest] = args;
+  return command === "mcp" && rest.every((word) => word === "--");
+}
 
-await runMain(main, { rawArgs: normalizeMainArgs(process.argv.slice(2)) });
+const argv = process.argv.slice(2);
+if (servesStdio(argv)) {
+  (await loadServer())();
+} else {
+  await runCli(
+    {
+      name: "browsers",
+      version,
+      description: "Unified browser-as-a-service provider for agents and CLI",
+      tools: browserTools,
+      commands: [sessionsCommand],
+      fallback: "scrape",
+      mcp: true,
+      expected: isRefusal,
+    },
+    normalizeSessionWords(argv),
+  );
+}

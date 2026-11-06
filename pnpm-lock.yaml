@@ -77,6 +77,9 @@ catalogs:
     '@types/node':
       specifier: 26.6.6
       version: 26.6.6
+    ai:
+      specifier: 7.0.163
+      version: 7.0.163
     changelogen:
       specifier: 0.6.2
       version: 0.6.2
@@ -144,6 +147,9 @@ importers:
       '@types/node':
         specifier: catalog:dev
         version: 26.6.6
+      ai:
+        specifier: catalog:dev
+        version: 7.0.163(zod@4.6.7)
       changelogen:
         specifier: catalog:dev
         version: 0.6.2(magicast@0.5.5)

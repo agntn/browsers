@@ -12,7 +12,8 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 - `src/core/lazy.ts` - one-shot async memo used by the registry
 - `src/core/block-page.ts` - recognizes block and captcha pages; every provider's `scrape` returns through `rejectBlockPage`
 - `src/core/errors.ts` - typed error hierarchy (BrowserError, HTTPError, AuthError, SessionError, etc.)
-- `src/tools.ts` - one `defineTool` per tool from `@agntn/tools`, the list MCP, Pi, OMP and the CLI all serve
+- `src/tools.ts` - one `defineTool` per tool from `@agntn/tools`, the list MCP, Pi, OMP, the AI SDK and the CLI all serve
+- `src/ai.ts` - `browsersAiTools`, the AI SDK tool map `toAiTools` derives from that list, behind the `./ai` export
 - `src/tool-operations.ts` - executors behind those tools, imported on the first call
 - `src/mcp.ts` - `createMcpServer()` over the `@agntn/tools/mcp` adapter; `src/mcp-stdio.ts` serves it on stdio
 - `src/providers/index.ts` - the manifest: key, default URL and a literal `import()` per provider
@@ -41,7 +42,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, eight
 
 - TypeScript, ESM, Node >= 26
 - obuild builds, Vite+ runs the rest: `vp test` runs Vitest, `vp lint` and `vp fmt` run oxlint and oxfmt; type-aware lint runs after `pnpm build`
-- native `fetch` for HTTP; the CLI, MCP, Pi and OMP come from `@agntn/tools`
+- native `fetch` for HTTP; the CLI, MCP, Pi, OMP and the AI SDK tools come from `@agntn/tools`
 - API keys from env: `PROVIDERNAME_API_KEY`
 - Nothing runs at import: providers load on the first `create()` and the executors on the first tool call; `sideEffects: false` in `package.json` states that and has to stay true
 - Schemas use `Type` from `@agntn/tools`, never a bare `typebox` import: OMP swaps that for its own facade and validation then lets anything through. `typebox` stays out of the manifest, since `@agntn/tools` carries its own and Pi 0.99 warns about a package that lists it. `test/host-peers.test.ts` guards both

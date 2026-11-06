@@ -196,12 +196,18 @@ class BrowserbaseProvider implements BrowserProvider {
     );
   }
 
+  /**
+   * Both formats at once. An abort fails the scrape even after one of them came back.
+   *
+   * @param {string} url Page to fetch.
+   * @param {ScrapeOptions} [options] Formats wanted and cancellation.
+   * @returns {Promise<(BrowserbaseFetchResponse | undefined)[]>} The raw page and the markdown.
+   */
   private async fetchPages(
     url: string,
     options?: ScrapeOptions,
   ): Promise<(BrowserbaseFetchResponse | undefined)[]> {
-    const formats = options?.formats ?? [];
-    const signal = options?.signal;
+    const { formats = [], signal } = options ?? {};
     const wantsHtml = formats.includes("html");
     const settled = await Promise.allSettled([
       wantsHtml ? this.fetchPage(url, { format: "raw", signal }) : undefined,
@@ -209,6 +215,7 @@ class BrowserbaseProvider implements BrowserProvider {
         ? this.fetchPage(url, { format: "markdown", signal })
         : undefined,
     ]);
+    signal?.throwIfAborted();
     const pages = settled.map((r) => (r.status === "fulfilled" ? r.value : undefined));
     if (pages.every((page) => !page)) {
       throw settled.find((r): r is PromiseRejectedResult => r.status === "rejected")?.reason;

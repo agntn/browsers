@@ -18,6 +18,7 @@ import {
 interface Call {
   readonly method: string;
   readonly url: string;
+  readonly body?: string;
   readonly signal?: AbortSignal;
 }
 
@@ -33,7 +34,12 @@ function stubFetch(answer: (call: Call) => unknown): Call[] {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
-      const call: Call = { method: init?.method ?? "GET", url, signal: init?.signal ?? undefined };
+      const call: Call = {
+        method: init?.method ?? "GET",
+        url,
+        body: typeof init?.body === "string" ? init.body : undefined,
+        signal: init?.signal ?? undefined,
+      };
       calls.push(call);
       const body = answer(call);
       if (body !== undefined) {
@@ -120,6 +126,25 @@ describe("cancelling a provider scrape", () => {
       expect(calls.every((call) => call.signal?.aborted)).toBe(true);
     },
   );
+});
+
+describe("cancelling a scrape that already has part of its answer", () => {
+  it("rejects a Browserbase scrape whose markdown was still loading", async () => {
+    const calls = stubFetch(({ body }) =>
+      body?.includes('"raw"') ? { statusCode: 200, content: "<p>page</p>" } : undefined,
+    );
+    const provider = await create("browserbase", { apiKey: "key" });
+    const controller = new AbortController();
+
+    const scrape = provider.scrape("https://example.test/", {
+      formats: ["html", "markdown"],
+      signal: controller.signal,
+    });
+    const outcome = expect(scrape).rejects.toThrow("This operation was aborted");
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    controller.abort();
+    await outcome;
+  });
 });
 
 const CF_CRAWL =

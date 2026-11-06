@@ -20,10 +20,10 @@ Steel scrapes in one HTTP call. Kernel wants a live session first. Browserbase h
 - ⚡ **Stateless where the vendor is.** Steel, Browserbase, Browserless, Hyperbrowser, Cloudflare and Playwright scrape without you opening a session. Kernel will not.
 - 📸 **The extras follow the backend.** PDFs, crawls, links, AI extract, search. Anchor will not scrape. Hyperbrowser will search.
 - 🏷️ **`capabilities()` is the list.** Navigate is true on Kernel, Browserless and Playwright. False on Steel. Read the flag.
-- 🤖 **Five surfaces, twelve tools.** CLI, library, MCP, Pi, OMP. They share the executors.
+- 🤖 **One set of tools for people and models.** The CLI runs the twelve tools MCP, Pi and OMP get. Plus the library. Five surfaces, one list.
 - 📏 **Agent scrape and crawl have a ceiling.** 20 000 characters unless you pass `maxChars`, 200 000 at most. A crawl shares it across pages.
-- ⏳ **A slow crawl keeps its job.** Cloudflare and Hyperbrowser wait two minutes, then hand back the job ID. Pass it as `jobId` with the same provider and browser, or `--job` in the CLI, and you wait for that job again. No second crawl.
-- 🔗 **Agent links come in pages.** 500 per call unless you pass `limit`, 5 000 at most. The answer counts the rest and names the `offset` to ask for next. The CLI still prints them all.
+- ⏳ **A slow crawl keeps its job.** Cloudflare and Hyperbrowser wait two minutes, then hand back the job ID. Pass it as `jobId` with the same provider and browser, or `--job-id` in the CLI, and you wait for that job again. No second crawl.
+- 🔗 **Agent links come in pages.** 500 per call unless you pass `limit`, 5 000 at most. The answer counts the rest and names the `offset` to ask for next. The CLI pages too. Same `--limit`, same `--offset`.
 - ♿ **A form reads as its fields.** The accessibility tree gives one line per field, button or heading, with its state. The httpbin pizza form comes to about a thousand characters. Cloudflare only for now.
 - 🔐 **Keys in a URL get scrubbed.** Query params named `token` or `api_key` land in errors as `[REDACTED]`.
 
@@ -42,7 +42,8 @@ npx @agntn/browsers scrape https://example.com --provider playwright
 ```
 
 ```
-ℹ Scraping via playwright...
+[provider=playwright] https://example.com
+
 This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.
 
 هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.
@@ -67,6 +68,7 @@ browsers links https://example.com --provider playwright
 ```
 
 ```
+[provider=playwright] 1 links:
 https://iana.org/help/example-domains
 ```
 
@@ -77,6 +79,8 @@ browsers accessibility https://httpbin.org/forms/post --root fieldset
 ```
 
 ```
+[provider=cloudflare] https://httpbin.org/forms/post (status 200): 16 nodes
+
 - group "Pizza Size"
   - Legend
     - StaticText "Pizza Size"
@@ -104,31 +108,30 @@ browsers providers
 ```
 
 ```
-● steel           scrape screenshot(sess) sessions cdp
-● browserbase     scrape sessions cdp
-● kernel          scrape(sess) screenshot(sess) scrapeWaitFor navigate evaluate sessions cdp
-● browserless     scrape screenshot element scrapeWaitFor screenshotWaitFor navigate evaluate sessions cdp pdf
-● hyperbrowser    scrape screenshot sessions cdp crawl search extract
-● anchor          screenshot(sess) sessions cdp
-● cloudflare      scrape screenshot element scrapeWaitFor screenshotWaitFor sessions cdp crawl pdf links extract accessibility
-● playwright      scrape screenshot(sess) element scrapeWaitFor screenshotWaitFor navigate evaluate sessions crawl pdf links
+○ steel
+○ browserbase
+○ kernel
+○ browserless
+○ hyperbrowser
+○ anchor
+○ cloudflare
+● playwright  scrape screenshot navigate evaluate sessions statelessScrape elementScreenshot screenshotWaitFor scrapeWaitFor crawl pdf links
 ```
 
 Filled dot means that key was in the env on this run. Playwright is always filled. A few more:
 
 ```bash
-browsers scrape https://example.com --provider playwright --format html
-browsers scrape https://example.com --provider playwright --waitFor p
+browsers scrape https://example.com --provider playwright --wait-for p
 browsers scrape https://example.com --browser kitesurf
 browsers screenshot https://example.com -o page.png
 browsers screenshot https://example.com -o notice.png --selector p -p browserless
-browsers screenshot https://quotes.toscrape.com/js-delayed/ -o quotes.png --waitFor .quote -p playwright
+browsers screenshot https://quotes.toscrape.com/js-delayed/ -o quotes.png --wait-for .quote -p playwright
 browsers pdf https://example.com -o page.pdf --provider playwright
-browsers crawl https://example.com --maxPages 5 --provider playwright
-browsers crawl --job <job-id> --provider cloudflare
-browsers search "browser automation" --provider hyperbrowser
+browsers crawl https://example.com --max-pages 5 --provider playwright
+browsers crawl --job-id <job-id> --provider cloudflare
+browsers search browser automation -n 3
 browsers extract https://example.com --prompt "Extract the heading"
-browsers session create --provider kernel
+browsers session --provider kernel
 ```
 
 `search` is Hyperbrowser. `extract` is Cloudflare or Hyperbrowser. The rest take `-p` when you do not want the default. `--browser kitesurf` picks Cloudflare and opts into Kitesurf. Leave it out and Cloudflare stays on Chromium.
@@ -139,14 +142,17 @@ browsers session create --provider kernel
 | --------------- | ------------------------------------- | ----------------------------------------------------- |
 | `scrape`        | Rendered page, markdown if it exists  | `browsers scrape https://example.com -p playwright`   |
 | `screenshot`    | Image to a file                       | `browsers screenshot https://example.com -o page.png` |
-| `crawl`         | Follow links, cap with `--maxPages`   | `browsers crawl https://example.com --maxPages 5`     |
+| `crawl`         | Follow links, cap with `--max-pages`  | `browsers crawl https://example.com --max-pages 5`    |
 | `pdf`           | URL to a PDF file                     | `browsers pdf https://example.com -o page.pdf`        |
 | `links`         | Unique hrefs                          | `browsers links https://example.com -p playwright`    |
 | `accessibility` | Roles, names and states, one per line | `browsers accessibility https://example.com`          |
 | `search`        | Hyperbrowser web search               | `browsers search "browser automation"`                |
 | `extract`       | Structured extract with a prompt      | `browsers extract https://example.com --prompt "..."` |
-| `session`       | `create`, `list`, `release`           | `browsers session create -p kernel`                   |
+| `session`       | Open a session, ID only               | `browsers session -p kernel`                          |
+| `sessions`      | Active session IDs                    | `browsers sessions -p kernel`                         |
+| `release`       | Close one, stop the bill              | `browsers release <session-id> -p kernel`             |
 | `providers`     | Who is configured, what they can do   | `browsers providers`                                  |
+| `capabilities`  | What one provider can do              | `browsers capabilities cloudflare`                    |
 | `mcp`           | MCP server on stdio                   | `browsers mcp`                                        |
 
 ## 🧠 Library

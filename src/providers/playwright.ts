@@ -79,6 +79,16 @@ interface PageTarget {
 }
 
 /**
+ * Closes the browser a lease launched, if any, after a failure that already says what went wrong.
+ *
+ * @param {PageLease} [lease] Page and the browser launched for it.
+ * @returns {Promise<void>} Resolves once the browser is closed or failed to close.
+ */
+async function closeQuietly(lease?: Readonly<PageLease>): Promise<void> {
+  await lease?.browser?.close().catch(() => {});
+}
+
+/**
  * Closes the lease's own browser when the signal aborts.
  *
  * @param {PageLease} lease Page and the browser launched for it, if any.
@@ -375,6 +385,14 @@ class PlaywrightProvider implements BrowserProvider {
     return { browser, page: await browser.newPage() };
   }
 
+  /**
+   * Runs `operation` on a page and closes the browser it launched. An abort fails the call even
+   * when the operation swallowed the closed page, as a crawl does, instead of passing it as done.
+   *
+   * @param {PageTarget} target The session to use, or none for a fresh browser, and cancellation.
+   * @param {(page: Page) => Promise<T>} operation Work on the page.
+   * @returns {Promise<T>} What the operation returned.
+   */
   private async withPage<T>(
     target: Readonly<PageTarget>,
     operation: (page: Page) => Promise<T>,
@@ -388,10 +406,11 @@ class PlaywrightProvider implements BrowserProvider {
       signal?.throwIfAborted();
       release = closeOnAbort(lease, signal);
       const result = await operation(lease.page);
+      signal?.throwIfAborted();
       if (lease.browser) await lease.browser.close();
       return result;
     } catch (error) {
-      if (lease?.browser) await lease.browser.close().catch(() => {});
+      await closeQuietly(lease);
       throw normalizeError(signal?.aborted ? signal.reason : error, "playwright");
     } finally {
       release();

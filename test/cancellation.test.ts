@@ -272,38 +272,63 @@ describe("cancelling a scrape that needs a temporary session", () => {
   });
 });
 
+/**
+ * A page that never answers, to cancel a local browser while it loads.
+ *
+ * @param {(url: string, arrived: Promise<void>) => Promise<void>} run Loads the page and aborts.
+ * @returns {Promise<void>} Resolves once the browser dropped the request.
+ */
+async function withHangingPage(
+  run: (url: string, arrived: Promise<void>) => Promise<void>,
+): Promise<void> {
+  let arrived!: () => void;
+  const arrivedRequest = new Promise<void>((resolve) => {
+    arrived = resolve;
+  });
+  let dropped!: () => void;
+  const droppedRequest = new Promise<void>((resolve) => {
+    dropped = resolve;
+  });
+  const server = createServer((request) => {
+    arrived();
+    request.socket.on("close", () => dropped());
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    await run(`http://127.0.0.1:${port}/`, arrivedRequest);
+    await droppedRequest;
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
 /** A cold Chrome launch on a CI runner takes longer than the 5 s vitest default. */
-describe("cancelling a local Playwright scrape", { timeout: 30_000 }, () => {
-  it("closes the browser it launched, which drops the page's request", async () => {
-    let dropped!: () => void;
-    const droppedRequest = new Promise<void>((resolve) => {
-      dropped = resolve;
-    });
-    let arrived!: () => void;
-    const arrivedRequest = new Promise<void>((resolve) => {
-      arrived = resolve;
-    });
-    const server = createServer((request) => {
-      arrived();
-      request.socket.on("close", () => dropped());
-    });
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-    const { port } = server.address() as AddressInfo;
-    try {
+describe("cancelling a local Playwright call", { timeout: 30_000 }, () => {
+  it("closes the browser a scrape launched, which drops the page's request", async () => {
+    await withHangingPage(async (url, arrived) => {
       const provider = await create("playwright");
       const controller = new AbortController();
 
-      const scrape = provider.scrape(`http://127.0.0.1:${port}/`, {
-        signal: controller.signal,
-      });
+      const scrape = provider.scrape(url, { signal: controller.signal });
       const outcome = expect(scrape).rejects.toThrow("This operation was aborted");
-      await arrivedRequest;
+      await arrived;
       controller.abort();
       await outcome;
-      await droppedRequest;
-    } finally {
-      server.closeAllConnections();
-      await new Promise((resolve) => server.close(resolve));
-    }
+    });
+  });
+
+  it("rejects a crawl cut off on its only page instead of returning it empty", async () => {
+    await withHangingPage(async (url, arrived) => {
+      const provider = await create("playwright");
+      const controller = new AbortController();
+
+      const crawl = provider.crawl?.(url, { signal: controller.signal });
+      const outcome = expect(crawl).rejects.toThrow("This operation was aborted");
+      await arrived;
+      controller.abort();
+      await outcome;
+    });
   });
 });

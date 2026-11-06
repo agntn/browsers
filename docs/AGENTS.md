@@ -66,7 +66,7 @@ Two resolution traps, both because the repo root is its own pnpm workspace:
 
 - `app/components/OgImage/Docs.takumi.vue` and `Landing.takumi.vue` override the Docus templates and are rendered by Takumi at build time. Takumi has no CSS variables, so the theme colours are repeated there as literals. A provider page's card is built from the registry, not from the description.
 - `app/assets/fonts.css` declares the Figtree and Fira Code TTFs in `public/fonts`, which is where nuxt-og-image reads them.
-- Descriptions go without commas and without a trailing period: Docus puts them in the OG file name, where a comma is a separator and `..png` is skipped without a word. A `: ` in a frontmatter description is a YAML mapping and the page vanishes from the prerender.
+- OG files are named by a hash since Docus 5.15, so a description may carry commas and a closing period to the card. A `: ` in a frontmatter description is still a YAML mapping, and the page vanishes from the prerender.
 
 ## Constraints
 

@@ -32,6 +32,19 @@ export default defineNuxtConfig({
     title: "@agntn/browsers",
     description:
       "One scrape call over Steel, Browserbase, Kernel, Browserless, Hyperbrowser, Anchor, Cloudflare and local Playwright, as a library, a CLI, an MCP server and Pi and OMP extensions.",
+    /** Spelled out, or agent discovery piles every page into one list and titles the landing `/`. */
+    sections: [
+      {
+        title: "Guide",
+        contentCollection: "docs",
+        contentFilters: [{ field: "path", operator: "LIKE", value: "/guide%" }],
+      },
+      {
+        title: "Providers",
+        contentCollection: "docs",
+        contentFilters: [{ field: "path", operator: "LIKE", value: "/providers%" }],
+      },
+    ],
   },
   /** Docus pages define their own OG images; the alt text is the one thing they leave unset. */
   ogImage: {
@@ -117,14 +130,15 @@ export default defineNuxtConfig({
   nitro: {
     preset: "cloudflare_module",
     compatibilityDate: "2026-09-03",
-    prerender: {
-      crawlLinks: true,
-      routes: ["/", "/sitemap.xml", "/robots.txt", "/llms.txt", "/llms-full.txt"],
-    },
     cloudflare: {
       deployConfig: true,
       nodeCompat: true,
     },
+  },
+  /** Nuxt's own prerender option; `nitro.prerender` is deprecated since 4.6. */
+  prerender: {
+    crawlLinks: true,
+    routes: ["/", "/sitemap.xml", "/robots.txt", "/llms.txt", "/llms-full.txt"],
   },
   compatibilityDate: "2026-09-03",
   /** Fonts live in public/fonts and app/assets/fonts.css, where nuxt-og-image reads them from. */

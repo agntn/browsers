@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "better-sqlite3": "12.11.1",
-    "docus": "5.13.0",
-    "nuxt": "4.5.2"
+    "docus": "5.15.0",
+    "nuxt": "4.6.4"
   },
   "devDependencies": {
     "@iconify-json/lucide": "1.2.149",

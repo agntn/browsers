@@ -1,66 +1,113 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
-import { resolveProvider, _hasKey, providerEnvKey, providerEnvHint } from "../src/core/resolve";
+import {
+  resolveProvider,
+  _hasKey,
+  _keyless,
+  providerEnvKey,
+  providerEnvHint,
+} from "../src/core/resolve";
+
+const PROVIDER_ENV = [
+  "STEEL_API_KEY",
+  "BROWSERBASE_API_KEY",
+  "KERNEL_API_KEY",
+  "BROWSERLESS_API_KEY",
+  "HYPERBROWSER_API_KEY",
+  "ANCHOR_API_KEY",
+  "CLOUDFLARE_API_TOKEN",
+  "AGNTN_CLOUDFLARE_ACCOUNT_ID",
+  "CLOUDFLARE_ACCOUNT_ID",
+  "BROWSERS_TEST_CF_WHOAMI",
+] as const;
+
+const saved: Record<string, string | undefined> = {};
+let home = "";
+
+beforeEach(() => {
+  for (const key of PROVIDER_ENV) {
+    saved[key] = process.env[key];
+    delete process.env[key];
+  }
+  home = mkdtempSync(join(tmpdir(), "browsers-cf-"));
+});
+
+afterEach(() => {
+  for (const [key, val] of Object.entries(saved)) {
+    if (val !== undefined) process.env[key] = val;
+    else delete process.env[key];
+  }
+  rmSync(home, { recursive: true, force: true });
+});
+
+/**
+ * Log the stand-in cf in with a token file that never expires, so no session outlives the test.
+ *
+ * @param {readonly string[]} accounts Account IDs the session reaches.
+ */
+function cfLogin(accounts: readonly string[]): void {
+  const file = join(home, "credentials.json");
+  writeFileSync(file, JSON.stringify({ oauth_token: "cf-session-token" }));
+  process.env.BROWSERS_TEST_CF_WHOAMI = JSON.stringify({
+    authenticated: true,
+    authSource: `OAuth token from ${file}`,
+    accounts: accounts.map((id) => ({ id })),
+  });
+}
 
 describe("_hasKey", () => {
-  const saved: Record<string, string | undefined> = {};
-
-  beforeEach(() => {
-    // Save and clear relevant env vars
-    for (const key of [
-      "STEEL_API_KEY",
-      "BROWSERBASE_API_KEY",
-      "KERNEL_API_KEY",
-      "BROWSERLESS_API_KEY",
-      "HYPERBROWSER_API_KEY",
-      "ANCHOR_API_KEY",
-      "CF_API_TOKEN",
-      "CLOUDFLARE_API_TOKEN",
-      "CF_ACCOUNT_ID",
-      "CLOUDFLARE_ACCOUNT_ID",
-    ]) {
-      saved[key] = process.env[key];
-      delete process.env[key];
-    }
+  it("playwright always has key", async () => {
+    expect(_keyless("playwright")).toBe(true);
+    expect(await _hasKey("playwright")).toBe(true);
   });
 
-  afterEach(() => {
-    for (const [key, val] of Object.entries(saved)) {
-      if (val !== undefined) process.env[key] = val;
-      else delete process.env[key];
-    }
+  it("returns false when no env var set", async () => {
+    expect(await _hasKey("steel")).toBe(false);
   });
 
-  it("playwright always has key", () => {
-    expect(_hasKey("playwright")).toBe(true);
-  });
-
-  it("returns false when no env var set", () => {
-    expect(_hasKey("steel")).toBe(false);
-  });
-
-  it("returns true when env var set", () => {
+  it("returns true when env var set", async () => {
     process.env.STEEL_API_KEY = "test";
-    expect(_hasKey("steel")).toBe(true);
+    expect(await _hasKey("steel")).toBe(true);
   });
 
-  it("cloudflare requires a token and account ID", () => {
-    expect(_hasKey("cloudflare")).toBe(false);
+  it("wants an exported token with an account", async () => {
+    expect(await _hasKey("cloudflare")).toBe(false);
 
-    process.env.CF_ACCOUNT_ID = "account";
-    expect(_hasKey("cloudflare")).toBe(false);
-    delete process.env.CF_ACCOUNT_ID;
-
-    process.env.CF_API_TOKEN = "test";
-    expect(_hasKey("cloudflare")).toBe(false);
-
-    process.env.CF_ACCOUNT_ID = "account";
-    expect(_hasKey("cloudflare")).toBe(true);
-
-    delete process.env.CF_API_TOKEN;
-    delete process.env.CF_ACCOUNT_ID;
     process.env.CLOUDFLARE_API_TOKEN = "test";
+    expect(await _hasKey("cloudflare")).toBe(false);
+
+    process.env.AGNTN_CLOUDFLARE_ACCOUNT_ID = "account";
+    expect(await _hasKey("cloudflare")).toBe(true);
+
+    delete process.env.AGNTN_CLOUDFLARE_ACCOUNT_ID;
     process.env.CLOUDFLARE_ACCOUNT_ID = "account";
-    expect(_hasKey("cloudflare")).toBe(true);
+    expect(await _hasKey("cloudflare")).toBe(true);
+  });
+
+  it("no longer reads CF_API_TOKEN and CF_ACCOUNT_ID", async () => {
+    process.env.CF_API_TOKEN = "test";
+    process.env.CF_ACCOUNT_ID = "account";
+    try {
+      expect(await _hasKey("cloudflare")).toBe(false);
+    } finally {
+      delete process.env.CF_API_TOKEN;
+      delete process.env.CF_ACCOUNT_ID;
+    }
+  });
+
+  it("takes a cf login that reaches one account", async () => {
+    cfLogin(["account"]);
+    expect(await _hasKey("cloudflare")).toBe(true);
+  });
+
+  it("refuses a cf login that reaches several accounts until one is named", async () => {
+    cfLogin(["one", "two"]);
+    expect(await _hasKey("cloudflare")).toBe(false);
+
+    process.env.AGNTN_CLOUDFLARE_ACCOUNT_ID = "two";
+    expect(await _hasKey("cloudflare")).toBe(true);
   });
 });
 
@@ -70,77 +117,57 @@ describe("providerEnvKey", () => {
     expect(providerEnvKey("browserbase")).toBe("BROWSERBASE_API_KEY");
   });
 
-  it("returns special env key for cloudflare", () => {
-    expect(providerEnvKey("cloudflare")).toBe("CF_API_TOKEN");
+  it("returns the token variable for cloudflare", () => {
+    expect(providerEnvKey("cloudflare")).toBe("CLOUDFLARE_API_TOKEN");
   });
 
-  it("describes every required Cloudflare value", () => {
-    expect(providerEnvHint("cloudflare")).toBe("CF_API_TOKEN and CF_ACCOUNT_ID");
+  it("names the cf login next to the token", () => {
+    expect(providerEnvHint("cloudflare")).toBe("cf auth login or CLOUDFLARE_API_TOKEN");
   });
 });
 
 describe("resolveProvider", () => {
-  const saved: Record<string, string | undefined> = {};
-
-  beforeEach(() => {
-    for (const key of [
-      "STEEL_API_KEY",
-      "BROWSERBASE_API_KEY",
-      "KERNEL_API_KEY",
-      "BROWSERLESS_API_KEY",
-      "HYPERBROWSER_API_KEY",
-      "ANCHOR_API_KEY",
-      "CF_API_TOKEN",
-      "CLOUDFLARE_API_TOKEN",
-      "CF_ACCOUNT_ID",
-      "CLOUDFLARE_ACCOUNT_ID",
-    ]) {
-      saved[key] = process.env[key];
-      delete process.env[key];
-    }
+  it("throws UnknownProviderError for unknown name", async () => {
+    await expect(resolveProvider("nonexistent")).rejects.toThrow("Unknown provider");
   });
 
-  afterEach(() => {
-    for (const [key, val] of Object.entries(saved)) {
-      if (val !== undefined) process.env[key] = val;
-      else delete process.env[key];
-    }
+  it("throws AuthError when API key missing", async () => {
+    await expect(resolveProvider("steel")).rejects.toThrow("Missing API key");
   });
 
-  it("throws UnknownProviderError for unknown name", () => {
-    expect(() => resolveProvider("nonexistent")).toThrow("Unknown provider");
-  });
-
-  it("throws AuthError when API key missing", () => {
-    expect(() => resolveProvider("steel")).toThrow("Missing API key");
-  });
-
-  it("returns preferred when configured", () => {
+  it("returns preferred when configured", async () => {
     process.env.STEEL_API_KEY = "test";
-    expect(resolveProvider("steel")).toBe("steel");
+    expect(await resolveProvider("steel")).toBe("steel");
   });
 
-  it("auto-detects first available", () => {
+  it("auto-detects first available", async () => {
     process.env.KERNEL_API_KEY = "test";
-    const result = resolveProvider();
-    expect(result).toBe("kernel");
+    expect(await resolveProvider()).toBe("kernel");
   });
 
-  it("skips incomplete Cloudflare configuration", () => {
-    process.env.CF_API_TOKEN = "test";
+  it("skips Cloudflare with a token but no account, and says why when named", async () => {
+    process.env.CLOUDFLARE_API_TOKEN = "test";
 
-    expect(resolveProvider()).toBe("playwright");
-    expect(() => resolveProvider("cloudflare")).toThrow("Set CF_API_TOKEN and CF_ACCOUNT_ID");
+    expect(await resolveProvider()).toBe("playwright");
+    const error = await resolveProvider("cloudflare").then(
+      () => undefined,
+      (failure: unknown) => failure,
+    );
+    expect(error).toMatchObject({ name: "AuthError", provider: "cloudflare" });
+    expect(String(error)).toContain("Set AGNTN_CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_ACCOUNT_ID");
   });
 
-  it("playwright resolves without env", () => {
-    expect(resolveProvider("playwright")).toBe("playwright");
+  it("tells a caller without any Cloudflare login how to get one", async () => {
+    await expect(resolveProvider("cloudflare")).rejects.toThrow("cf auth login");
   });
 
-  it("throws NoProviderConfiguredError when nothing available", () => {
-    // playwright always resolves (no API key needed), so this test requires
-    // all non-playwright providers to be cleared AND a custom env check
-    // Instead, test the error class directly
-    expect(() => resolveProvider("nonexistent-provider")).toThrow("Unknown provider");
+  it("picks Cloudflare from a cf login alone", async () => {
+    cfLogin(["account"]);
+    expect(await resolveProvider()).toBe("cloudflare");
+    expect(await resolveProvider("cloudflare")).toBe("cloudflare");
+  });
+
+  it("playwright resolves without env", async () => {
+    expect(await resolveProvider("playwright")).toBe("playwright");
   });
 });

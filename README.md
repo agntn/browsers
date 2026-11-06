@@ -118,7 +118,7 @@ browsers providers
 ● playwright  scrape screenshot navigate evaluate sessions statelessScrape elementScreenshot screenshotWaitFor scrapeWaitFor crawl pdf links
 ```
 
-Filled dot means that key was in the env on this run. Playwright is always filled. A few more:
+A filled dot means the provider can run here. Usually that's a key in the env. Cloudflare also counts your `cf auth login`, which costs one `cf auth whoami`. Playwright is always filled. A few more:
 
 ```bash
 browsers scrape https://example.com --provider playwright --wait-for p
@@ -174,18 +174,18 @@ That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resol
 
 ## 🗺️ Providers
 
-| Provider         | Auth                             | Capabilities                                                                                                                              |
-| ---------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **steel**        | `STEEL_API_KEY`                  | scrape, screenshot (session), sessions, CDP                                                                                               |
-| **browserbase**  | `BROWSERBASE_API_KEY`            | scrape, sessions, CDP                                                                                                                     |
-| **kernel**       | `KERNEL_API_KEY`                 | scrape (session), scrape waitFor, screenshot (session), navigate, evaluate, sessions, CDP                                                 |
-| **browserless**  | `BROWSERLESS_API_KEY`            | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, navigate, evaluate, sessions, CDP, PDF                        |
-| **hyperbrowser** | `HYPERBROWSER_API_KEY`           | scrape, screenshot, sessions, CDP, crawl, search, extract                                                                                 |
-| **anchor**       | `ANCHOR_API_KEY`                 | screenshot (session), sessions, CDP                                                                                                       |
-| **cloudflare**   | `CF_API_TOKEN` + `CF_ACCOUNT_ID` | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, sessions, CDP, crawl, PDF, links, extract, accessibility tree |
-| **playwright**   | none, local                      | scrape, scrape waitFor, screenshot (session), element screenshot, screenshot waitFor, navigate, evaluate, sessions, crawl, PDF, links     |
+| Provider         | Auth                                                   | Capabilities                                                                                                                              |
+| ---------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **steel**        | `STEEL_API_KEY`                                        | scrape, screenshot (session), sessions, CDP                                                                                               |
+| **browserbase**  | `BROWSERBASE_API_KEY`                                  | scrape, sessions, CDP                                                                                                                     |
+| **kernel**       | `KERNEL_API_KEY`                                       | scrape (session), scrape waitFor, screenshot (session), navigate, evaluate, sessions, CDP                                                 |
+| **browserless**  | `BROWSERLESS_API_KEY`                                  | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, navigate, evaluate, sessions, CDP, PDF                        |
+| **hyperbrowser** | `HYPERBROWSER_API_KEY`                                 | scrape, screenshot, sessions, CDP, crawl, search, extract                                                                                 |
+| **anchor**       | `ANCHOR_API_KEY`                                       | screenshot (session), sessions, CDP                                                                                                       |
+| **cloudflare**   | `cf auth login` or `CLOUDFLARE_API_TOKEN` + account ID | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, sessions, CDP, crawl, PDF, links, extract, accessibility tree |
+| **playwright**   | none, local                                            | scrape, scrape waitFor, screenshot (session), element screenshot, screenshot waitFor, navigate, evaluate, sessions, crawl, PDF, links     |
 
-Anchor does not scrape. The row stays, because someone will look for it. Cloudflare also accepts `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+Anchor does not scrape. The row stays, because someone will look for it. Cloudflare can use your `cf auth login`, so there's no token to export. An exported `CLOUDFLARE_API_TOKEN` still needs an account variable.
 
 ## 🤖 Agents
 

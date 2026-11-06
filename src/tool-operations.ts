@@ -7,6 +7,7 @@ import {
   MAX_SCRAPE_MAX_CHARS,
   MAX_SEARCH_RESULTS,
 } from "./tool-contract.ts";
+import { hasCloudflareCredentials } from "./core/cloudflare.ts";
 import { BrowserError, InvalidInputError } from "./core/errors.ts";
 import { create, providers } from "./core/registry.ts";
 import {
@@ -320,7 +321,8 @@ export async function listBrowserSessions(
 }
 
 /**
- * Describes one registered provider, or marks it unconfigured when it cannot be built.
+ * Describes one registered provider, or marks it unconfigured when it cannot be built. Cloudflare
+ * builds without credentials, so it gets the lookup a request would make.
  *
  * @param name - Provider name.
  * @returns {Promise<BrowserProviderStatus>} Configuration state and capability flags.
@@ -328,6 +330,9 @@ export async function listBrowserSessions(
 async function providerStatus(name: string): Promise<BrowserProviderStatus> {
   try {
     const provider = await create(name);
+    if (name === "cloudflare" && !(await hasCloudflareCredentials())) {
+      return { name, configured: false, capabilities: {} };
+    }
     return { name, configured: true, capabilities: { ...provider.capabilities() } };
   } catch {
     return { name, configured: false, capabilities: {} };

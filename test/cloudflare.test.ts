@@ -6,8 +6,8 @@ import { create } from "../src/core/registry";
 import { browserAccessibility, browserScrape, browserScreenshot } from "../src/tool-operations";
 import type { BrowserProvider } from "../src/core/types";
 
-const previousToken = process.env.CF_API_TOKEN;
-const previousAccountID = process.env.CF_ACCOUNT_ID;
+const previousToken = process.env.CLOUDFLARE_API_TOKEN;
+const previousAccountID = process.env.CLOUDFLARE_ACCOUNT_ID;
 
 function jsonResponse(value: unknown): Response {
   return new Response(JSON.stringify(value), {
@@ -48,10 +48,10 @@ function cloudflareResponse(url: string): Response {
 afterEach(() => {
   vi.unstubAllGlobals();
   resetDefaultClientForTests();
-  if (previousToken === undefined) delete process.env.CF_API_TOKEN;
-  else process.env.CF_API_TOKEN = previousToken;
-  if (previousAccountID === undefined) delete process.env.CF_ACCOUNT_ID;
-  else process.env.CF_ACCOUNT_ID = previousAccountID;
+  if (previousToken === undefined) delete process.env.CLOUDFLARE_API_TOKEN;
+  else process.env.CLOUDFLARE_API_TOKEN = previousToken;
+  if (previousAccountID === undefined) delete process.env.CLOUDFLARE_ACCOUNT_ID;
+  else process.env.CLOUDFLARE_ACCOUNT_ID = previousAccountID;
 });
 
 describe("cloudflare browser selection", () => {
@@ -103,8 +103,8 @@ describe("cloudflare browser selection", () => {
 
   it("selects Cloudflare automatically when an agent requests Kitesurf", async () => {
     const urls: string[] = [];
-    process.env.CF_API_TOKEN = "test-token";
-    process.env.CF_ACCOUNT_ID = "test-account";
+    process.env.CLOUDFLARE_API_TOKEN = "test-token";
+    process.env.CLOUDFLARE_ACCOUNT_ID = "test-account";
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL | Request) => {
@@ -338,8 +338,8 @@ describe("cloudflare scrape", () => {
   });
 
   it("gives the agent tool markdown", async () => {
-    process.env.CF_API_TOKEN = "test-token";
-    process.env.CF_ACCOUNT_ID = "test-account";
+    process.env.CLOUDFLARE_API_TOKEN = "test-token";
+    process.env.CLOUDFLARE_ACCOUNT_ID = "test-account";
     recordRequests();
 
     const result = await browserScrape({ url: "https://example.test", provider: "cloudflare" });
@@ -411,8 +411,8 @@ describe("cloudflare errors", () => {
   const accountID = "account-8f3c2a";
 
   function failWith(status: number, message: string): void {
-    process.env.CF_API_TOKEN = "cf-token";
-    process.env.CF_ACCOUNT_ID = accountID;
+    process.env.CLOUDFLARE_API_TOKEN = "cf-token";
+    process.env.CLOUDFLARE_ACCOUNT_ID = accountID;
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -492,8 +492,8 @@ describe("cloudflare errors", () => {
   });
 
   it("waits past Browser Run's own 30 second waits and names the timeout", async () => {
-    process.env.CF_API_TOKEN = "cf-token";
-    process.env.CF_ACCOUNT_ID = accountID;
+    process.env.CLOUDFLARE_API_TOKEN = "cf-token";
+    process.env.CLOUDFLARE_ACCOUNT_ID = accountID;
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -516,8 +516,8 @@ describe("cloudflare errors", () => {
   });
 
   it("keeps the account ID out of a request with no response", async () => {
-    process.env.CF_API_TOKEN = "cf-token";
-    process.env.CF_ACCOUNT_ID = accountID;
+    process.env.CLOUDFLARE_API_TOKEN = "cf-token";
+    process.env.CLOUDFLARE_ACCOUNT_ID = accountID;
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -595,8 +595,8 @@ describe("cloudflare accessibility tree", () => {
   });
 
   it("tells the agent when root matches no element", async () => {
-    process.env.CF_API_TOKEN = "test-token";
-    process.env.CF_ACCOUNT_ID = "test-account";
+    process.env.CLOUDFLARE_API_TOKEN = "test-token";
+    process.env.CLOUDFLARE_ACCOUNT_ID = "test-account";
     const bodies: unknown[] = [];
     vi.stubGlobal(
       "fetch",

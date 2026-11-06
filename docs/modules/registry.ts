@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { addTemplate, defineNuxtModule } from "nuxt/kit";
 import { create } from "../../src/core/registry.ts";
-import { _hasKey, providerEnvHint } from "../../src/core/resolve.ts";
+import { _keyless, providerEnvHint } from "../../src/core/resolve.ts";
 import { builtins } from "../../src/providers/index.ts";
 import { browserCapabilities } from "../../src/tool-operations.ts";
 import { version } from "../../src/version.ts";
@@ -15,26 +15,22 @@ const PROVIDER_ENV = [
   "BROWSERLESS_API_KEY",
   "HYPERBROWSER_API_KEY",
   "ANCHOR_API_KEY",
-  "CF_API_TOKEN",
-  "CF_ACCOUNT_ID",
   "CLOUDFLARE_API_TOKEN",
+  "AGNTN_CLOUDFLARE_ACCOUNT_ID",
   "CLOUDFLARE_ACCOUNT_ID",
 ] as const;
 
 /**
- * Runs `callback` with every provider variable set to `value` (or cleared for `undefined`), then
+ * Runs `callback` with every provider variable set to `value`, then
  * puts the build's own environment back, so a key on the build machine never shapes the site.
  *
  * @param value - What every provider variable holds during the call.
  * @param callback - Work that reads the environment.
  * @returns {Promise<T>} What the callback returns.
  */
-async function withProviderEnv<T>(value: string | undefined, callback: () => T | Promise<T>): Promise<T> {
+async function withProviderEnv<T>(value: string, callback: () => T | Promise<T>): Promise<T> {
   const saved = PROVIDER_ENV.map((name) => [name, process.env[name]] as const);
-  for (const name of PROVIDER_ENV) {
-    if (value === undefined) delete process.env[name];
-    else process.env[name] = value;
-  }
+  for (const name of PROVIDER_ENV) process.env[name] = value;
   try {
     return await callback();
   } finally {
@@ -58,9 +54,7 @@ async function withProviderEnv<T>(value: string | undefined, callback: () => T |
 export default defineNuxtModule({
   meta: { name: "browsers-registry" },
   async setup(_options, nuxt) {
-    const keyless = await withProviderEnv(undefined, () =>
-      builtins.filter((entry) => _hasKey(entry.key)).map((entry) => entry.key),
-    );
+    const keyless = builtins.filter((entry) => _keyless(entry.key)).map((entry) => entry.key);
     const providers = await withProviderEnv("docs-build", () =>
       Promise.all(
         builtins.map(async (entry): Promise<ProviderRecord> => {

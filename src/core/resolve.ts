@@ -13,56 +13,62 @@ import type {
   ScrapeOptions,
   ScreenshotOptions,
 } from "./types.ts";
+import { hasCloudflareCredentials, resolveCloudflareCredentials } from "./cloudflare.ts";
 import { resolveCloudflareBrowser } from "./utils.ts";
 
-type ProviderEnvRequirements = readonly (readonly [string, ...string[]])[];
-
-const specialEnvRequirements: Readonly<Record<string, ProviderEnvRequirements>> = {
-  cloudflare: [
-    ["CF_API_TOKEN", "CLOUDFLARE_API_TOKEN"],
-    ["CF_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID"],
-  ],
-};
+/** Cloudflare reads `@agntn/credentials`, so a cf login stands in for the token and the account. */
+const CLOUDFLARE_TOKEN = "CLOUDFLARE_API_TOKEN";
+const CLOUDFLARE_HINT = `cf auth login or ${CLOUDFLARE_TOKEN}`;
 
 /**
- * Check whether a provider can run with the current environment.
+ * Check whether a provider runs without any credentials.
  *
  * @param {string} provider Provider name.
- * @returns {boolean} Whether credentials are available or unnecessary.
+ * @returns {boolean} True for the local browser.
  * @internal
  */
-export function _hasKey(provider: string): boolean {
-  if (provider === "playwright") return true;
-  const requirements = specialEnvRequirements[provider];
-  if (requirements) {
-    return requirements.every((group) => group.some((key) => Boolean(process.env[key])));
-  }
+export function _keyless(provider: string): boolean {
+  return provider === "playwright";
+}
+
+/**
+ * Check whether a provider can run here. Cloudflare also counts a cf CLI login, which takes
+ * running `cf auth whoami` when no token is exported.
+ *
+ * @param {string} provider Provider name.
+ * @returns {Promise<boolean>} Whether credentials are available or unnecessary.
+ * @internal
+ */
+export async function _hasKey(provider: string): Promise<boolean> {
+  if (_keyless(provider)) return true;
+  if (provider === "cloudflare") return hasCloudflareCredentials();
   return Boolean(process.env[`${provider.toUpperCase()}_API_KEY`]);
 }
 
 /**
- * Resolve a provider or reject a missing explicit choice.
+ * Resolve a provider or reject a missing explicit choice. A named Cloudflare fails with the
+ * credentials lookup's own reason: missing token or account, and how to log in.
  *
  * @param {string} [preferred] Preferred provider name.
- * @returns {string} Resolved provider name.
+ * @returns {Promise<string>} Resolved provider name.
  */
-export function resolveProvider(preferred?: string): string {
+export async function resolveProvider(preferred?: string): Promise<string> {
   const available = listProviders();
   if (preferred) {
     if (!available.includes(preferred)) {
       throw new UnknownProviderError(preferred);
     }
-    if (!_hasKey(preferred)) {
-      const requirements = specialEnvRequirements[preferred];
-      const message = requirements
-        ? `Missing configuration for ${preferred}. Set ${providerEnvHint(preferred)}`
-        : `Missing API key for ${preferred}. Set ${providerEnvKey(preferred)}`;
-      throw new AuthError(message, preferred);
+    if (preferred === "cloudflare") await resolveCloudflareCredentials({});
+    else if (!(await _hasKey(preferred))) {
+      throw new AuthError(
+        `Missing API key for ${preferred}. Set ${providerEnvKey(preferred)}`,
+        preferred,
+      );
     }
     return preferred;
   }
   for (const name of available) {
-    if (_hasKey(name)) return name;
+    if (await _hasKey(name)) return name;
   }
   throw new NoProviderConfiguredError();
 }
@@ -111,7 +117,7 @@ async function firstProvider<P extends BrowserProvider>(
 ): Promise<{ name: string; provider: P }> {
   const checked: string[] = [];
   for (const name of listProviders()) {
-    if (!_hasKey(name)) continue;
+    if (!(await _hasKey(name))) continue;
     const provider = await create(name);
     if (accepts(provider)) return { name, provider };
     checked.push(name);
@@ -154,7 +160,7 @@ export async function createProvider(
       operationLabels[operation],
     );
   }
-  const name = resolveProvider(browser && !preferred ? "cloudflare" : preferred);
+  const name = await resolveProvider(browser && !preferred ? "cloudflare" : preferred);
   const provider = await create(name, { browser: resolveCloudflareBrowser(name, browser) });
   if (operation && !supports(provider, operation)) {
     throw new UnsupportedOperationError(
@@ -245,7 +251,7 @@ export async function createScreenshotProvider(
  * @returns {string} Primary environment key.
  */
 export function providerEnvKey(provider: string): string {
-  return specialEnvRequirements[provider]?.[0]?.[0] ?? `${provider.toUpperCase()}_API_KEY`;
+  return provider === "cloudflare" ? CLOUDFLARE_TOKEN : `${provider.toUpperCase()}_API_KEY`;
 }
 
 /**
@@ -255,10 +261,7 @@ export function providerEnvKey(provider: string): string {
  * @returns {string} Readable environment requirement.
  */
 export function providerEnvHint(provider: string): string {
-  const requirements = specialEnvRequirements[provider];
-  return requirements
-    ? requirements.map(([primary]) => primary).join(" and ")
-    : providerEnvKey(provider);
+  return provider === "cloudflare" ? CLOUDFLARE_HINT : providerEnvKey(provider);
 }
 
 /**

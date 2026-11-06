@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stands in for the cf CLI so no test reaches a real login: prints BROWSERS_TEST_CF_WHOAMI, or a logged out status.
+printf '%s\n' "${BROWSERS_TEST_CF_WHOAMI:-{\"authenticated\":false\}}"

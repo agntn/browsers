@@ -208,8 +208,8 @@ describe("kitesurf crawl job", () => {
 
   it("names the browser the job has to be read with again", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
-    vi.stubEnv("CF_API_TOKEN", "token");
-    vi.stubEnv("CF_ACCOUNT_ID", "test-account");
+    vi.stubEnv("CLOUDFLARE_API_TOKEN", "token");
+    vi.stubEnv("CLOUDFLARE_ACCOUNT_ID", "test-account");
     const calls = stubFetch(({ method }) =>
       method === "POST"
         ? { success: true, result: "job-4" }

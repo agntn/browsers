@@ -15,6 +15,7 @@ const sharedReadonlyOptions = readonlyRule[1];
 export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
+    setupFiles: ["test/setup.ts"],
   },
   fmt: { ...oxfmt, ignorePatterns: ["CHANGELOG.md", "docs"] },
   /** Keep mutable public request types source-compatible while applying the shared policy elsewhere. */

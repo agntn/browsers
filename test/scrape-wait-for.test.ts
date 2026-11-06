@@ -64,7 +64,6 @@ describe("provider choice for waiting scrapes", () => {
       "BROWSERLESS_API_KEY",
       "HYPERBROWSER_API_KEY",
       "ANCHOR_API_KEY",
-      "CF_API_TOKEN",
       "CLOUDFLARE_API_TOKEN",
     ]) {
       vi.stubEnv(key, "");

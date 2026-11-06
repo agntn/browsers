@@ -29,24 +29,21 @@ docs/
 ## Commands
 
 ```bash
-pnpm install          # from docs/, the repo root needs no install or build first
+pnpm install          # from docs/ or the root, either way the whole workspace
 pnpm dev              # http://localhost:3000
 pnpm build            # Cloudflare Workers output in .output/, content routes prerendered
 pnpm deploy           # build, then wrangler deploy to browsers.agntn.dev
 ```
 
-Deployment: Workers Builds with root directory `docs`. It installs `docs/` and nothing else, and that's enough. Nitro preset `cloudflare_module`. Nuxt Content wants a D1 binding named `DB`. `wrangler.jsonc` carries it plus the `NUXT_SITE_URL` var. The database `agntn-browsers` lives in the EU jurisdiction, which is set at creation; the binding names it by id alone. No KV binding.
+Deployment: Workers Builds with root directory `docs`. `docs/` is a member of the root workspace, so its install walks up to the root `pnpm-lock.yaml` and fills both `node_modules`. Nitro preset `cloudflare_module`. Nuxt Content wants a D1 binding named `DB`. `wrangler.jsonc` carries it plus the `NUXT_SITE_URL` var. The database `agntn-browsers` lives in the EU jurisdiction, which is set at creation; the binding names it by id alone. No KV binding.
 
-`modules/registry.ts` imports `../src/core/registry.ts`, `../src/core/resolve.ts`, `../src/providers/index.ts` and `../src/tool-operations.ts` under Nuxt's jiti when Nuxt starts. That works without the root `node_modules` because nothing in that graph imports an npm package at module scope: HTTP goes through the native `fetch`, and `playwright-core` loads on the first launch, which the module never makes. A new top-level npm import anywhere under `src/core`, `src/providers` or `src/tool-operations.ts` breaks the deploy. Add the package to `docs/package.json` at the root's version, or keep the import lazy.
+`modules/registry.ts` imports `../src/core/registry.ts`, `../src/core/resolve.ts`, `../src/providers/index.ts` and `../src/tool-operations.ts` under Nuxt's jiti when Nuxt starts. Nothing in that graph imports an npm package at module scope: HTTP goes through the native `fetch`, and `playwright-core` loads on the first launch, which the module never makes. A bare import there would resolve from the root `node_modules`, which the workspace install fills, but keep it lazy anyway, since nothing in the library runs at import (root `AGENTS.md`).
 
-The template is plain JavaScript with a `.d.mts` beside it for the types. `nuxt build` keeps its build directory under `node_modules/.cache`, where Nitro strips no TypeScript, so a `.ts` template passed the first build of a checkout and broke every one after it.
+The template is plain JavaScript with a `.d.mts` beside it for the types. A `.ts` template passed the first build of a checkout and broke every one after it, back when `nuxt build` kept its build directory under `node_modules/.cache`, where Nitro strips no TypeScript. Since docs joined the root workspace the build lands in `docs/.nuxt`; the template stays JavaScript anyway, which works in both.
 
 The page itself imports only `src/tool-contract.ts` (through `#tool-contract`), which imports nothing. The provider modules stay out of the browser: `playwright.ts` imports `node:child_process`.
 
-Two resolution traps, both because the repo root is its own pnpm workspace:
-
-- `pnpm-workspace.yaml` sets `shamefullyHoist: true`. Without it `docs/node_modules` holds only direct dependencies, Node walks up to the root `node_modules`, and the server bundle can end up with a second copy of Vue.
-- `nuxt.config.ts` pins `workspaceDir` to `docs/`, disables devtools and telemetry, and adds the repo root to `vite.server.fs.allow`, since `src/version.ts` reads `../package.json`.
+Nothing is hoisted, so every package the site imports sits in `docs/package.json`, and `test/docs-dependencies.test.ts` fails on the one you forgot. Versions live in the `deps` and `dev` catalogs of the root `pnpm-workspace.yaml`, where one line moves the library and the site together. The `docs` catalog holds the site's own TypeScript 5.9: Docus parses through `@typescript-eslint`, whose peer stops below 6.1, while the library runs on 7.
 
 ## Live values
 

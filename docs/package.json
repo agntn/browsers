@@ -10,15 +10,21 @@
     "deploy": "pnpm build && wrangler deploy"
   },
   "dependencies": {
-    "better-sqlite3": "12.11.1",
-    "docus": "5.15.0",
-    "nuxt": "4.6.4"
+    "@vueuse/core": "catalog:deps",
+    "better-sqlite3": "catalog:deps",
+    "docus": "catalog:deps",
+    "nuxt": "catalog:deps",
+    "ufo": "catalog:deps"
   },
   "devDependencies": {
-    "@iconify-json/lucide": "1.2.149",
-    "@iconify-json/simple-icons": "1.2.101",
-    "@iconify-json/vscode-icons": "1.2.94",
-    "wrangler": "4.128.0"
+    "@iconify-json/lucide": "catalog:dev",
+    "@iconify-json/simple-icons": "catalog:dev",
+    "@iconify-json/vscode-icons": "catalog:dev",
+    "@nuxt/content": "catalog:dev",
+    "@nuxt/ui": "catalog:dev",
+    "shiki": "catalog:dev",
+    "typescript": "catalog:docs",
+    "wrangler": "catalog:dev"
   },
-  "packageManager": "pnpm@11.3.0"
+  "packageManager": "pnpm@12.18.0"
 }

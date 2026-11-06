@@ -26,6 +26,9 @@ jobs:
         with:
           node-version: v26.10.0
           registry-url: https://registry.npmjs.org
+          # The library alone: the tarball never sees docs/.
+          run-install: |
+            - args: ["--frozen-lockfile", "--filter", "@agntn/browsers"]
 
       - run: pnpm build
 

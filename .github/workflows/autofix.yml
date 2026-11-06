@@ -18,6 +18,9 @@ jobs:
         with:
           node-version: v26.10.0
           cache: true
+          # The library alone: lint skips docs/, so Nuxt and workerd stay out of this job.
+          run-install: |
+            - args: ["--frozen-lockfile", "--filter", "@agntn/browsers"]
 
       - name: Fix lint issues
         run: pnpm run lint:fix

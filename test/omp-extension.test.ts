@@ -1,11 +1,10 @@
 import { readFileSync } from "node:fs";
-import * as TypeBox from "@oh-my-pi/omptype/typebox";
-import { Value } from "typebox/value";
+import { validateInput, wireSchema } from "@agntn/tools";
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@oh-my-pi/pi-coding-agent";
 import { describe, expect, it } from "vite-plus/test";
 import browsersOmpExtension from "../extensions/omp/browsers";
 import { browserToolNames } from "../src/tool-contract";
-import { browserToolSchemas } from "../src/tool-schemas";
+import { browserTools } from "../src/tools";
 
 class TestText {
   constructor(private readonly text: string) {}
@@ -47,12 +46,15 @@ interface RegisteredExtension {
   tools: Map<string, ToolDefinition>;
 }
 
-function registerExtension(): RegisteredExtension {
+/** OMP's `Type.Unsafe` hands the schema over as is; the core validates inside `execute`. */
+const passThroughTypebox = { Type: { Unsafe: (schema: unknown) => schema } };
+
+async function registerExtension(): Promise<RegisteredExtension> {
   const tools = new Map<string, ToolDefinition>();
   let label: string | undefined;
   const api = {
     pi: { Text: TestText },
-    typebox: TypeBox,
+    typebox: passThroughTypebox,
     setLabel(value: string) {
       label = value;
     },
@@ -60,7 +62,7 @@ function registerExtension(): RegisteredExtension {
       tools.set(tool.name, tool);
     },
   };
-  browsersOmpExtension(api as unknown as ExtensionAPI);
+  await browsersOmpExtension(api as unknown as ExtensionAPI);
   return { label, tools };
 }
 
@@ -70,8 +72,19 @@ function requireTool(tools: Readonly<Map<string, ToolDefinition>>, name: string)
   return tool;
 }
 
+const definitions = new Map(browserTools.map((tool) => [tool.name, tool]));
+
+/**
+ * Whether the core takes the arguments the way every adapter checks them before `execute`.
+ *
+ * @param tool - Tool as OMP registered it.
+ * @param value - Arguments from the model.
+ * @returns {boolean} Whether they pass the tool schema.
+ */
 function accepts(tool: ToolDefinition, value: unknown): boolean {
-  return (tool.parameters as unknown as TypeBox.TSchema).safeParse(value).success;
+  const definition = definitions.get(tool.name);
+  if (!definition) throw new Error(`No definition for ${tool.name}`);
+  return validateInput(definition, value).ok;
 }
 
 const unusedContext = {} as ExtensionContext;
@@ -97,19 +110,14 @@ describe("browsers OMP extension", () => {
 
     expect(manifest.omp.extensions).toEqual(["./extensions/omp/browsers.ts"]);
     expect(manifest.exports).toHaveProperty("./mcp");
+    expect(manifest.files).not.toContain("src/tool-schemas.ts");
     expect(manifest.files).toEqual(
-      expect.arrayContaining([
-        "dist",
-        "extensions/omp",
-        "extensions/pi",
-        "src/tool-contract.ts",
-        "src/tool-schemas.ts",
-      ]),
+      expect.arrayContaining(["dist", "extensions/omp", "extensions/pi", "src/tool-contract.ts"]),
     );
   });
 
-  it("registers the complete browser tool surface with exact approvals", () => {
-    const { label, tools } = registerExtension();
+  it("registers the complete browser tool surface with exact approvals", async () => {
+    const { label, tools } = await registerExtension();
 
     expect(label).toBe("Browsers");
     expect([...tools.keys()]).toEqual([
@@ -126,24 +134,22 @@ describe("browsers OMP extension", () => {
       "browsers_search",
       "browsers_capabilities",
     ]);
-    expect(requireTool(tools, "browsers_session").approval).toBe("write");
-    expect(requireTool(tools, "browsers_release").approval).toBe("write");
-    for (const name of [...tools.keys()].filter(
-      (name) => name !== "browsers_session" && name !== "browsers_release",
-    )) {
-      expect(requireTool(tools, name).approval).toBe("read");
+    /** Screenshot and PDF write a file, so OMP asks first, as MCP's annotations say. */
+    const writes = ["browsers_session", "browsers_release", "browsers_screenshot", "browsers_pdf"];
+    for (const name of tools.keys()) {
+      expect(requireTool(tools, name).approval).toBe(writes.includes(name) ? "write" : "read");
     }
   });
 
-  it("registers custom call and result renderers for every tool", () => {
-    for (const tool of registerExtension().tools.values()) {
+  it("registers custom call and result renderers for every tool", async () => {
+    for (const tool of (await registerExtension()).tools.values()) {
       expect(typeof tool.renderCall).toBe("function");
       expect(typeof tool.renderResult).toBe("function");
     }
   });
 
-  it("adapts OMP spinner and result error state to the shared renderer", () => {
-    const tool = requireTool(registerExtension().tools, "browsers_links");
+  it("adapts OMP spinner and result error state to the shared renderer", async () => {
+    const tool = requireTool((await registerExtension()).tools, "browsers_links");
     if (!tool.renderCall || !tool.renderResult) throw new Error("Missing browser link renderers");
 
     const call: unknown = Reflect.apply(tool.renderCall, tool, [
@@ -161,8 +167,8 @@ describe("browsers OMP extension", () => {
     expect(renderComponent(result)).toBe("✗ Link extraction failed (failed)");
   });
 
-  it("keeps every OMP parameter schema aligned with Pi and MCP", () => {
-    const { tools } = registerExtension();
+  it("hands OMP the schema MCP lists and refuses what it refuses", async () => {
+    const { tools } = await registerExtension();
     const samples: Record<(typeof browserToolNames)[number], { valid: unknown; invalid: unknown }> =
       {
         browsers_scrape: {
@@ -219,22 +225,17 @@ describe("browsers OMP extension", () => {
 
     for (const name of browserToolNames) {
       const ompTool = requireTool(tools, name);
-      const sharedSchema = browserToolSchemas[name];
-      expect(accepts(ompTool, samples[name].valid)).toBe(
-        Value.Check(sharedSchema, samples[name].valid),
-      );
-      expect(accepts(ompTool, samples[name].invalid)).toBe(
-        Value.Check(sharedSchema, samples[name].invalid),
-      );
+      const definition = definitions.get(name);
+      if (!definition) throw new Error(`No definition for ${name}`);
+      expect(ompTool.parameters).toEqual(wireSchema(definition));
+      expect(accepts(ompTool, samples[name].valid)).toBe(true);
+      expect(accepts(ompTool, samples[name].invalid)).toBe(false);
       expect(accepts(ompTool, { ...(samples[name].valid as object), extra: true })).toBe(false);
-      expect(Value.Check(sharedSchema, { ...(samples[name].valid as object), extra: true })).toBe(
-        false,
-      );
     }
   });
 
-  it("declares the scrape contract enforced by the shared executor", () => {
-    const tool = requireTool(registerExtension().tools, "browsers_scrape");
+  it("declares the scrape contract enforced by the shared executor", async () => {
+    const tool = requireTool((await registerExtension()).tools, "browsers_scrape");
 
     expect(accepts(tool, { url: "https://example.test" })).toBe(true);
     expect(accepts(tool, { url: "https://example.test", browser: "kitesurf" })).toBe(true);
@@ -244,8 +245,8 @@ describe("browsers OMP extension", () => {
     expect(accepts(tool, { url: "https://example.test", maxChars: 10.5 })).toBe(false);
   });
 
-  it("declares the search contract enforced by the shared executor", () => {
-    const tool = requireTool(registerExtension().tools, "browsers_search");
+  it("declares the search contract enforced by the shared executor", async () => {
+    const tool = requireTool((await registerExtension()).tools, "browsers_search");
 
     expect(accepts(tool, { query: "browser agents" })).toBe(true);
     expect(accepts(tool, { query: "browser agents", maxResults: 1 })).toBe(true);
@@ -255,15 +256,15 @@ describe("browsers OMP extension", () => {
     expect(accepts(tool, { query: "browser agents", maxResults: 2.5 })).toBe(false);
   });
 
-  it("takes a crawl job ID in place of the starting URL", () => {
-    const tool = requireTool(registerExtension().tools, "browsers_crawl");
+  it("takes a crawl job ID in place of the starting URL", async () => {
+    const tool = requireTool((await registerExtension()).tools, "browsers_crawl");
 
     expect(accepts(tool, { jobId: "job-1", provider: "cloudflare" })).toBe(true);
     expect(accepts(tool, { jobId: "", provider: "cloudflare" })).toBe(false);
   });
 
   it("executes capability discovery through the shared operations module", async () => {
-    const tool = requireTool(registerExtension().tools, "browsers_capabilities");
+    const tool = requireTool((await registerExtension()).tools, "browsers_capabilities");
 
     const result = await tool.execute(
       "test",
@@ -275,5 +276,13 @@ describe("browsers OMP extension", () => {
 
     expect(contentTexts(result.content)[0]).toContain("[playwright]");
     expect(result.details).toMatchObject({ provider: "playwright" });
+  });
+
+  it("refuses bad arguments inside execute, where the core validates", async () => {
+    const tool = requireTool((await registerExtension()).tools, "browsers_search");
+
+    await expect(
+      tool.execute("test", { query: "x", maxResults: 11 }, undefined, undefined, unusedContext),
+    ).rejects.toThrow(/Invalid arguments at \/maxResults/);
   });
 });

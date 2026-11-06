@@ -176,16 +176,6 @@ export function sanitizeField(value: string): string {
   return value.replace(UNSAFE_CHARACTERS, " ").replaceAll(/ +/g, " ").trim();
 }
 
-/**
- * Reduces an unknown failure to one terminal safe line.
- *
- * @param error - Unknown failure value.
- * @returns {string} A terminal safe error message.
- */
-export function errorMessage(error: unknown): string {
-  return sanitizeField(error instanceof Error ? error.message : String(error));
-}
-
 function resolveMaxChars(value?: number): number {
   const maxChars = value ?? DEFAULT_SCRAPE_MAX_CHARS;
   if (!Number.isInteger(maxChars) || maxChars < 1 || maxChars > MAX_SCRAPE_MAX_CHARS) {
@@ -293,6 +283,36 @@ export async function releaseBrowserSession(
     content: content(`[provider=${name}] Session ${sanitizeField(params.sessionId)} released.`),
     details: { released: true },
   };
+}
+
+/** Public details for the active sessions of one provider. */
+export interface BrowserSessionsDetails {
+  sessions: Array<BrowserSessionDetails["session"]>;
+}
+
+/**
+ * Lists the active sessions of one provider, by ID only: a CDP URL carries the connection token.
+ *
+ * @param params - Provider to ask.
+ * @returns {Promise<ToolResult<BrowserSessionsDetails>>} One line per session.
+ */
+export async function listBrowserSessions(
+  params: Readonly<BrowserSessionParams>,
+): Promise<ToolResult<BrowserSessionsDetails>> {
+  const { name, provider } = await createProvider(params.provider, params.browser);
+  const sessions = (await provider.listSessions()).map((session) => ({
+    id: session.id,
+    provider: session.provider,
+    createdAt: session.createdAt,
+  }));
+  const lines =
+    sessions.length === 0
+      ? [`[provider=${name}] No active sessions.`]
+      : [
+          `[provider=${name}] ${sessions.length} active session${sessions.length === 1 ? "" : "s"}:`,
+          ...sessions.map((session) => sanitizeField(session.id)),
+        ];
+  return { content: content(lines.join("\n")), details: { sessions } };
 }
 
 /**

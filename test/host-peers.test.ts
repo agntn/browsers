@@ -21,6 +21,7 @@ const hostProvidedPackages = [
 
 interface Manifest {
   readonly dependencies?: Readonly<Record<string, string>>;
+  readonly devDependencies?: Readonly<Record<string, string>>;
   readonly peerDependencies?: Readonly<Record<string, string>>;
   readonly peerDependenciesMeta?: Readonly<Record<string, { readonly optional?: boolean }>>;
 }
@@ -34,12 +35,12 @@ describe("packages the host supplies", () => {
     );
   });
 
-  it("leave typebox an optional peer with the range Pi asks for", () => {
-    expect(manifest.peerDependencies?.typebox).toBe("*");
-    expect(manifest.peerDependenciesMeta?.typebox).toEqual({ optional: true });
+  it("leave typebox to @agntn/tools, which carries its own copy", () => {
+    expect(manifest.peerDependencies?.typebox).toBeUndefined();
+    expect(manifest.devDependencies?.typebox).toBeUndefined();
   });
 
-  it("leave the CLI and the MCP server a bundled typebox of their own", () => {
+  it("keep a bare typebox import out of dist, since OMP swaps it for a facade", () => {
     const importers = readdirSync(join(repoRoot, "dist"), { recursive: true, encoding: "utf8" })
       .filter((file) => file.endsWith(".mjs") || file.endsWith(".d.mts"))
       .filter((file) =>
@@ -49,11 +50,5 @@ describe("packages the host supplies", () => {
       );
 
     expect(importers).toEqual([]);
-  });
-
-  it("ship the license of the typebox they inline", () => {
-    expect(readFileSync(join(repoRoot, "dist/THIRD-PARTY-LICENSES.md"), "utf8")).toMatch(
-      /^## typebox$[\s\S]*?Copyright \(c\) .* Haydn Paterson/mu,
-    );
   });
 });

@@ -1,13 +1,9 @@
+import { sanitizeLine } from "@agntn/tools";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { resetDefaultClientForTests } from "../src/core/client";
 import { HTTPError, RateLimitError, TimeoutError, TransportError } from "../src/core/errors";
 import { create } from "../src/core/registry";
-import {
-  browserAccessibility,
-  browserScrape,
-  browserScreenshot,
-  errorMessage,
-} from "../src/tool-operations";
+import { browserAccessibility, browserScrape, browserScreenshot } from "../src/tool-operations";
 import type { BrowserProvider } from "../src/core/types";
 
 const previousToken = process.env.CF_API_TOKEN;
@@ -444,7 +440,7 @@ describe("cloudflare errors", () => {
       (failure: unknown) => failure,
     );
 
-    const text = errorMessage(error);
+    const text = sanitizeLine((error as Error).message);
     expect(text).toContain(`HTTP ${status}`);
     expect(text).toContain(reason);
     expect(text).toContain(path);
@@ -458,7 +454,7 @@ describe("cloudflare errors", () => {
       (failure: unknown) => failure,
     );
 
-    const text = errorMessage(error);
+    const text = sanitizeLine((error as Error).message);
     expect(text).toContain("Rate limited by");
     expect(text).toContain("/accounts/[account]/browser-rendering/markdown");
     expect(text).toContain("Rate limit exceeded");
@@ -475,7 +471,7 @@ describe("cloudflare errors", () => {
       (failure: unknown) => failure,
     );
 
-    expect(errorMessage(error)).toBe(
+    expect(sanitizeLine((error as Error).message)).toBe(
       "HTTP 404 from https://api.cloudflare.com/client/v4/accounts/[account]/browser-rendering/markdown: Could not route to /client/v4/accounts/[account]/browser-rendering/markdown, perhaps your object identifier is invalid?",
     );
     expect((error as HTTPError).body).not.toContain(accountID);
@@ -489,7 +485,9 @@ describe("cloudflare errors", () => {
     );
 
     expect(error).toBeInstanceOf(RateLimitError);
-    expect(errorMessage(error)).toContain("Too many requests for account [account]");
+    expect(sanitizeLine((error as Error).message)).toContain(
+      "Too many requests for account [account]",
+    );
     expect((error as RateLimitError).body).not.toContain(accountID);
   });
 
@@ -512,7 +510,7 @@ describe("cloudflare errors", () => {
     );
 
     expect(error).toBeInstanceOf(TimeoutError);
-    expect(errorMessage(error)).toBe(
+    expect(sanitizeLine((error as Error).message)).toBe(
       "Timed out after 90s with no response from https://api.cloudflare.com/client/v4/accounts/[account]/browser-rendering/markdown",
     );
   });
@@ -536,7 +534,7 @@ describe("cloudflare errors", () => {
     );
 
     expect(error).toBeInstanceOf(TransportError);
-    expect(errorMessage(error)).toBe(
+    expect(sanitizeLine((error as Error).message)).toBe(
       "No response from https://api.cloudflare.com/client/v4/accounts/[account]/browser-rendering/markdown: getaddrinfo EAI_AGAIN api.cloudflare.com",
     );
   });

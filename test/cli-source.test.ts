@@ -112,7 +112,7 @@ describe("browsers mcp from the built bin", () => {
     }
   });
 
-  it("keeps the bundle in a checkout without dev dependencies", () => {
+  it.skipIf(!stripsTypes)("runs the source in a checkout with runtime dependencies only", () => {
     const copy = mkdtempSync(join(tmpdir(), "browsers-prod-"));
     try {
       for (const entry of ["dist", "src", "package.json"]) {
@@ -122,7 +122,6 @@ describe("browsers mcp from the built bin", () => {
         dependencies?: Record<string, string>;
       };
       const dependencies = Object.keys(manifest.dependencies ?? {});
-      expect(dependencies).not.toContain("typebox");
       for (const name of dependencies) {
         mkdirSync(join(copy, "node_modules", name, ".."), { recursive: true });
         symlinkSync(join(repoRoot, "node_modules", name), join(copy, "node_modules", name));
@@ -131,8 +130,8 @@ describe("browsers mcp from the built bin", () => {
       const copiedSource = pathToFileURL(join(copy, "src/")).href;
 
       expect(result.status).toBe(0);
-      expect(result.loaded).toContain(pathToFileURL(join(copy, "dist/_chunks/mcp.mjs")).href);
-      expect(result.loaded.filter((url) => url.startsWith(copiedSource))).toEqual([]);
+      expect(result.loaded).toContain(`${copiedSource}mcp.ts`);
+      expect(result.loaded).not.toContain(pathToFileURL(join(copy, "dist/_chunks/mcp.mjs")).href);
     } finally {
       rmSync(copy, { recursive: true, force: true });
     }

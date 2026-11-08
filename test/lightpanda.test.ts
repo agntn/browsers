@@ -242,6 +242,24 @@ describe("lightpanda fetch, cloud", () => {
     expect(requests.map(({ url }) => url)).toContain("/ws?token=wrong&browser=lightpanda");
   });
 
+  it("checks an attached server at its /json/version, whatever path its socket has", async () => {
+    const paths: (string | undefined)[] = [];
+    const cdp = createServer((req, res) => {
+      paths.push(req.url);
+      res.statusCode = req.url === "/json/version" ? 200 : 404;
+      res.end(req.url === "/json/version" ? "{}" : "not found");
+    });
+    await new Promise<void>((resolve) => cdp.listen(0, "127.0.0.1", resolve));
+    const { port } = cdp.address() as AddressInfo;
+    const provider = await create("lightpanda", {
+      baseURL: `ws://127.0.0.1:${port}/devtools/browser/abc`,
+    });
+
+    await expect(provider.checkAvailability?.()).resolves.toBeUndefined();
+    expect(paths).toEqual(["/json/version"]);
+    await new Promise<void>((resolve) => cdp.close(() => resolve()));
+  });
+
   it("throws NavigationError when the cloud got no status from the site", async () => {
     reply = { status: 200, body: JSON.stringify({ data: "", status: 0 }) };
     const provider = await create("lightpanda", { apiKey: "lpd-test", baseURL });

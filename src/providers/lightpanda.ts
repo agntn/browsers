@@ -254,6 +254,17 @@ async function openEndpoint(target: Readonly<Target>): Promise<Endpoint> {
 }
 
 /**
+ * The `/json/version` route of the server behind a CDP socket, whatever path the socket has.
+ *
+ * @param {string} socket - A `ws://` or `wss://` address, like Chrome's `/devtools/browser/<id>`.
+ * @returns {string} The `http(s)` version route on the same host.
+ */
+function versionRoute(socket: string): string {
+  const { protocol, host } = new URL(socket);
+  return `${protocol.replace(/^ws/, "http")}//${host}/json/version`;
+}
+
+/**
  * Connects over CDP and opens a page in a context of its own, which Lightpanda limits to one page.
  *
  * @param {Endpoint} endpoint - Where to connect.
@@ -720,7 +731,7 @@ class LightpandaProvider implements BrowserProvider {
     try {
       if (target.kind === "launch") await execFileAsync(target.executable, ["version"]);
       else if (target.kind === "attach") {
-        await this.client.getJSON(`${target.endpoint.replace(/^ws/, "http")}/json/version`);
+        await this.client.getJSON(versionRoute(target.endpoint));
       } else await this.cloudFetch("https://example.com", "markdown");
     } catch (error) {
       throw target.kind === "launch"

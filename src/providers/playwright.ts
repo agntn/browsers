@@ -485,8 +485,9 @@ class PlaywrightProvider implements BrowserProvider {
   }
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
+    let browser: Browser | undefined;
     try {
-      const browser = await launch(options?.headless ?? true);
+      browser = await launch(options?.headless ?? true);
       const context = await browser.newContext({
         viewport: options?.viewport ?? { width: 1280, height: 720 },
       });
@@ -504,6 +505,7 @@ class PlaywrightProvider implements BrowserProvider {
       });
       return { ...session };
     } catch (error) {
+      await browser?.close().catch(() => {});
       throw normalizeError(error, "playwright");
     }
   }

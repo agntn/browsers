@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import type { ServerResponse } from "node:http";
 import { describe, it, expect, afterAll, beforeAll } from "vite-plus/test";
@@ -9,6 +10,12 @@ import {
   SessionNotFoundError,
 } from "../src/core/errors";
 import type { BrowserProvider, BrowserSession } from "../src/core/types";
+
+/* Processes this test file started; Playwright launches Chrome as a direct child. */
+function childPids(): string[] {
+  const result = spawnSync("pgrep", ["-P", String(process.pid)], { encoding: "utf8" });
+  return result.stdout.split("\n").filter(Boolean);
+}
 
 // A cold Chrome launch on a CI runner takes longer than the 5 s vitest default.
 describe("playwright provider (local)", { timeout: 30_000 }, () => {
@@ -66,6 +73,20 @@ describe("playwright provider (local)", { timeout: 30_000 }, () => {
 
     await expect(releaseProvider.getSession(session.id)).resolves.toBeNull();
     await expect(provider.listSessions()).resolves.not.toContainEqual(session);
+  });
+
+  it("closes its Chrome when the session's page won't open", async () => {
+    const children = childPids();
+    const listed = await provider.listSessions();
+
+    const error = await provider
+      .createSession({ headless: true, viewport: { width: -5, height: 10 } })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(BrowserError);
+    expect((error as Error).message).toContain("Screen width and height values must be positive");
+    expect(childPids()).toEqual(children);
+    await expect(provider.listSessions()).resolves.toEqual(listed);
   });
 
   it("scrapes a data: URL", async () => {

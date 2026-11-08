@@ -21,5 +21,17 @@
       "enabled": true,
       "invocation_logs": true
     }
+  },
+  "previews": {
+    "vars": {
+      "NUXT_SITE_URL": "https://browsers.agntn.dev"
+    },
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "agntn-browsers-preview",
+        "database_id": "b9f3e52e-5e2f-42d0-899f-c552d87dc6cc"
+      }
+    ]
   }
 }

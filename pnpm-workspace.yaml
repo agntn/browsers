@@ -3,7 +3,7 @@ packages:
 
 allowBuilds:
   "@google/genai": false
-  better-sqlite3: true
+  better-sqlite3: false
   esbuild: true
   onnxruntime-node: false
   protobufjs: false
@@ -25,7 +25,6 @@ catalogs:
     "@agntn/tools": 0.3.0
     "@modelcontextprotocol/server": 2.4.0
     "@vueuse/core": 15.0.0
-    better-sqlite3: 12.11.1
     docus: 5.15.0
     nuxt: 4.6.4
     playwright-core: 1.60.0

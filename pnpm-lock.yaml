@@ -22,9 +22,6 @@ catalogs:
     '@vueuse/core':
       specifier: 15.0.0
       version: 15.0.0
-    better-sqlite3:
-      specifier: 12.11.1
-      version: 12.11.1
     docus:
       specifier: 5.15.0
       version: 5.15.0
@@ -171,9 +168,6 @@ importers:
       '@vueuse/core':
         specifier: catalog:deps
         version: 15.0.0(vue@3.5.45(typescript@5.9.3))
-      better-sqlite3:
-        specifier: catalog:deps
-        version: 12.11.1
       docus:
         specifier: catalog:deps
         version: 5.15.0(57e86dac496d7163bd7e55b0d0a7ff32)

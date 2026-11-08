@@ -28,7 +28,18 @@ const CLOUDFLARE_HINT = `cf auth login or ${CLOUDFLARE_TOKEN}`;
  * @internal
  */
 export function _keyless(provider: string): boolean {
-  return provider === "playwright" || provider === "lightpanda";
+  return provider === "playwright" || provider === "lightpanda" || provider === "attach";
+}
+
+/**
+ * Check whether a call that names no provider may land here. Never attach: it drives your logins.
+ *
+ * @param {string} provider Provider name.
+ * @returns {boolean} False for attach.
+ * @internal
+ */
+export function _autoSelectable(provider: string): boolean {
+  return provider !== "attach";
 }
 
 /**
@@ -68,7 +79,7 @@ export async function resolveProvider(preferred?: string): Promise<string> {
     return preferred;
   }
   for (const name of available) {
-    if (await _hasKey(name)) return name;
+    if (_autoSelectable(name) && (await _hasKey(name))) return name;
   }
   throw new NoProviderConfiguredError();
 }
@@ -117,7 +128,7 @@ async function firstProvider<P extends BrowserProvider>(
 ): Promise<{ name: string; provider: P }> {
   const checked: string[] = [];
   for (const name of listProviders()) {
-    if (!(await _hasKey(name))) continue;
+    if (!_autoSelectable(name) || !(await _hasKey(name))) continue;
     const provider = await create(name);
     if (accepts(provider)) return { name, provider };
     checked.push(name);

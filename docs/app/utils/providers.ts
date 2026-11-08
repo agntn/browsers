@@ -56,6 +56,11 @@ const PRESENTATION: Record<BrowserProviderName, { name: string; icon: string; bl
     icon: "i-lucide-paw-print",
     blurb: "Its own engine, not Chromium. A local binary or the cloud, and it never paints",
   },
+  attach: {
+    name: "Attach",
+    icon: "i-lucide-cable",
+    blurb: "Your logged-in tabs, without handing over the mouse",
+  },
 };
 
 export interface ProviderEntry extends ProviderRecord {

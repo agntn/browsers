@@ -27,6 +27,7 @@ import {
   normalizeError,
 } from "../core/errors.ts";
 import { assertUrl, assertUrlOrSession, waitForMissMessage } from "../core/utils.ts";
+import { dropProcessSession, holdProcessSession } from "../core/process-sessions.ts";
 import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
 import type { Browser, Frame, Page } from "playwright-core";
@@ -435,6 +436,10 @@ class PlaywrightProvider implements BrowserProvider {
         metadata: { headless: options?.headless ?? true },
       };
       playwrightSessions.set(session.id, { session, browser, page });
+      holdProcessSession(session.id, {
+        provider: "playwright",
+        release: async () => this.releaseSession(session.id),
+      });
       return { ...session };
     } catch (error) {
       throw normalizePlaywrightError(error);
@@ -453,6 +458,7 @@ class PlaywrightProvider implements BrowserProvider {
   async releaseSession(sessionId: string): Promise<void> {
     const record = this.getSessionData(sessionId);
     playwrightSessions.delete(sessionId);
+    dropProcessSession(sessionId);
     await record.browser.close().catch(() => {});
   }
 

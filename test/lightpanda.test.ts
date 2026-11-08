@@ -1,4 +1,3 @@
-import { execSync } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
@@ -16,6 +15,7 @@ import {
   UnsupportedOperationError,
 } from "../src/core/errors";
 import { create } from "../src/core/registry";
+import { systemChromium } from "./chromium";
 import { _keyless } from "../src/core/resolve";
 
 /* Every variable the provider reads, cleared around each test and set only where a test says. */
@@ -267,21 +267,6 @@ describe("lightpanda fetch, cloud", () => {
     await expect(provider.scrape("https://example.com")).rejects.toBeInstanceOf(NavigationError);
   });
 });
-
-function systemChromium(): string | undefined {
-  for (const name of ["google-chrome-stable", "google-chrome", "chromium", "chromium-browser"]) {
-    try {
-      const path = execSync(`which ${name}`, {
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "ignore"],
-      }).trim();
-      if (path) return path;
-    } catch {
-      /* not found */
-    }
-  }
-  return undefined;
-}
 
 async function freePort(): Promise<number> {
   const probe = createServer();

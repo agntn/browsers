@@ -1,6 +1,7 @@
 /** What only the CLI has; anything an agent needs goes to `tools.ts`. */
 import { defineTool, Type } from "@agntn/tools";
 import { BrowserError } from "./core/errors.ts";
+import { releaseProcessSessions } from "./core/process-sessions.ts";
 import { browserProviderNames } from "./tool-contract.ts";
 import { loadOperations } from "./tools.ts";
 
@@ -48,6 +49,15 @@ export function normalizeSessionWords(args: readonly string[]): string[] {
   const [command, word, ...rest] = args;
   const target = command === "session" && word !== undefined ? sessionWords.get(word) : undefined;
   return target === undefined ? [...args] : [target, ...rest];
+}
+
+/** Releases this process's sessions, which no later command can reach, and says so on stderr. */
+export async function releaseCommandSessions(): Promise<void> {
+  for (const { id, provider } of await releaseProcessSessions()) {
+    process.stderr.write(
+      `[provider=${provider}] Session ${id} released: it lived in this process.\n`,
+    );
+  }
 }
 
 /**

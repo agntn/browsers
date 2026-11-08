@@ -1,4 +1,3 @@
-import { execSync } from "node:child_process";
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -7,6 +6,7 @@ import type { Browser } from "playwright-core";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import { SessionNotFoundError } from "../src/core/errors";
 import { create } from "../src/core/registry";
+import { systemChromium } from "./chromium";
 
 interface CapturedRequest {
   method?: string;
@@ -249,21 +249,6 @@ describe("browserless current session API", () => {
     ]);
   });
 });
-
-function systemChromium(): string | undefined {
-  for (const name of ["google-chrome-stable", "google-chrome", "chromium", "chromium-browser"]) {
-    try {
-      const path = execSync(`which ${name}`, {
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "ignore"],
-      }).trim();
-      if (path) return path;
-    } catch {
-      // not found
-    }
-  }
-  return undefined;
-}
 
 async function freePort(): Promise<number> {
   const probe = createServer();

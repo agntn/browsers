@@ -5,7 +5,12 @@ import { existsSync } from "node:fs";
 import { sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCli } from "@agntn/tools/cli";
-import { isRefusal, normalizeSessionWords, sessionsCommand } from "./cli-commands.ts";
+import {
+  isRefusal,
+  normalizeSessionWords,
+  releaseCommandSessions,
+  sessionsCommand,
+} from "./cli-commands.ts";
 import type { serveStdio } from "./mcp-stdio.ts";
 import { browserTools } from "./tools.ts";
 import { version } from "./version.ts";
@@ -58,17 +63,21 @@ const argv = process.argv.slice(2);
 if (servesStdio(argv)) {
   (await loadServer())();
 } else {
-  await runCli(
-    {
-      name: "browsers",
-      version,
-      description: "Unified browser-as-a-service provider for agents and CLI",
-      tools: browserTools,
-      commands: [sessionsCommand],
-      fallback: "scrape",
-      mcp: true,
-      expected: isRefusal,
-    },
-    normalizeSessionWords(argv),
-  );
+  try {
+    await runCli(
+      {
+        name: "browsers",
+        version,
+        description: "Unified browser-as-a-service provider for agents and CLI",
+        tools: browserTools,
+        commands: [sessionsCommand],
+        fallback: "scrape",
+        mcp: true,
+        expected: isRefusal,
+      },
+      normalizeSessionWords(argv),
+    );
+  } finally {
+    await releaseCommandSessions();
+  }
 }

@@ -1,12 +1,25 @@
+import { spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import type { Browser } from "playwright-core";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+} from "vite-plus/test";
 import {
   AuthError,
   BrowserError,
@@ -36,7 +49,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await rm(scratch, { recursive: true, force: true });
+  await rm(scratch, { recursive: true, force: true, maxRetries: 5 });
 });
 
 beforeEach(() => {
@@ -326,6 +339,30 @@ async function serving(cdpUrl: string): Promise<boolean> {
 /* A cold Chrome launch on a CI runner takes longer than the vitest defaults. */
 const chromeTimeout = 30_000;
 
+/* Runs the host fixture on its own profile, so whatever outlives it can be found and killed. */
+async function hostSession(...args: string[]) {
+  const profile = await mkdtemp(join(scratch, "host-"));
+  const host = spawn(
+    process.execPath,
+    [fileURLToPath(new URL("fixtures/lightpanda-host.ts", import.meta.url)), ...args],
+    {
+      env: { ...process.env, BROWSERS_TEST_LIGHTPANDA_PROFILE: profile },
+      stdio: ["ignore", "pipe", "inherit"],
+    },
+  );
+  onTestFinished(() => {
+    host.kill("SIGKILL");
+    spawnSync("pkill", ["-f", profile]);
+  });
+  const exited = once(host, "exit");
+  const reader = createInterface({ input: host.stdout });
+  const lines: string[] = [];
+  reader.on("line", (line) => lines.push(line));
+  const closed = once(reader, "close");
+  const [cdpUrl] = (await once(reader, "line")) as [string];
+  return { host, cdpUrl, lines, exited, closed };
+}
+
 describe("lightpanda over CDP", { timeout: chromeTimeout }, () => {
   let site: Server;
   let page: string;
@@ -352,6 +389,7 @@ describe("lightpanda over CDP", { timeout: chromeTimeout }, () => {
   });
 
   it("starts lightpanda serve for a session and stops it on release", async () => {
+    const listeners = process.listenerCount("SIGTERM");
     const provider = await create("lightpanda");
     const session = await provider.createSession();
 
@@ -367,6 +405,7 @@ describe("lightpanda over CDP", { timeout: chromeTimeout }, () => {
     await other.releaseSession(session.id);
     expect(await provider.listSessions()).toEqual([]);
     await expect.poll(() => serving(session.cdpUrl ?? ""), { timeout: 10_000 }).toBe(false);
+    expect(process.listenerCount("SIGTERM")).toBe(listeners);
   });
 
   it("scrapes with waitFor and reads links on a server of their own", async () => {
@@ -399,5 +438,26 @@ describe("lightpanda over CDP", { timeout: chromeTimeout }, () => {
     await provider.releaseSession(session.id);
     expect(await serving(version.webSocketDebuggerUrl)).toBe(true);
     expect((await provider.scrape(page)).title).toBe("Panda page");
+  });
+
+  it("stops lightpanda serve when its host gets SIGTERM, and still dies of it", async () => {
+    const { host, cdpUrl, exited } = await hostSession();
+    expect(await serving(cdpUrl)).toBe(true);
+
+    host.kill("SIGTERM");
+
+    expect(await exited).toEqual([null, "SIGTERM"]);
+    await expect.poll(() => serving(cdpUrl), { timeout: 10_000 }).toBe(false);
+  });
+
+  it("leaves SIGTERM to a host that handles it, after stopping lightpanda serve", async () => {
+    const { host, cdpUrl, lines, exited, closed } = await hostSession("--handle");
+
+    host.kill("SIGTERM");
+
+    expect(await exited).toEqual([0, null]);
+    await closed;
+    expect(lines).toEqual([cdpUrl, "handled"]);
+    await expect.poll(() => serving(cdpUrl), { timeout: 10_000 }).toBe(false);
   });
 });

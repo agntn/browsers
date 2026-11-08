@@ -46,6 +46,12 @@ const SERVE_START_TIMEOUT = 10_000;
 /** Milliseconds one `lightpanda fetch` may run before it is killed. */
 const FETCH_TIMEOUT = 60_000;
 
+/** Signals that end the host. A `lightpanda serve` it started has to go down with it. */
+const HOST_SIGNALS = ["SIGTERM", "SIGINT", "SIGHUP"] as const;
+
+/** The stop of every `lightpanda serve` this process started and hasn't stopped yet. */
+const runningServers = new Set<() => void>();
+
 /** A failed `goto` with Lightpanda's own reason, like `CouldntResolveHost`. */
 const GOTO_FAILURE = /^page\.goto: ([A-Z][A-Za-z]+) at /;
 
@@ -215,6 +221,37 @@ async function waitUntilServing(
 }
 
 /**
+ * Stops every server, then sends the signal again when no other listener would take it.
+ *
+ * @param {NodeJS.Signals} signal - What the host got.
+ */
+function stopServersOnSignal(signal: NodeJS.Signals): void {
+  for (const stop of runningServers) stop();
+  if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
+}
+
+/**
+ * Counts a server in, and listens for the host's signals while it is the only one.
+ *
+ * @param {() => void} stop - What stops it.
+ */
+function holdServer(stop: () => void): void {
+  runningServers.add(stop);
+  if (runningServers.size > 1) return;
+  for (const signal of HOST_SIGNALS) process.on(signal, stopServersOnSignal);
+}
+
+/**
+ * Counts a server out, and lets go of the host's signals once none is left.
+ *
+ * @param {() => void} stop - The stop `holdServer` got.
+ */
+function dropServer(stop: () => void): void {
+  if (!runningServers.delete(stop) || runningServers.size > 0) return;
+  for (const signal of HOST_SIGNALS) process.off(signal, stopServersOnSignal);
+}
+
+/**
  * Starts `lightpanda serve` on a free loopback port and waits until it answers.
  *
  * @param {string} executable - The Lightpanda binary.
@@ -226,8 +263,11 @@ async function launchServer(executable: string): Promise<Endpoint> {
     stdio: "ignore",
   });
   const stop = (): void => {
+    dropServer(stop);
     child.kill();
   };
+  holdServer(stop);
+  child.once("exit", () => dropServer(stop));
   const died = new Promise<never>((_resolve, reject) => {
     child.once("error", reject);
     child.once("exit", (code) => {

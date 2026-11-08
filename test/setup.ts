@@ -13,4 +13,5 @@ delete process.env.BROWSERS_TEST_CF_WHOAMI;
 delete process.env.LIGHTPANDA_API_KEY;
 delete process.env.LPD_TOKEN;
 delete process.env.LIGHTPANDA_EXECUTABLE_PATH;
+delete process.env.ATTACH_URL;
 process.env.PATH = `${fileURLToPath(new URL("fixtures/bin", import.meta.url))}${delimiter}${process.env.PATH ?? ""}`;

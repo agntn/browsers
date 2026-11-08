@@ -357,7 +357,7 @@ export const linksTool = defineTool({
   input: Type.Object(
     {
       url: Type.String({ description: "URL to extract links from" }),
-      provider: providerOf("cloudflare", "playwright", "lightpanda"),
+      provider: providerOf("cloudflare", "playwright", "lightpanda", "attach"),
       browser,
       limit: Type.Optional(
         Type.Integer({

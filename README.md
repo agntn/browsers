@@ -15,10 +15,11 @@ Steel scrapes in one HTTP call. Kernel wants a live session first. Browserbase h
 
 ## ✨ Features
 
-- 🧩 **Every backend, one contract.** Steel, Browserbase, Kernel, Browserless, Hyperbrowser, Anchor, Cloudflare, Playwright and Lightpanda. Same objects on your side. Anchor still has no scrape.
+- 🧩 **Every backend, one contract.** Steel, Browserbase, Kernel, Browserless, Hyperbrowser, Anchor, Cloudflare, Playwright, Lightpanda and Attach. Same objects on your side. Anchor still has no scrape.
 - 🖥️ **Playwright is local.** No key. Chromium on the machine you already have.
 - 🐼 **Lightpanda isn't Chromium.** A headless browser built from scratch. No token, and it runs your local `lightpanda`, no key, no bill. With `LIGHTPANDA_API_KEY` it goes to the cloud. It never paints, so no screenshots or PDFs.
-- ⚡ **Stateless where the vendor is.** Steel, Browserbase, Browserless, Hyperbrowser, Cloudflare, Playwright and Lightpanda scrape without you opening a session. Kernel will not.
+- 🔌 **Attach reads your own tabs.** Borrowed books and SSO dashboards are fair game. Name the provider explicitly. Your browser stays open, and navigation stays yours.
+- ⚡ **Stateless where the vendor is.** Steel, Browserbase, Browserless, Hyperbrowser, Cloudflare, Playwright, Lightpanda and Attach scrape without you opening a session. Kernel will not.
 - 📸 **The extras follow the backend.** PDFs, crawls, links, AI extract, search. Anchor will not scrape. Hyperbrowser will search.
 - 🏷️ **`capabilities()` is the list.** Navigate is true on Kernel, Browserless, Playwright and Lightpanda. False on Steel. Read the flag.
 - 🤖 **One set of tools for people and models.** The CLI, MCP, Pi, OMP and the AI SDK get the same tools. Plus the library. Six surfaces, one list.
@@ -118,9 +119,10 @@ browsers providers
 ○ cloudflare
 ● playwright  scrape screenshot navigate evaluate sessions statelessScrape elementScreenshot screenshotWaitFor scrapeWaitFor crawl pdf links
 ● lightpanda  scrape navigate evaluate sessions cdp statelessScrape scrapeWaitFor links
+● attach  scrape screenshot evaluate sessions statelessScrape statelessScreenshot elementScreenshot screenshotWaitFor scrapeWaitFor links
 ```
 
-A filled dot means the provider can run here. Usually that's a key in the env. Cloudflare also counts your `cf auth login`, which costs one `cf auth whoami`. Playwright and Lightpanda are always filled. A few more:
+A filled dot means the provider can run here. Usually that's a key in the env. Cloudflare also counts your `cf auth login`, which costs one `cf auth whoami`. Playwright, Lightpanda and Attach are always filled, though Attach still waits for you to name it. A few more:
 
 ```bash
 browsers scrape https://example.com --provider playwright --wait-for p
@@ -187,6 +189,7 @@ That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resol
 | **cloudflare**   | `cf auth login` or `CLOUDFLARE_API_TOKEN` + account ID | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, sessions, CDP, crawl, PDF, links, extract, accessibility tree |
 | **playwright**   | none, local                                            | scrape, scrape waitFor, screenshot (session), element screenshot, screenshot waitFor, navigate, evaluate, sessions, crawl, PDF, links     |
 | **lightpanda**   | none, local, or `LIGHTPANDA_API_KEY` for its cloud     | scrape, scrape waitFor, navigate, evaluate, sessions, CDP, links                                                                          |
+| **attach**       | none, your own browser on port 9222 or `ATTACH_URL`    | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, evaluate, sessions, links                                     |
 
 Anchor does not scrape. The row stays, because someone will look for it. Cloudflare can use your `cf auth login`, so there's no token to export. An exported `CLOUDFLARE_API_TOKEN` still needs an account variable.
 
@@ -210,11 +213,13 @@ Twelve tools, `browsers_scrape` through `browsers_capabilities`, the same twelve
 
 `browsers_screenshot` hands the image back to the model. A full page too big for that goes to a file: pass `path`, and it refuses to overwrite one that exists. `browsers_pdf` always writes to `path`, under the same rule, since a PDF cannot go back to the model.
 
-Pass `selector` and you get one element instead of the page. Cloudflare, Browserless and Playwright can do that. Leave `provider` out and one of them gets picked; name another and it says no rather than hand back the whole page.
+Pass `selector` and you get one element instead of the page. Cloudflare, Browserless and Playwright can do that. Attach can too, once you name it. Leave `provider` out and one of them gets picked; name another and it says no rather than hand back the whole page.
 
-`waitFor` holds the shot until a CSS selector shows up, so a page that fills itself in late stops coming back half built. Same three providers, same flat no from the rest.
+`waitFor` holds the shot until a CSS selector shows up, so a page that fills itself in late stops coming back half built. Same three providers, plus Attach by name, same flat no from the rest.
 
-`browsers_scrape` takes `waitFor` too. Kernel joins the club there, since it runs Playwright inside the session anyway. Lightpanda is a browser itself and waits through CDP. Steel, Browserbase and Hyperbrowser have nothing to wait with, so they refuse before a single request. Used to be they'd hand back the empty skeleton and call it a scrape.
+`browsers_scrape` takes `waitFor` too. Kernel joins the club there, since it runs Playwright inside the session anyway. Lightpanda is a browser itself and waits through CDP. Attach waits right in your own tab.
+
+Steel, Browserbase and Hyperbrowser have nothing to wait with, so they refuse before a single request. Used to be they'd hand back the empty skeleton and call it a scrape.
 
 ### AI SDK
 

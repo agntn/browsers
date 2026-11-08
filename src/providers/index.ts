@@ -54,4 +54,9 @@ export const builtins: readonly ProviderEntry[] = [
     defaultURL: "local",
     load: () => import("./lightpanda.ts").then((m) => m.factory),
   },
+  {
+    key: "attach",
+    defaultURL: "local",
+    load: () => import("./attach.ts").then((m) => m.factory),
+  },
 ];

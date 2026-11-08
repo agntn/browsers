@@ -49,4 +49,9 @@ export const builtins: readonly ProviderEntry[] = [
     defaultURL: "local",
     load: () => import("./playwright.ts").then((m) => m.factory),
   },
+  {
+    key: "lightpanda",
+    defaultURL: "local",
+    load: () => import("./lightpanda.ts").then((m) => m.factory),
+  },
 ];

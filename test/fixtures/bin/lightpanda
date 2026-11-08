@@ -1,0 +1,31 @@
+#!/bin/sh
+# Stands in for the lightpanda binary so no test needs it. fetch replays a recorded run from
+# test/fixtures/lightpanda and logs its arguments to BROWSERS_TEST_LIGHTPANDA_ARGS; serve runs
+# BROWSERS_TEST_LIGHTPANDA_CHROME as a CDP server on the port it was given, with a profile per
+# port under BROWSERS_TEST_LIGHTPANDA_PROFILE.
+fixtures="$(dirname "$0")/../lightpanda"
+case "$1" in
+  version)
+    echo "1.0.3"
+    ;;
+  fetch)
+    [ -n "$BROWSERS_TEST_LIGHTPANDA_ARGS" ] && printf '%s\n' "$*" >> "$BROWSERS_TEST_LIGHTPANDA_ARGS"
+    for arg in "$@"; do url="$arg"; done
+    case "$* $url" in
+      *"--dump markdown"*"https://example.com/missing") cat "$fixtures/missing-markdown.json" ;;
+      *"--dump markdown"*"https://example.com/") cat "$fixtures/example-markdown.json" ;;
+      *"https://example.com/") cat "$fixtures/example-html.json" ;;
+      *"https://nonexistent.invalid/") cat "$fixtures/unresolved-html.json"; exit 1 ;;
+      *) echo "no recording for $url" >&2; exit 2 ;;
+    esac
+    ;;
+  serve)
+    [ -n "$BROWSERS_TEST_LIGHTPANDA_CHROME" ] || exit 1
+    exec "$BROWSERS_TEST_LIGHTPANDA_CHROME" --headless=new --remote-debugging-address="$3" \
+      --remote-debugging-port="$5" --user-data-dir="$BROWSERS_TEST_LIGHTPANDA_PROFILE/$5" \
+      --no-first-run about:blank
+    ;;
+  *)
+    exit 2
+    ;;
+esac

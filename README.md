@@ -5,21 +5,22 @@
 [![license](https://npmx.dev/api/registry/badge/license/@agntn/browsers)](https://npmx.dev/package/@agntn/browsers)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/agntn/browsers)
 
-🌐 Eight vendors. One scrape call. JavaScript already ran.
+🌐 Different browsers, same job. One scrape call. JavaScript already ran.
 
 Docs, a page per provider and one real scrape through each of them: [browsers.agntn.dev](https://browsers.agntn.dev).
 
 ## Why?
 
-Steel scrapes in one HTTP call. Kernel wants a live session first. Browserbase hands you CDP. A model will mix those three up, so this is one `scrape()` over eight backends.
+Steel scrapes in one HTTP call. Kernel wants a live session first. Browserbase hands you CDP. A model will mix those three up, so this is one `scrape()` over all of them.
 
 ## ✨ Features
 
-- 🧩 **Eight backends, one contract.** Steel, Browserbase, Kernel, Browserless, Hyperbrowser, Anchor, Cloudflare and Playwright. Same objects on your side. Anchor still has no scrape.
+- 🧩 **Every backend, one contract.** Steel, Browserbase, Kernel, Browserless, Hyperbrowser, Anchor, Cloudflare, Playwright and Lightpanda. Same objects on your side. Anchor still has no scrape.
 - 🖥️ **Playwright is local.** No key. Chromium on the machine you already have.
-- ⚡ **Stateless where the vendor is.** Steel, Browserbase, Browserless, Hyperbrowser, Cloudflare and Playwright scrape without you opening a session. Kernel will not.
+- 🐼 **Lightpanda isn't Chromium.** A headless browser built from scratch. No token, and it runs your local `lightpanda`, no key, no bill. With `LIGHTPANDA_API_KEY` it goes to the cloud. It never paints, so no screenshots or PDFs.
+- ⚡ **Stateless where the vendor is.** Steel, Browserbase, Browserless, Hyperbrowser, Cloudflare, Playwright and Lightpanda scrape without you opening a session. Kernel will not.
 - 📸 **The extras follow the backend.** PDFs, crawls, links, AI extract, search. Anchor will not scrape. Hyperbrowser will search.
-- 🏷️ **`capabilities()` is the list.** Navigate is true on Kernel, Browserless and Playwright. False on Steel. Read the flag.
+- 🏷️ **`capabilities()` is the list.** Navigate is true on Kernel, Browserless, Playwright and Lightpanda. False on Steel. Read the flag.
 - 🤖 **One set of tools for people and models.** The CLI, MCP, Pi, OMP and the AI SDK get the same tools. Plus the library. Six surfaces, one list.
 - 📏 **Agent scrape and crawl have a ceiling.** 20 000 characters unless you pass `maxChars`, 200 000 at most. A crawl shares it across pages.
 - ⏳ **A slow crawl keeps its job.** Cloudflare and Hyperbrowser wait two minutes, then hand back the job ID. Pass it as `jobId` with the same provider and browser, or `--job-id` in the CLI, and you wait for that job again. No second crawl.
@@ -116,9 +117,10 @@ browsers providers
 ○ anchor
 ○ cloudflare
 ● playwright  scrape screenshot navigate evaluate sessions statelessScrape elementScreenshot screenshotWaitFor scrapeWaitFor crawl pdf links
+● lightpanda  scrape navigate evaluate sessions cdp statelessScrape scrapeWaitFor links
 ```
 
-A filled dot means the provider can run here. Usually that's a key in the env. Cloudflare also counts your `cf auth login`, which costs one `cf auth whoami`. Playwright is always filled. A few more:
+A filled dot means the provider can run here. Usually that's a key in the env. Cloudflare also counts your `cf auth login`, which costs one `cf auth whoami`. Playwright and Lightpanda are always filled. A few more:
 
 ```bash
 browsers scrape https://example.com --provider playwright --wait-for p
@@ -184,6 +186,7 @@ That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resol
 | **anchor**       | `ANCHOR_API_KEY`                                       | screenshot (session), sessions, CDP                                                                                                       |
 | **cloudflare**   | `cf auth login` or `CLOUDFLARE_API_TOKEN` + account ID | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, sessions, CDP, crawl, PDF, links, extract, accessibility tree |
 | **playwright**   | none, local                                            | scrape, scrape waitFor, screenshot (session), element screenshot, screenshot waitFor, navigate, evaluate, sessions, crawl, PDF, links     |
+| **lightpanda**   | none, local, or `LIGHTPANDA_API_KEY` for its cloud     | scrape, scrape waitFor, navigate, evaluate, sessions, CDP, links                                                                          |
 
 Anchor does not scrape. The row stays, because someone will look for it. Cloudflare can use your `cf auth login`, so there's no token to export. An exported `CLOUDFLARE_API_TOKEN` still needs an account variable.
 
@@ -211,7 +214,7 @@ Pass `selector` and you get one element instead of the page. Cloudflare, Browser
 
 `waitFor` holds the shot until a CSS selector shows up, so a page that fills itself in late stops coming back half built. Same three providers, same flat no from the rest.
 
-`browsers_scrape` takes `waitFor` too. Kernel joins the club there, since it runs Playwright inside the session anyway. Steel, Browserbase and Hyperbrowser have nothing to wait with, so they refuse before a single request. Used to be they'd hand back the empty skeleton and call it a scrape.
+`browsers_scrape` takes `waitFor` too. Kernel joins the club there, since it runs Playwright inside the session anyway. Lightpanda is a browser itself and waits through CDP. Steel, Browserbase and Hyperbrowser have nothing to wait with, so they refuse before a single request. Used to be they'd hand back the empty skeleton and call it a scrape.
 
 ### AI SDK
 
@@ -242,7 +245,7 @@ Need a fetch that is not a browser? [@agntn/web](https://github.com/agntn/web). 
 
 ## 🧩 Adding a provider
 
-Want a ninth? A class that implements `BrowserProvider`, an exported `factory`, a manifest entry in `src/providers/index.ts` and the name list in `src/tool-contract.ts`. Nonstandard env keys go in `src/core/resolve.ts`. Outside the package, `register(name, defaultURL, factory)` adds one at runtime.
+Want another? A class that implements `BrowserProvider`, an exported `factory`, a manifest entry in `src/providers/index.ts` and the name list in `src/tool-contract.ts`. Nonstandard env keys go in `src/core/resolve.ts`. Outside the package, `register(name, defaultURL, factory)` adds one at runtime.
 
 ## 🛠️ Development
 

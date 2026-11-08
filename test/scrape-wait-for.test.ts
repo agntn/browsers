@@ -21,7 +21,7 @@ describe("waiting scrapes on providers that read the page right away", () => {
       expect(error).toBeInstanceOf(UnsupportedOperationError);
       expect(error).toMatchObject({
         provider: name,
-        message: `${name} cannot wait for a selector before a scrape. Use kernel, browserless, cloudflare or playwright, or drop waitFor.`,
+        message: `${name} cannot wait for a selector before a scrape. Use kernel, browserless, cloudflare, playwright or lightpanda, or drop waitFor.`,
       });
     },
   );

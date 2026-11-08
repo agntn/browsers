@@ -103,7 +103,7 @@ export const scrapeTool = defineTool({
         Type.String({
           minLength: 1,
           description:
-            "CSS selector to wait for before reading the page, for content that renders after load. Kernel, Browserless, Cloudflare and Playwright only.",
+            "CSS selector to wait for before reading the page, for content that renders after load. Kernel, Browserless, Cloudflare, Playwright and Lightpanda only.",
         }),
       ),
       maxChars: maxChars("page content characters to return"),
@@ -349,7 +349,7 @@ export const linksTool = defineTool({
   snippet: "Extract links from a webpage.",
   guidelines: [
     "Use browsers_links when the user needs the links of a page. It returns the first page of them with the total; pass the next offset it reports to read the rest.",
-    "Cloudflare and Playwright support this currently.",
+    "Cloudflare, Playwright and Lightpanda support this currently.",
   ],
   effect: "read",
   idempotent: false,
@@ -357,7 +357,7 @@ export const linksTool = defineTool({
   input: Type.Object(
     {
       url: Type.String({ description: "URL to extract links from" }),
-      provider: providerOf("cloudflare", "playwright"),
+      provider: providerOf("cloudflare", "playwright", "lightpanda"),
       browser,
       limit: Type.Optional(
         Type.Integer({

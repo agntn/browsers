@@ -51,6 +51,11 @@ const PRESENTATION: Record<BrowserProviderName, { name: string; icon: string; bl
     icon: "i-lucide-drama",
     blurb: "Chromium on your own machine. No key, no account, no bill",
   },
+  lightpanda: {
+    name: "Lightpanda",
+    icon: "i-lucide-paw-print",
+    blurb: "Its own engine, not Chromium. A local binary or the cloud, and it never paints",
+  },
 };
 
 export interface ProviderEntry extends ProviderRecord {

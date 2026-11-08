@@ -261,11 +261,18 @@ export class NavigationError extends BrowserError {
    * @param provider - Provider key, like `steel`.
    * @param reason - What the browser showed, like `HTTP ERROR 500`, or an empty string.
    * @param statusCode - The site's HTTP status, when the reason carries one.
-   * @param options - The browser's own error, kept as `cause`.
+   * @param options - The browser's own error, kept as `cause`, and `own` when the provider is the
+   * browser, so the reason is its verdict and not Chrome's.
    */
-  constructor(provider: string, reason: string, statusCode?: number, options?: ErrorOptions) {
+  constructor(
+    provider: string,
+    reason: string,
+    statusCode?: number,
+    options?: ErrorOptions & { readonly own?: boolean },
+  ) {
     const label = provider.charAt(0).toUpperCase() + provider.slice(1);
-    super(`${label} couldn't load the page${reason ? `, Chrome showed ${reason}` : ""}`, options);
+    const verdict = options?.own ? `: ${reason}` : `, Chrome showed ${reason}`;
+    super(`${label} couldn't load the page${reason ? verdict : ""}`, options);
     this.name = "NavigationError";
     this.provider = provider;
     this.reason = reason;

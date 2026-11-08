@@ -147,6 +147,7 @@ describe("browsers session", { timeout: 60_000 }, () => {
       env: {
         PATH: process.env.PATH,
         HOME: profiles,
+        TMPDIR: profiles,
         BROWSERS_TEST_LIGHTPANDA_CHROME: systemChromium() ?? chromium.executablePath(),
         BROWSERS_TEST_LIGHTPANDA_PROFILE: profiles,
       },
@@ -155,7 +156,7 @@ describe("browsers session", { timeout: 60_000 }, () => {
     });
     const id = /Session created: (\S+)/.exec(child.stdout)?.[1];
 
-    /* The timeout sends SIGTERM, and Playwright answers it by closing Chrome and exiting 0. */
+    /* Playwright exits 0 on the timeout SIGTERM, so only `error` gives a hang away. */
     expect(child.error).toBeUndefined();
     expect(child.status).toBe(0);
     expect(id).toBeDefined();

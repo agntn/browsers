@@ -8,6 +8,7 @@ export const browserProviderNames = [
   "anchor",
   "cloudflare",
   "playwright",
+  "lightpanda",
 ] as const;
 
 /** Browser tool names shared by every agent surface. */
@@ -62,7 +63,7 @@ export const browserToolLabels: Readonly<Record<BrowserToolName, string>> = {
 /** Model-facing descriptions shared by Pi, OMP, and MCP. */
 export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> = {
   browsers_scrape:
-    "Read-only/open-world network fetch: scrape content from a URL using a cloud browser provider. Returns rendered HTML/markdown/text after JavaScript execution. Use when a URL needs a real browser to render (JS-heavy SPAs, sites with bot protection, dynamic content). `waitFor` holds the read until a CSS selector shows up; Kernel, Browserless, Cloudflare and Playwright support it, and without `provider` the first configured one of them is used. This tool does not accept a session ID. Providers that need a session open and release one internally.",
+    "Read-only/open-world network fetch: scrape content from a URL using a cloud browser provider. Returns rendered HTML/markdown/text after JavaScript execution. Use when a URL needs a real browser to render (JS-heavy SPAs, sites with bot protection, dynamic content). `waitFor` holds the read until a CSS selector shows up; Kernel, Browserless, Cloudflare, Playwright and Lightpanda support it, and without `provider` the first configured one of them is used. This tool does not accept a session ID. Providers that need a session open and release one internally.",
   browsers_session:
     "Create a cloud browser session. Returns an opaque session ID. Only browsers_release accepts this ID; no other tool can drive the session.",
   browsers_release:
@@ -78,7 +79,7 @@ export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> 
   browsers_pdf:
     "Generate a PDF from a URL and write it to `path`. Cloudflare, Browserless and Playwright support stateless PDF generation.",
   browsers_links:
-    "Extract the unique links of a webpage in page order. Returns up to `limit` links from `offset` with the total count; when links remain, call again with the next offset it reports. Each call reads the page again, so a changed total means the page changed between calls. Cloudflare and Playwright support stateless link extraction.",
+    "Extract the unique links of a webpage in page order. Returns up to `limit` links from `offset` with the total count; when links remain, call again with the next offset it reports. Each call reads the page again, so a changed total means the page changed between calls. Cloudflare, Playwright and Lightpanda support stateless link extraction.",
   browsers_accessibility:
     "Read a webpage's accessibility tree: the roles, names, values and states (checked, disabled, expanded) of its headings, links, buttons and form fields, one node per indented line. Use it to find what a page offers or what a form asks for, which scraped markdown leaves out. `root` limits it to the subtree of one CSS selector, generic nodes included; a selector that matches nothing is an error. Cloudflare supports it.",
   browsers_search: "Web search via browser provider. Hyperbrowser supports native web search.",

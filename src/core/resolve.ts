@@ -24,11 +24,11 @@ const CLOUDFLARE_HINT = `cf auth login or ${CLOUDFLARE_TOKEN}`;
  * Check whether a provider runs without any credentials.
  *
  * @param {string} provider Provider name.
- * @returns {boolean} True for the local browser.
+ * @returns {boolean} True for the local browsers. Lightpanda goes to its cloud only with a token.
  * @internal
  */
 export function _keyless(provider: string): boolean {
-  return provider === "playwright";
+  return provider === "playwright" || provider === "lightpanda";
 }
 
 /**

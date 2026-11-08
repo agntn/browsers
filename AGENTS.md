@@ -2,7 +2,7 @@
 
 ## What
 
-Unified browser-as-a-service provider library for AI agents. One registry, eight providers.
+Unified browser-as-a-service provider library for AI agents. One registry, a file per provider.
 
 ## Structure
 

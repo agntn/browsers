@@ -112,7 +112,7 @@ describe("provider selection by operation", () => {
 
     await expect(call).rejects.toBeInstanceOf(UnsupportedOperationError);
     await expect(call).rejects.toThrow(
-      "No configured provider supports structured extraction (checked: steel, playwright).",
+      "No configured provider supports structured extraction (checked: steel, playwright, lightpanda).",
     );
   });
 });

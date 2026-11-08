@@ -118,7 +118,7 @@ export function assertNoWaitFor(waitFor: string | undefined, provider: string): 
 export function assertNoScrapeWaitFor(waitFor: string | undefined, provider: string): void {
   if (waitFor === undefined) return;
   throw new UnsupportedOperationError(
-    `${provider} cannot wait for a selector before a scrape. Use kernel, browserless, cloudflare or playwright, or drop waitFor.`,
+    `${provider} cannot wait for a selector before a scrape. Use kernel, browserless, cloudflare, playwright or lightpanda, or drop waitFor.`,
     provider,
   );
 }

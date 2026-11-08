@@ -25,6 +25,7 @@ import {
   SessionNotFoundError,
   navigationFailure,
   normalizeError,
+  responseReason,
 } from "../core/errors.ts";
 import { assertUrl, assertUrlOrSession, waitForMissMessage } from "../core/utils.ts";
 import { dropProcessSession, holdProcessSession } from "../core/process-sessions.ts";
@@ -106,14 +107,83 @@ function closeOnAbort(lease: Readonly<PageLease>, signal?: AbortSignal): () => v
   return () => signal.removeEventListener("abort", close);
 }
 
-function normalizePlaywrightError(error: unknown): BrowserError {
-  const message = error instanceof Error ? error.message : String(error);
-  if (message.includes("executable") || message.includes("browserType.launch")) {
+/** Playwright's refusal to start a browser file that isn't there, with the path it tried. */
+const MISSING_EXECUTABLE = /executable doesn't exist at (\S+)/i;
+
+/** The executable in the launch log's `<launching>` line. */
+const LAUNCHED_EXECUTABLE = /^<launching> (\S+)/m;
+
+/** How the browser process ended, from the launch log. */
+const BROWSER_EXIT = /<process did exit: exitCode=([^,]+), signal=([^>]+)>/;
+
+/** Browser stderr in the launch log; the call log below repeats it indented, so `^` skips that. */
+const BROWSER_STDERR = /^\[pid=\d+\]\[err\] (.+)$/gm;
+
+/** Stderr lines a crash keeps: the first ones say why, the rest is the crash reporter's fallout. */
+const STDERR_LINES = 3;
+
+/**
+ * Says how the browser process ended, from the launch log.
+ *
+ * @param {string} log Playwright's launch error message.
+ * @returns {string} ` (SIGTRAP)`, ` (exit code 1)`, or nothing when the log doesn't say.
+ */
+function exitNote(log: string): string {
+  const exit = BROWSER_EXIT.exec(log);
+  if (!exit) return "";
+  const [, code, signal] = exit;
+  return signal && signal !== "null" ? ` (${signal})` : ` (exit code ${code ?? "unknown"})`;
+}
+
+/**
+ * Picks the reason a launch failed: the browser's first stderr lines, or Playwright's own line.
+ *
+ * @param {string} log Playwright's launch error message.
+ * @returns {string} One line, cut by `responseReason`.
+ */
+function crashReason(log: string): string {
+  const stderr = Array.from(log.matchAll(BROWSER_STDERR), ([, line = ""]) => line.trim());
+  const lines = [...new Set(stderr.filter(Boolean))].slice(0, STDERR_LINES);
+  const headline = log.split("\n", 1)[0]?.replace(/^browserType\.launch: /, "") ?? "";
+  return responseReason(lines.length > 0 ? lines.join("; ") : headline) ?? "no reason given";
+}
+
+/**
+ * One line for a failed launch; the install hint is only for a browser that isn't there.
+ *
+ * @param {unknown} error What `chromium.launch` threw.
+ * @returns {BrowserError} The error, with Playwright's own as `cause`.
+ */
+function launchFailure(error: unknown): BrowserError {
+  const log = error instanceof Error ? error.message : String(error);
+  const missing = MISSING_EXECUTABLE.exec(log)?.[1];
+  if (missing) {
     return new BrowserError(
-      "Playwright browser not found. Run: npx playwright-core install chromium",
+      `Playwright browser not found at ${missing}. Run: npx playwright-core install chromium`,
+      { cause: error },
     );
   }
-  return normalizeError(error, "playwright");
+  const executable = LAUNCHED_EXECUTABLE.exec(log)?.[1] ?? "the browser";
+  return new BrowserError(
+    `Playwright couldn't start ${executable}${exitNote(log)}: ${crashReason(log)}`,
+    { cause: error },
+  );
+}
+
+/**
+ * Starts Chrome or Chromium from `PATH`, or Playwright's own download when there is none.
+ *
+ * @param {boolean} headless Whether the browser runs without a window.
+ * @returns {Promise<Browser>} The running browser.
+ * @throws {BrowserError} From `launchFailure` when the browser won't start.
+ */
+async function launch(headless: boolean): Promise<Browser> {
+  const { chromium } = await import("playwright-core");
+  try {
+    return await chromium.launch({ headless, executablePath: resolveSystemChromium() });
+  } catch (error) {
+    throw launchFailure(error);
+  }
 }
 
 function truncateText(text: string | undefined, maxChars: number | undefined): string | undefined {
@@ -378,11 +448,7 @@ class PlaywrightProvider implements BrowserProvider {
 
   private async acquirePage(session?: BrowserSession): Promise<PageLease> {
     if (session) return { page: this.getPage(session) };
-    const { chromium } = await import("playwright-core");
-    const browser = await chromium.launch({
-      headless: true,
-      executablePath: resolveSystemChromium(),
-    });
+    const browser = await launch(true);
     return { browser, page: await browser.newPage() };
   }
 
@@ -420,11 +486,7 @@ class PlaywrightProvider implements BrowserProvider {
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
     try {
-      const { chromium } = await import("playwright-core");
-      const browser = await chromium.launch({
-        headless: options?.headless ?? true,
-        executablePath: resolveSystemChromium(),
-      });
+      const browser = await launch(options?.headless ?? true);
       const context = await browser.newContext({
         viewport: options?.viewport ?? { width: 1280, height: 720 },
       });
@@ -442,7 +504,7 @@ class PlaywrightProvider implements BrowserProvider {
       });
       return { ...session };
     } catch (error) {
-      throw normalizePlaywrightError(error);
+      throw normalizeError(error, "playwright");
     }
   }
 
@@ -557,14 +619,10 @@ class PlaywrightProvider implements BrowserProvider {
 
   async checkAvailability(): Promise<void> {
     try {
-      const { chromium } = await import("playwright-core");
-      const browser = await chromium.launch({
-        headless: true,
-        executablePath: resolveSystemChromium(),
-      });
+      const browser = await launch(true);
       await browser.close();
     } catch (error) {
-      throw normalizePlaywrightError(error);
+      throw normalizeError(error, "playwright");
     }
   }
 }

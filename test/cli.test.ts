@@ -3,9 +3,11 @@ import { mkdtemp, open, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vite-plus/test";
+import { chromium } from "playwright-core";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { isRefusal, normalizeSessionWords } from "../src/cli-commands";
 import { InvalidInputError } from "../src/core/errors";
+import { systemChromium } from "./chromium";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 
@@ -123,5 +125,43 @@ describe("browsers CLI", () => {
     expect(run.status).toBe(0);
     const details = JSON.parse(run.stdout) as { providers: Array<{ name: string }> };
     expect(details.providers.map((row) => row.name)).toContain("playwright");
+  });
+});
+
+/* A cold Chrome launch on a CI runner takes longer than the vitest defaults. */
+describe("browsers session", { timeout: 60_000 }, () => {
+  let profiles: string;
+
+  beforeAll(async () => {
+    profiles = await mkdtemp(join(tmpdir(), "browsers-cli-session-"));
+  });
+
+  afterAll(async () => {
+    await rm(profiles, { recursive: true, force: true });
+  });
+
+  it.each(["playwright", "lightpanda"])("prints a %s session, closes it and exits", (provider) => {
+    const child = spawnSync(process.execPath, ["src/cli.ts", "session", "-p", provider], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        PATH: process.env.PATH,
+        HOME: profiles,
+        BROWSERS_TEST_LIGHTPANDA_CHROME: systemChromium() ?? chromium.executablePath(),
+        BROWSERS_TEST_LIGHTPANDA_PROFILE: profiles,
+      },
+      input: "",
+      timeout: 30_000,
+    });
+    const id = /Session created: (\S+)/.exec(child.stdout)?.[1];
+
+    /* The timeout sends SIGTERM, and Playwright answers it by closing Chrome and exiting 0. */
+    expect(child.error).toBeUndefined();
+    expect(child.status).toBe(0);
+    expect(id).toBeDefined();
+    expect(child.stderr).toBe(
+      `[provider=${provider}] Session ${id} released: it lived in this process.\n`,
+    );
+    expect(spawnSync("pgrep", ["-f", profiles]).status).toBe(1);
   });
 });

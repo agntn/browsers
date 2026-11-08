@@ -24,6 +24,7 @@ import {
   normalizeError,
 } from "../core/errors.ts";
 import { assertUrl, waitForMissMessage } from "../core/utils.ts";
+import { dropProcessSession, holdProcessSession } from "../core/process-sessions.ts";
 import { execFile, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:net";
@@ -606,6 +607,10 @@ class LightpandaProvider implements BrowserProvider {
         metadata: { mode: this.target.kind },
       };
       this.sessions().set(session.id, { session, connection });
+      holdProcessSession(session.id, {
+        provider: PROVIDER,
+        release: async () => this.releaseSession(session.id),
+      });
       return { ...session };
     } catch (error) {
       throw this.target.kind === "launch"
@@ -627,6 +632,7 @@ class LightpandaProvider implements BrowserProvider {
   async releaseSession(sessionId: string): Promise<void> {
     const record = this.record(sessionId);
     this.sessions().delete(sessionId);
+    dropProcessSession(sessionId);
     await disconnect(record.connection);
   }
 

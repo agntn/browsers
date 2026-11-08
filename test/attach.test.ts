@@ -40,12 +40,25 @@ function systemFirefox(): string | undefined {
 async function launch(command: string, args: readonly string[]): Promise<Running> {
   const child = spawn(command, args, { stdio: ["ignore", "ignore", "pipe"] });
   const lines = createInterface({ input: child.stderr });
+  const seen: string[] = [];
   const socket = await new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(
+        new Error(`${command} printed no debugging address in 20s:\n${seen.slice(-20).join("\n")}`),
+      );
+    }, 20_000);
     lines.on("line", (line) => {
+      seen.push(line);
       const address = /listening on (ws:\/\/\S+)/.exec(line)?.[1];
-      if (address) resolve(address);
+      if (!address) return;
+      clearTimeout(timer);
+      resolve(address);
     });
-    child.once("exit", (code) => reject(new Error(`${command} exited with ${code}`)));
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      reject(new Error(`${command} exited with ${code}:\n${seen.slice(-20).join("\n")}`));
+    });
   });
   return {
     endpoint: `http://${new URL(socket).host}`,
@@ -65,8 +78,11 @@ function pngSize(base64: string): [number, number] {
 /* Asks for a page title until the tab has loaded, since a hook can't use `expect.poll`. */
 async function loaded(read: () => Promise<string | undefined>, title: string): Promise<void> {
   const deadline = Date.now() + 20_000;
-  while ((await read().catch(() => undefined)) !== title) {
-    if (Date.now() > deadline) throw new Error(`No tab showed "${title}" within 20s`);
+  let last: unknown;
+  while ((await read().catch((error: unknown) => void (last = error))) !== title) {
+    if (Date.now() > deadline) {
+      throw new Error(`No tab showed "${title}" within 20s, last: ${String(last)}`);
+    }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 }
@@ -311,7 +327,7 @@ describe.skipIf(!firefox)("attach to a Firefox over WebDriver BiDi", () => {
     ]);
     const provider = await create("attach", { baseURL: browser.endpoint });
     await loaded(async () => (await provider.scrape(`${base}/book`)).title, "Shelf /book/page/3");
-  }, 30_000);
+  }, 45_000);
 
   afterAll(async () => {
     await browser.stop();
@@ -374,5 +390,5 @@ describe.skipIf(!firefox)("attach to a Firefox over WebDriver BiDi", () => {
       "The browser closed the WebDriver BiDi connection.",
     );
     await provider.releaseSession(session.id);
-  }, 30_000);
+  }, 45_000);
 });

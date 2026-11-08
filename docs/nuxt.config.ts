@@ -146,6 +146,10 @@ export default defineNuxtConfig({
       type: "d1",
       bindingName: "DB",
     },
+    /** The prerender reads content through Node's own `node:sqlite`, which is why `better-sqlite3` can stay unbuilt. */
+    experimental: {
+      sqliteConnector: "native",
+    },
     build: {
       markdown: {
         highlight: {

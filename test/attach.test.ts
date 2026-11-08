@@ -36,7 +36,7 @@ function systemFirefox(): string | undefined {
   return undefined;
 }
 
-/* Starts a browser on port 0 and reads the port it took from the line it prints on stderr. */
+/* Starts a browser on port 0 and reads its port from stderr. A cold Firefox on CI took 30s. */
 async function launch(command: string, args: readonly string[]): Promise<Running> {
   const child = spawn(command, args, { stdio: ["ignore", "ignore", "pipe"] });
   const lines = createInterface({ input: child.stderr });
@@ -45,9 +45,9 @@ async function launch(command: string, args: readonly string[]): Promise<Running
     const timer = setTimeout(() => {
       child.kill();
       reject(
-        new Error(`${command} printed no debugging address in 20s:\n${seen.slice(-20).join("\n")}`),
+        new Error(`${command} printed no debugging address in 60s:\n${seen.slice(-20).join("\n")}`),
       );
-    }, 20_000);
+    }, 60_000);
     lines.on("line", (line) => {
       seen.push(line);
       const address = /listening on (ws:\/\/\S+)/.exec(line)?.[1];
@@ -77,11 +77,11 @@ function pngSize(base64: string): [number, number] {
 
 /* Asks for a page title until the tab has loaded, since a hook can't use `expect.poll`. */
 async function loaded(read: () => Promise<string | undefined>, title: string): Promise<void> {
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + 30_000;
   let last: unknown;
   while ((await read().catch((error: unknown) => void (last = error))) !== title) {
     if (Date.now() > deadline) {
-      throw new Error(`No tab showed "${title}" within 20s, last: ${String(last)}`);
+      throw new Error(`No tab showed "${title}" within 30s, last: ${String(last)}`);
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -327,7 +327,7 @@ describe.skipIf(!firefox)("attach to a Firefox over WebDriver BiDi", () => {
     ]);
     const provider = await create("attach", { baseURL: browser.endpoint });
     await loaded(async () => (await provider.scrape(`${base}/book`)).title, "Shelf /book/page/3");
-  }, 45_000);
+  }, 100_000);
 
   afterAll(async () => {
     await browser.stop();
@@ -390,5 +390,5 @@ describe.skipIf(!firefox)("attach to a Firefox over WebDriver BiDi", () => {
       "The browser closed the WebDriver BiDi connection.",
     );
     await provider.releaseSession(session.id);
-  }, 45_000);
+  }, 100_000);
 });

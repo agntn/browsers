@@ -60,12 +60,14 @@ export class Client {
   readonly baseDelay: number;
   readonly timeout: number;
   readonly userAgent: string;
+  readonly retryable: NonNullable<ClientOptions["retryable"]>;
 
   constructor(options: ClientOptions = {}) {
     this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.baseDelay = options.baseDelay ?? DEFAULT_BASE_DELAY;
     this.timeout = options.timeout ?? DEFAULT_TIMEOUT;
     this.userAgent = options.userAgent ?? `browsers/${version}`;
+    this.retryable = options.retryable ?? (() => true);
   }
 
   async getJSON<T>(
@@ -244,9 +246,12 @@ export class Client {
     if (response.status < 400 || response.status >= 600) {
       return { reply: { headers: response.headers, data } };
     }
+    const error = failedResponse(response, data, sanitizeUrl(url));
     return {
-      error: failedResponse(response, data, sanitizeUrl(url)),
-      retry: RETRY_STATUS_CODES.has(response.status),
+      error,
+      retry:
+        RETRY_STATUS_CODES.has(response.status) &&
+        this.retryable({ status: response.status, body: error.body }),
     };
   }
 
@@ -334,9 +339,13 @@ function parseJSON(text: string): unknown {
  * @param {Response} response The response.
  * @param {unknown} data Its body, as read for the route.
  * @param {string} url Sanitized request URL.
- * @returns {Error} The rate limit or HTTP error.
+ * @returns {HTTPError | RateLimitError} The rate limit or HTTP error.
  */
-function failedResponse(response: Response, data: unknown, url: string): Error {
+function failedResponse(
+  response: Response,
+  data: unknown,
+  url: string,
+): HTTPError | RateLimitError {
   const body = responseText(data);
   if (response.status === 429) {
     const retryAfter = parseRetryAfter(response.headers.get("Retry-After"));

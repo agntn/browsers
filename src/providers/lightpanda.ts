@@ -13,7 +13,7 @@ import type {
   ScreenshotResult,
 } from "../core/types.ts";
 import { rejectBlockPage } from "../core/block-page.ts";
-import { defaultClient } from "../core/client.ts";
+import { Client, defaultClient } from "../core/client.ts";
 import {
   AuthError,
   BrowserError,
@@ -522,6 +522,10 @@ async function runFetch(executable: string, request: Readonly<FetchRequest>): Pr
 class LightpandaProvider implements BrowserProvider {
   private readonly target: Target;
   private readonly client = defaultClient();
+  /** One ask per dead page; a real server fault still gets its retries. */
+  private readonly fetchClient = new Client({
+    retryable: ({ body }) => !CLOUD_LOAD_FAILURE.test(body),
+  });
 
   constructor(config: ProviderConfig) {
     this.target = resolveTarget(config);
@@ -696,7 +700,7 @@ class LightpandaProvider implements BrowserProvider {
   ): Promise<ScrapeResult> {
     if (this.target.kind !== "cloud") throw new BrowserError("POST /api/fetch is cloud only");
     try {
-      const reply = await this.client.postJSON<CloudFetchReply>(
+      const reply = await this.fetchClient.postJSON<CloudFetchReply>(
         `${this.target.baseURL}/api/fetch`,
         {
           url,

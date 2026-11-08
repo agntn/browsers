@@ -267,4 +267,6 @@ export interface ClientOptions {
   baseDelay?: number;
   timeout?: number;
   userAgent?: string;
+  /** Says `false` when the body is already the final answer, so asking again is pointless. */
+  retryable?: (failure: Readonly<{ status: number; body: string }>) => boolean;
 }

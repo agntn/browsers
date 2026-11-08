@@ -284,11 +284,25 @@ describe("lightpanda fetch, cloud", () => {
     });
   });
 
-  it("keeps a cloud 500 without a page load error as HTTPError", async () => {
+  it("asks the cloud about a dead host once", async () => {
+    reply = {
+      status: 500,
+      body: "fetch: navigate https://nonexistent.invalid: page load error CouldntConnect\n",
+    };
+    const provider = await create("lightpanda", { apiKey: "lpd-test", baseURL });
+
+    await expect(provider.scrape("https://nonexistent.invalid")).rejects.toBeInstanceOf(
+      NavigationError,
+    );
+    expect(requests).toHaveLength(1);
+  });
+
+  it("keeps a cloud 500 without a page load error as HTTPError, after its retries", async () => {
     reply = { status: 500, body: "internal error" };
     const provider = await create("lightpanda", { apiKey: "lpd-test", baseURL });
 
     await expect(provider.scrape("https://example.com")).rejects.toBeInstanceOf(HTTPError);
+    expect(requests).toHaveLength(4);
   });
 });
 

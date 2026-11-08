@@ -155,6 +155,41 @@ describe("Client retry timeout", () => {
     await expect(client.getJSON(url)).rejects.toThrow(/^HTTP 400 from .*: Bad request$/);
     expect(count).toBe(1);
   });
+
+  it("stops retrying once retryable reads a final answer in the body", async () => {
+    respond = (_request, response) => {
+      response.statusCode = 503;
+      response.end(count === 1 ? "busy" : "gone");
+    };
+    const seen: { status: number; body: string }[] = [];
+    const client = new Client({
+      timeout: 150,
+      maxRetries: 3,
+      baseDelay: 1,
+      retryable: (failure) => {
+        seen.push({ ...failure });
+        return failure.body !== "gone";
+      },
+    });
+    await expect(client.getJSON(url)).rejects.toThrow(/^HTTP 503 from .*: gone$/);
+    expect(count).toBe(2);
+    expect(seen).toEqual([
+      { status: 503, body: "busy" },
+      { status: 503, body: "gone" },
+    ]);
+  });
+
+  it("keeps retrying a request with no response whatever retryable says", async () => {
+    respond = () => {};
+    const client = new Client({
+      timeout: 150,
+      maxRetries: 1,
+      baseDelay: 1,
+      retryable: () => false,
+    });
+    await expect(client.getJSON(url)).rejects.toThrow(TimeoutError);
+    expect(count).toBe(2);
+  });
 });
 
 describe("Client with no response", () => {

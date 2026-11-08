@@ -17,6 +17,7 @@ import { defaultClient } from "../core/client.ts";
 import {
   AuthError,
   BrowserError,
+  HTTPError,
   InvalidInputError,
   NavigationError,
   SessionNotFoundError,
@@ -47,6 +48,9 @@ const FETCH_TIMEOUT = 60_000;
 
 /** A failed `goto` with Lightpanda's own reason, like `CouldntResolveHost`. */
 const GOTO_FAILURE = /^page\.goto: ([A-Z][A-Za-z]+) at /;
+
+/** The cloud's 500 for a page that never loaded, read from the end past the URL it echoes. */
+const CLOUD_LOAD_FAILURE = /: page load error ([A-Z][A-Za-z]+)\s*$/;
 
 /** How Playwright reports a CDP socket the server refused for the token. */
 const CDP_UNAUTHORIZED = /\b401 Unauthorized\b/;
@@ -416,6 +420,21 @@ function fetchedResult(
 }
 
 /**
+ * Turns the cloud's 500 for a dead page into `NavigationError`; a real server fault stays as it was.
+ *
+ * @param {unknown} error - What `POST /api/fetch` threw.
+ * @returns {BrowserError} The navigation failure with Lightpanda's reason, or the normalized error.
+ */
+function cloudFetchFailure(error: unknown): BrowserError {
+  const reason =
+    error instanceof HTTPError && error.statusCode === 500
+      ? CLOUD_LOAD_FAILURE.exec(error.body)?.[1]
+      : undefined;
+  if (!reason) return normalizeError(error, PROVIDER);
+  return new NavigationError(PROVIDER, reason, undefined, { cause: error, own: true });
+}
+
+/**
  * Reads the JSON `lightpanda fetch --json` printed, also when it exited 1 for a failed page.
  *
  * @param {unknown} error - What `execFile` threw, carrying `stdout`.
@@ -690,7 +709,7 @@ class LightpandaProvider implements BrowserProvider {
       if (!reply.status) throw new NavigationError(PROVIDER, "", undefined, { own: true });
       return fetchedResult(url, { format, content: reply.data ?? "", status: reply.status });
     } catch (error) {
-      throw normalizeError(error, PROVIDER);
+      throw cloudFetchFailure(error);
     }
   }
 

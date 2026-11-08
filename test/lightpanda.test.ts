@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import {
   AuthError,
   BrowserError,
+  HTTPError,
   InvalidInputError,
   NavigationError,
   UnsupportedOperationError,
@@ -265,6 +266,29 @@ describe("lightpanda fetch, cloud", () => {
     const provider = await create("lightpanda", { apiKey: "lpd-test", baseURL });
 
     await expect(provider.scrape("https://example.com")).rejects.toBeInstanceOf(NavigationError);
+  });
+
+  it("throws NavigationError with the cloud's reason when the site doesn't resolve", async () => {
+    /* What euwest answered on 2026-11-08 for a host that doesn't resolve. */
+    reply = {
+      status: 500,
+      body: "fetch: navigate https://nonexistent.invalid: page load error CouldntConnect\n",
+    };
+    const provider = await create("lightpanda", { apiKey: "lpd-test", baseURL });
+    const call = provider.scrape("https://nonexistent.invalid", { formats: ["markdown"] });
+
+    await expect(call).rejects.toBeInstanceOf(NavigationError);
+    await expect(call).rejects.toMatchObject({
+      message: "Lightpanda couldn't load the page: CouldntConnect",
+      reason: "CouldntConnect",
+    });
+  });
+
+  it("keeps a cloud 500 without a page load error as HTTPError", async () => {
+    reply = { status: 500, body: "internal error" };
+    const provider = await create("lightpanda", { apiKey: "lpd-test", baseURL });
+
+    await expect(provider.scrape("https://example.com")).rejects.toBeInstanceOf(HTTPError);
   });
 });
 

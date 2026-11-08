@@ -1,0 +1,7 @@
+#!/bin/sh
+# Stands in for a Chrome that starts and dies at once, the way it does without a writable HOME.
+echo "mkdir: cannot create directory '/nonexistent': Permission denied" >&2
+echo "chrome_crashpad_handler: --database is required" >&2
+echo "Try 'chrome_crashpad_handler --help' for more information." >&2
+echo "recvmsg: Connection reset by peer (104)" >&2
+kill -TRAP $$

@@ -253,7 +253,7 @@ Need a fetch that is not a browser? [@agntn/web](https://github.com/agntn/web). 
 
 ## 🧩 Adding a provider
 
-Want another? A class that implements `BrowserProvider`, an exported `factory`, a manifest entry in `src/providers/index.ts` and the name list in `src/tool-contract.ts`. Nonstandard env keys go in `src/core/resolve.ts`. Outside the package, `register(name, defaultURL, factory)` adds one at runtime.
+Want another? A class that implements `BrowserProvider`, an exported `factory`, a manifest entry in `src/providers/index.ts` and the name list in `src/tool-contract.ts`. Nonstandard env keys go in `src/core/resolve.ts`. The docs want one too: a page in `docs/content/2.providers/`, a `PRESENTATION` entry and a recorded scrape. Forget one and `pnpm typecheck` or `pnpm test:run` nags until it's there. Outside the package, `register(name, defaultURL, factory)` adds one at runtime.
 
 ## 🛠️ Development
 

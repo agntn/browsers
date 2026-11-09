@@ -53,4 +53,22 @@ describe("docs site", () => {
       expect(library).toHaveProperty(name);
     }
   });
+
+  it("renders recorded page text as text, never through v-html", () => {
+    const components = readdirSync(new URL("app/", docs), { recursive: true, encoding: "utf8" })
+      .filter((file) => file.endsWith(".vue"))
+      .filter((file) => readFileSync(new URL(`app/${file}`, docs), "utf8").includes("v-html"));
+    expect(components).toEqual([]);
+  });
+
+  it("keeps `: ` out of a plain frontmatter description, where YAML reads it as a mapping", () => {
+    const pages = readdirSync(new URL("content/", docs), { recursive: true, encoding: "utf8" })
+      .filter((file) => file.endsWith(".md"))
+      .filter((file) =>
+        /^\s*description: (?!["'])[^\n]*: /mu.test(
+          readFileSync(new URL(`content/${file}`, docs), "utf8").split(/^---$/mu)[1] ?? "",
+        ),
+      );
+    expect(pages).toEqual([]);
+  });
 });

@@ -133,4 +133,8 @@ describe("package entries", () => {
     expect(loadedProviders(result.loaded)).toEqual(["steel"]);
     expect(loadedHeavy(result.loaded)).toEqual([]);
   });
+
+  it("declares no side effects, so a bundler drops the providers nobody names", () => {
+    expect(pkg.sideEffects).toBe(false);
+  });
 });

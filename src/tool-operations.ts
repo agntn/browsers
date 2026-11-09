@@ -60,7 +60,6 @@ export interface BrowserScrapeParams {
 /** Arguments accepted by the browser session tool. */
 export interface BrowserSessionParams {
   provider?: string;
-  browser?: string;
   region?: string;
 }
 
@@ -68,7 +67,6 @@ export interface BrowserSessionParams {
 export interface BrowserReleaseParams {
   sessionId: string;
   provider?: string;
-  browser?: string;
 }
 
 /** Arguments accepted by the browser screenshot tool. */
@@ -293,11 +291,7 @@ export async function browserScrape(
 export async function browserSession(
   params: Readonly<BrowserSessionParams>,
 ): Promise<ToolResult<BrowserSessionDetails>> {
-  const { name, provider } = await createCapableProvider(
-    params.provider,
-    params.browser,
-    "sessions",
-  );
+  const { name, provider } = await createCapableProvider(params.provider, undefined, "sessions");
   const session = await provider.createSession({ region: params.region });
   return {
     content: content(`[provider=${name}] Session created: ${sanitizeField(session.id)}`),
@@ -316,7 +310,7 @@ export async function browserSession(
 export async function releaseBrowserSession(
   params: Readonly<BrowserReleaseParams>,
 ): Promise<ToolResult<{ released: boolean }>> {
-  const { name, provider } = await createProvider(params.provider, params.browser);
+  const { name, provider } = await createProvider(params.provider);
   await provider.releaseSession(params.sessionId);
   return {
     content: content(`[provider=${name}] Session ${sanitizeField(params.sessionId)} released.`),
@@ -338,7 +332,7 @@ export interface BrowserSessionsDetails {
 export async function listBrowserSessions(
   params: Readonly<BrowserSessionParams>,
 ): Promise<ToolResult<BrowserSessionsDetails>> {
-  const { name, provider } = await createProvider(params.provider, params.browser);
+  const { name, provider } = await createProvider(params.provider);
   const sessions = (await provider.listSessions()).map((session) => ({
     id: session.id,
     provider: session.provider,

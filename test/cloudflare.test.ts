@@ -4,6 +4,7 @@ import { resetDefaultClientForTests } from "../src/core/client";
 import {
   EmptyUrlError,
   HTTPError,
+  InvalidInputError,
   RateLimitError,
   TimeoutError,
   TransportError,
@@ -79,22 +80,14 @@ describe("cloudflare browser selection", () => {
       browser: "kitesurf",
     });
 
-    const session = await provider.createSession({ timeout: 60_000 });
-    await provider.getSession("session-1");
-    await provider.listSessions();
     await provider.scrape("https://example.test");
     await provider.screenshot({ url: "https://example.test" });
     await provider.crawl?.("https://example.test");
     await provider.pdf?.("https://example.test");
     await provider.links?.("https://example.test");
     await provider.extract?.("https://example.test", { prompt: "Extract the title" });
-    await provider.releaseSession("session-1");
 
-    expect(session.cdpUrl).toBe("wss://example.test/session-1");
     expect(urls).toEqual([
-      "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/devtools/browser?keep_alive=60000&browser=kitesurf",
-      "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/devtools/browser/session-1?browser=kitesurf",
-      "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/devtools/session?browser=kitesurf",
       "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/content?browser=kitesurf",
       "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/screenshot?browser=kitesurf",
       "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/crawl?browser=kitesurf",
@@ -103,8 +96,29 @@ describe("cloudflare browser selection", () => {
       "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/pdf?browser=kitesurf",
       "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/links?browser=kitesurf",
       "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/json?browser=kitesurf",
-      "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run/devtools/browser/session-1?browser=kitesurf",
     ]);
+  });
+
+  /* The session route answers `?browser=kitesurf` with Chromium, so Kitesurf refuses before it. */
+  it("refuses Kitesurf sessions before network I/O", async () => {
+    const fetch = vi.fn(async () => jsonResponse({ sessionId: "session-1" }));
+    vi.stubGlobal("fetch", fetch);
+    resetDefaultClientForTests();
+
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+      browser: "kitesurf",
+    });
+
+    await expect(provider.createSession({ timeout: 60_000 })).rejects.toThrow(InvalidInputError);
+    await expect(provider.releaseSession("session-1")).rejects.toThrow(
+      "Kitesurf has no sessions: Cloudflare ties each Kitesurf browser to one CDP socket",
+    );
+    expect(await provider.listSessions()).toEqual([]);
+    expect(await provider.getSession("session-1")).toBeNull();
+    expect(provider.capabilities()).toMatchObject({ sessions: false, cdp: false, webmcp: true });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("selects Cloudflare automatically when an agent requests Kitesurf", async () => {

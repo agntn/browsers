@@ -20,11 +20,6 @@ export const sessionsCommand = defineTool({
           description: `Provider name. One of: ${browserProviderNames.join(", ")}. Auto-detected from env.`,
         }),
       ),
-      browser: Type.Optional(
-        Type.Literal("kitesurf", {
-          description: "Use Cloudflare's Kitesurf engine instead of the default Chromium browser.",
-        }),
-      ),
     },
     { additionalProperties: false },
   ),

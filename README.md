@@ -212,7 +212,7 @@ omp install @agntn/browsers
 }
 ```
 
-Every tool, `browsers_scrape` through `browsers_capabilities`, is the same on MCP, Pi and OMP. Cloudflare calls backed by Browser Run take `browser: "kitesurf"`. No `provider` needed then. They do not drive a session you already opened.
+Every tool, `browsers_scrape` through `browsers_capabilities`, is the same on MCP, Pi and OMP. Cloudflare page tools take `browser: "kitesurf"`. No `provider` needed then. They do not drive a session you already opened, and Kitesurf has none to drive.
 
 `browsers_screenshot` hands the image back to the model. A full page too big for that goes to a file: pass `path`, and it refuses to overwrite one that exists. `browsers_pdf` always writes to `path`, under the same rule, since a PDF cannot go back to the model.
 

@@ -183,10 +183,10 @@ describe("browsers OMP extension", () => {
           valid: { url: "https://example.test", browser: "kitesurf" },
           invalid: {},
         },
-        browsers_session: { valid: { browser: "kitesurf" }, invalid: { extra: true } },
+        browsers_session: { valid: { region: "eu-west-1" }, invalid: { browser: "kitesurf" } },
         browsers_release: {
-          valid: { sessionId: "session-1", browser: "kitesurf" },
-          invalid: {},
+          valid: { sessionId: "session-1" },
+          invalid: { sessionId: "session-1", browser: "kitesurf" },
         },
         browsers_providers: { valid: {}, invalid: { extra: true } },
         browsers_screenshot: {

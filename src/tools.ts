@@ -133,7 +133,6 @@ export const sessionTool = defineTool({
   input: Type.Object(
     {
       provider,
-      browser,
       region: Type.Optional(
         Type.String({ description: "Preferred region (e.g. us-east-1, eu-west-1)" }),
       ),
@@ -162,7 +161,6 @@ export const releaseTool = defineTool({
     {
       sessionId: Type.String({ description: "Session ID to release" }),
       provider,
-      browser,
     },
     { additionalProperties: false },
   ),

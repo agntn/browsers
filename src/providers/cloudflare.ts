@@ -61,6 +61,10 @@ import {
  */
 const REQUEST_TIMEOUT = 90_000;
 
+/** Cloudflare scopes a Kitesurf browser to one CDP socket, and its session route answers with Chromium. */
+const KITESURF_SESSIONS =
+  'Kitesurf has no sessions: Cloudflare ties each Kitesurf browser to one CDP socket, and its session route starts Chromium. Leave out browser for a Chromium session. Scrape, screenshot and the other page tools take browser: "kitesurf" and start their own.';
+
 interface CfEnvelope<T = unknown> {
   readonly success: boolean;
   readonly result: T;
@@ -318,8 +322,8 @@ class CloudflareProvider implements BrowserProvider {
       screenshot: true,
       navigate: false,
       evaluate: false,
-      sessions: true,
-      cdp: true,
+      sessions: this.browser === undefined,
+      cdp: this.browser === undefined,
       statelessScrape: true,
       statelessScreenshot: true,
       elementScreenshot: true,
@@ -411,6 +415,7 @@ class CloudflareProvider implements BrowserProvider {
   }
 
   async createSession(options?: CreateSessionOptions): Promise<BrowserSession> {
+    if (this.browser === "kitesurf") throw new InvalidInputError(KITESURF_SESSIONS);
     try {
       const params: Record<string, string> = options?.timeout
         ? { keep_alive: String(options.timeout) }
@@ -435,6 +440,7 @@ class CloudflareProvider implements BrowserProvider {
   }
 
   async getSession(sessionId: string): Promise<BrowserSession | null> {
+    if (this.browser === "kitesurf") return null;
     try {
       const res = await this.request({
         url: this.browserEndpoint(`/devtools/browser/${sessionId}`),
@@ -455,6 +461,7 @@ class CloudflareProvider implements BrowserProvider {
   }
 
   async listSessions(): Promise<BrowserSession[]> {
+    if (this.browser === "kitesurf") return [];
     try {
       const res = await this.request({
         url: this.browserEndpoint("/devtools/session"),
@@ -475,6 +482,7 @@ class CloudflareProvider implements BrowserProvider {
   }
 
   async releaseSession(sessionId: string): Promise<void> {
+    if (this.browser === "kitesurf") throw new InvalidInputError(KITESURF_SESSIONS);
     try {
       await this.request({
         url: this.browserEndpoint(`/devtools/browser/${sessionId}`),

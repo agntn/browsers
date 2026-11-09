@@ -24,6 +24,7 @@ import type {
   CrawlPage,
   ProviderCapabilities,
   ScreenshotResult,
+  WebMcpTool,
 } from "./core/types.ts";
 import {
   imageMimeType,
@@ -129,6 +130,18 @@ export interface BrowserAccessibilityParams extends BrowserUrlParams {
   maxChars?: number;
 }
 
+/** Arguments accepted by the browser WebMCP tools tool. */
+export interface BrowserWebMcpToolsParams extends BrowserUrlParams {
+  maxChars?: number;
+}
+
+/** Arguments accepted by the browser WebMCP call tool. */
+export interface BrowserWebMcpCallParams extends BrowserUrlParams {
+  tool: string;
+  input?: Readonly<Record<string, unknown>>;
+  maxChars?: number;
+}
+
 /** Arguments accepted by the browser search tool. */
 export interface BrowserSearchParams {
   query: string;
@@ -176,6 +189,27 @@ function content(text: string): Array<{ type: "text"; text: string }> {
  */
 export function sanitizeField(value: string): string {
   return value.replace(UNSAFE_CHARACTERS, " ").replaceAll(/ +/g, " ").trim();
+}
+
+/**
+ * Cuts text to `maxChars` at the last `at` (a line break by default) and says how much went.
+ *
+ * @param text - Whole text.
+ * @param limit - Characters to keep at most, and the separator to cut at.
+ * @returns {{ body: string; truncation: string }} The kept text and its truncation note, if any.
+ */
+function cutAt(
+  text: string,
+  limit: Readonly<{ maxChars: number; at?: string }>,
+): { body: string; truncation: string } {
+  const { maxChars, at = "\n" } = limit;
+  if (text.length <= maxChars) return { body: text, truncation: "" };
+  const cut = text.lastIndexOf(at, maxChars);
+  const body = text.slice(0, cut > 0 ? cut : maxChars);
+  return {
+    body,
+    truncation: `\n\n[truncated ${text.length - body.length} of ${text.length} characters]`,
+  };
 }
 
 function resolveMaxChars(value?: number): number {
@@ -912,13 +946,7 @@ export async function browserAccessibility(
   const { provider, result, tree } = await readAccessibilityTree(params, options);
   const lines = accessibilityOutline(tree);
   const outline = lines.join("\n");
-  let body = outline;
-  let truncation = "";
-  if (outline.length > maxChars) {
-    const cut = outline.lastIndexOf("\n", maxChars);
-    body = outline.slice(0, cut > 0 ? cut : maxChars);
-    truncation = `\n\n[truncated ${outline.length - body.length} of ${outline.length} characters]`;
-  }
+  const { body, truncation } = cutAt(outline, { maxChars });
   const page = [
     result.statusCode === undefined ? undefined : `status ${result.statusCode}`,
     result.title ? quoted(result.title) : undefined,
@@ -933,6 +961,129 @@ export async function browserAccessibility(
       ...(result.statusCode === undefined ? {} : { statusCode: result.statusCode }),
       nodes: lines.length,
       contentLength: outline.length,
+    },
+  };
+}
+
+/** Page tools and their hints, kept by agent harnesses; the text carries the same list. */
+export interface BrowserWebMcpToolsDetails {
+  url: string;
+  provider: string;
+  tools: WebMcpTool[];
+  /** Characters of the whole listing, before `maxChars` cut it. */
+  contentLength: number;
+}
+
+/** What one page tool returned, kept by agent harnesses; the text carries its text parts. */
+export interface BrowserWebMcpCallDetails {
+  url: string;
+  provider: string;
+  tool: string;
+  output: unknown;
+  /** Characters of the whole answer text, before `maxChars` cut it. */
+  contentLength: number;
+}
+
+/** The hints a listing names, in the order it names them. */
+const WEBMCP_HINTS = [
+  ["readOnly", "read-only"],
+  ["untrustedContent", "untrusted content"],
+  ["consequential", "consequential"],
+] as const;
+
+/**
+ * One tool as lines of name and hints, description and schema, each field from the page cleaned.
+ *
+ * @param tool - A page tool.
+ * @returns {string[]} The block's lines.
+ */
+function webmcpToolLines(tool: Readonly<WebMcpTool>): string[] {
+  const hints = WEBMCP_HINTS.filter(([key]) => tool.annotations?.[key] === true).map(
+    ([, label]) => label,
+  );
+  const head = `${sanitizeField(tool.name)}${hints.length > 0 ? ` (${hints.join(", ")})` : ""}`;
+  const description = sanitizeField(tool.description);
+  const schema = tool.inputSchema ? sanitizeField(JSON.stringify(tool.inputSchema)) : "";
+  return [
+    head,
+    ...(description ? [`  ${description}`] : []),
+    ...(schema ? [`  input: ${schema}`] : []),
+  ];
+}
+
+/**
+ * Lists the WebMCP tools one page registers, bounded by `maxChars` between two tools.
+ *
+ * @param params - Page and provider arguments.
+ * @param options - Cancellation.
+ * @returns {Promise<ToolResult<BrowserWebMcpToolsDetails>>} The listing and the tools.
+ */
+export async function browserWebMcpTools(
+  params: Readonly<BrowserWebMcpToolsParams>,
+  options?: Readonly<AbortOptions>,
+): Promise<ToolResult<BrowserWebMcpToolsDetails>> {
+  const maxChars = resolveMaxChars(params.maxChars);
+  const { name, provider } = await createProvider(params.provider, params.browser, "webmcpTools");
+  const { tools } = await provider.webmcpTools(params.url, { signal: options?.signal });
+  const listing = tools.map((tool) => webmcpToolLines(tool).join("\n")).join("\n\n");
+  const { body, truncation } = cutAt(listing, { maxChars, at: "\n\n" });
+  const url = sanitizeField(params.url);
+  const header =
+    tools.length === 0
+      ? `[provider=${name}] ${url}: no WebMCP tools. The page registered none once it loaded.`
+      : `[provider=${name}] ${url}: ${tools.length} WebMCP tools`;
+  return {
+    content: content(tools.length === 0 ? header : `${header}\n\n${body}${truncation}`),
+    details: { url: params.url, provider: name, tools, contentLength: listing.length },
+  };
+}
+
+/**
+ * Checks that `input` is a JSON object, the only shape a page tool takes.
+ *
+ * @param input - The caller's `input`.
+ * @returns {Readonly<Record<string, unknown>>} The input, `{}` when left out.
+ * @throws {InvalidInputError} For an array, `null` or a primitive.
+ */
+function webmcpInput(input: unknown): Readonly<Record<string, unknown>> {
+  if (input === undefined) return {};
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    throw new InvalidInputError("input must be a JSON object of the tool's arguments.");
+  }
+  return input as Readonly<Record<string, unknown>>;
+}
+
+/**
+ * Runs one page tool and returns its cleaned answer, bounded by `maxChars`.
+ *
+ * @param params - Page, tool, input and provider arguments.
+ * @param options - Cancellation.
+ * @returns {Promise<ToolResult<BrowserWebMcpCallDetails>>} The answer and the raw output.
+ */
+export async function browserWebMcpCall(
+  params: Readonly<BrowserWebMcpCallParams>,
+  options?: Readonly<AbortOptions>,
+): Promise<ToolResult<BrowserWebMcpCallDetails>> {
+  const maxChars = resolveMaxChars(params.maxChars);
+  const input = webmcpInput(params.input);
+  const { name, provider } = await createProvider(params.provider, params.browser, "webmcpCall");
+  const result = await provider.webmcpCall(params.url, {
+    tool: params.tool,
+    input,
+    signal: options?.signal,
+  });
+  const { sanitizeText } = await import("@agntn/tools");
+  const text = sanitizeText(result.text);
+  const { body, truncation } = cutAt(text, { maxChars });
+  const header = `[provider=${name}] ${sanitizeField(params.url)} ${sanitizeField(params.tool)}:`;
+  return {
+    content: content(`${header}\n\n${body || "(the tool returned no text)"}${truncation}`),
+    details: {
+      url: params.url,
+      provider: name,
+      tool: params.tool,
+      output: result.output,
+      contentLength: text.length,
     },
   };
 }

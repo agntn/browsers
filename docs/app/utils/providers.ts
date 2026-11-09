@@ -146,6 +146,7 @@ export const OPERATIONS: readonly Operation[] = [
   { key: "crawl", label: "crawl", about: "Follow links from a start page", support: flag("crawl") },
   { key: "links", label: "links", about: "Unique hrefs in page order", support: flag("links") },
   { key: "accessibility", label: "a11y tree", about: "Roles, names and states, one node per line", support: flag("accessibilityTree") },
+  { key: "webmcp", label: "webmcp", about: "List and run the tools a page registers for agents", support: flag("webmcp") },
   { key: "extract", label: "extract", about: "Structured data from a prompt", support: flag("extract") },
   { key: "search", label: "search", about: "Web search", support: flag("search") },
   { key: "sessions", label: "sessions", about: "Create, list and release a browser", support: flag("sessions") },

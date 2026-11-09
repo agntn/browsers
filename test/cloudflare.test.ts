@@ -1,7 +1,13 @@
 import { sanitizeLine } from "@agntn/tools";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { resetDefaultClientForTests } from "../src/core/client";
-import { HTTPError, RateLimitError, TimeoutError, TransportError } from "../src/core/errors";
+import {
+  EmptyUrlError,
+  HTTPError,
+  RateLimitError,
+  TimeoutError,
+  TransportError,
+} from "../src/core/errors";
 import { create } from "../src/core/registry";
 import { browserAccessibility, browserScrape, browserScreenshot } from "../src/tool-operations";
 import type { BrowserProvider } from "../src/core/types";
@@ -683,5 +689,166 @@ describe("cloudflare availability", () => {
     await expect(provider.checkAvailability?.()).rejects.toThrow(
       "HTTP 403 from https://api.cloudflare.com/client/v4/accounts/[account]/browser-rendering/devtools/session: Forbidden",
     );
+  });
+});
+
+/* A WebSocket that records where it went and with which headers, then refuses the upgrade. */
+class RefusedSocket extends EventTarget {
+  static opened: { url: string; headers: Record<string, string> | undefined }[] = [];
+  readonly readyState = 3;
+
+  constructor(url: string, init?: { readonly headers?: Record<string, string> }) {
+    super();
+    RefusedSocket.opened.push({ url, headers: init?.headers });
+    queueMicrotask(() => this.dispatchEvent(new Event("error")));
+  }
+
+  close(): void {}
+}
+
+describe("cloudflare WebMCP sockets", () => {
+  afterEach(() => {
+    RefusedSocket.opened = [];
+  });
+
+  it("asks for Kitesurf in the socket URL and opens no REST session", async () => {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        urls.push(input instanceof Request ? input.url : String(input));
+        return jsonResponse({});
+      }),
+    );
+    vi.stubGlobal("WebSocket", RefusedSocket);
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+      browser: "kitesurf",
+    });
+
+    await expect(provider.webmcpTools?.("https://shop.test")).rejects.toThrow(
+      "The browser refused the CDP connection.",
+    );
+    expect(RefusedSocket.opened).toEqual([
+      {
+        url: "wss://api.cloudflare.com/client/v4/accounts/test-account/browser-run/devtools/browser?browser=kitesurf",
+        headers: { Authorization: "Bearer test-token" },
+      },
+    ]);
+    expect(urls).toEqual([]);
+  });
+
+  it("releases the Chromium session when its socket never opens", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input);
+        calls.push(`${init?.method ?? "GET"} ${url}`);
+        return cloudflareResponse(url);
+      }),
+    );
+    vi.stubGlobal("WebSocket", RefusedSocket);
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+
+    await expect(
+      provider.webmcpCall?.("https://shop.test", { tool: "search", input: { query: "socks" } }),
+    ).rejects.toThrow("The browser refused the CDP connection.");
+    expect(RefusedSocket.opened.map(({ url }) => url)).toEqual([
+      "wss://api.cloudflare.com/client/v4/accounts/test-account/browser-rendering/devtools/browser/session-1",
+    ]);
+    expect(calls).toEqual([
+      "POST https://api.cloudflare.com/client/v4/accounts/test-account/browser-rendering/devtools/browser",
+      "DELETE https://api.cloudflare.com/client/v4/accounts/test-account/browser-rendering/devtools/browser/session-1",
+    ]);
+  });
+
+  it("refuses a blank tool name or URL and a cancelled call before any request", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("WebSocket", RefusedSocket);
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+    const controller = new AbortController();
+    controller.abort(new Error("stop"));
+
+    await expect(provider.webmcpCall?.("https://shop.test", { tool: " " })).rejects.toThrow(
+      "tool must name one of the page's WebMCP tools.",
+    );
+    await expect(provider.webmcpCall?.(" ", { tool: "search" })).rejects.toBeInstanceOf(
+      EmptyUrlError,
+    );
+    await expect(
+      provider.webmcpTools?.("https://shop.test", { signal: controller.signal }),
+    ).rejects.toThrow("stop");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(RefusedSocket.opened).toEqual([]);
+  });
+});
+
+/* A WebSocket that opens, records each command and refuses it, and closes when told. */
+class OpenSocket extends EventTarget {
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static sent: string[] = [];
+  readyState = 0;
+
+  constructor() {
+    super();
+    queueMicrotask(() => {
+      this.readyState = 1;
+      this.dispatchEvent(new Event("open"));
+    });
+  }
+
+  send(data: string): void {
+    OpenSocket.sent.push(data);
+    const { id } = JSON.parse(data) as { readonly id: number };
+    const reply = JSON.stringify({ id, error: { code: -32_000, message: "refused" } });
+    queueMicrotask(() => this.dispatchEvent(new MessageEvent("message", { data: reply })));
+  }
+
+  close(): void {
+    this.readyState = 3;
+    this.dispatchEvent(new Event("close"));
+  }
+}
+
+describe("cloudflare WebMCP cancellation", () => {
+  it("drops a call cancelled while its session opens, and releases that session", async () => {
+    OpenSocket.sent = [];
+    const controller = new AbortController();
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input);
+        const method = init?.method ?? "GET";
+        calls.push(`${method} ${url}`);
+        if (method === "POST") controller.abort(new Error("cancelled during setup"));
+        return cloudflareResponse(url);
+      }),
+    );
+    vi.stubGlobal("WebSocket", OpenSocket);
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+
+    await expect(
+      provider.webmcpCall?.("https://shop.test", { tool: "book", signal: controller.signal }),
+    ).rejects.toThrow("cancelled during setup");
+    expect(OpenSocket.sent).toEqual([]);
+    expect(calls).toEqual([
+      "POST https://api.cloudflare.com/client/v4/accounts/test-account/browser-rendering/devtools/browser",
+      "DELETE https://api.cloudflare.com/client/v4/accounts/test-account/browser-rendering/devtools/browser/session-1",
+    ]);
   });
 });

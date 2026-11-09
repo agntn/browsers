@@ -24,7 +24,11 @@ import type {
   BrowserProviderFactory,
   ProviderCapabilities,
   CloudflareBrowser,
+  WebMcpCallOptions,
+  WebMcpCallResult,
+  WebMcpToolsResult,
 } from "../core/types.ts";
+import type { CdpSocket, WebMcpPage } from "../core/webmcp.ts";
 import { rejectBlockPage } from "../core/block-page.ts";
 import { Client } from "../core/client.ts";
 import {
@@ -36,6 +40,7 @@ import {
 import {
   BrowserError,
   HTTPError,
+  InvalidInputError,
   RateLimitError,
   TimeoutError,
   TransportError,
@@ -326,6 +331,7 @@ class CloudflareProvider implements BrowserProvider {
       search: false,
       extract: true,
       accessibilityTree: true,
+      webmcp: true,
     };
   }
 
@@ -798,6 +804,112 @@ class CloudflareProvider implements BrowserProvider {
     } catch (error) {
       throw this.fail(error);
     }
+  }
+
+  async webmcpTools(url: string, options?: Readonly<AbortOptions>): Promise<WebMcpToolsResult> {
+    assertUrl(url);
+    const tools = await this.withWebMcpPage({ url, signal: options?.signal }, async (page) =>
+      page.tools(),
+    );
+    return { url, tools };
+  }
+
+  async webmcpCall(url: string, call: Readonly<WebMcpCallOptions>): Promise<WebMcpCallResult> {
+    assertUrl(url);
+    if (typeof call.tool !== "string" || call.tool.trim() === "") {
+      throw new InvalidInputError("tool must name one of the page's WebMCP tools.");
+    }
+    const input = call.input ?? {};
+    const { output, text } = await this.withWebMcpPage({ url, signal: call.signal }, async (page) =>
+      page.call(call.tool, input),
+    );
+    return { url, tool: call.tool, output, text };
+  }
+
+  /**
+   * Opens `url` in a browser of its own for `use`, closed after or on cancel, even mid setup.
+   *
+   * @param {object} target - Page to open, and its cancellation.
+   * @param {string} target.url - Page to open.
+   * @param {AbortSignal} [target.signal] - Cancellation.
+   * @param {(page: WebMcpPage) => Promise<T>} use - What to do with the page.
+   * @returns {Promise<T>} Whatever `use` returns.
+   */
+  private async withWebMcpPage<T>(
+    target: Readonly<{ url: string; signal?: AbortSignal }>,
+    use: (page: WebMcpPage) => Promise<T>,
+  ): Promise<T> {
+    const { url, signal } = target;
+    signal?.throwIfAborted();
+    const { WebMcpPage: Page } = await import("../core/webmcp.ts");
+    const browser = await this.webmcpBrowser().catch((error: unknown) => {
+      throw this.fail(error);
+    });
+    const stop = (): void => browser.socket.close();
+    signal?.addEventListener("abort", stop, { once: true });
+    try {
+      signal?.throwIfAborted();
+      return await use(await Page.open(browser.socket, { url, provider: "cloudflare" }));
+    } catch (error) {
+      signal?.throwIfAborted();
+      throw this.fail(error);
+    } finally {
+      signal?.removeEventListener("abort", stop);
+      browser.socket.close();
+      await browser.release();
+    }
+  }
+
+  /**
+   * A browser socket. Kitesurf answers only when the socket URL asks, never on a REST session.
+   *
+   * @returns {Promise<{ socket: CdpSocket; release: () => Promise<void> }>} Socket and cleanup.
+   */
+  private async webmcpBrowser(): Promise<{
+    socket: CdpSocket;
+    release: () => Promise<void>;
+  }> {
+    if (this.browser === "kitesurf") {
+      const socket = await this.openCdp((accountId) =>
+        this.browserEndpoint("/devtools/browser")(accountId).replace(/^https:/, "wss:"),
+      );
+      return { socket, release: async () => {} };
+    }
+    const session = await this.createSession();
+    const release = async (): Promise<void> => {
+      await this.releaseSession(session.id).catch(() => undefined);
+    };
+    try {
+      const socket = await this.openCdp(
+        (accountId) =>
+          `${this.base(accountId).replace(/^https:/, "wss:")}/devtools/browser/${encodeURIComponent(session.id)}`,
+      );
+      return { socket, release };
+    } catch (error) {
+      await release();
+      throw error;
+    }
+  }
+
+  /**
+   * Connects, and like `request` once more with a fresh cf token when the upgrade is refused.
+   *
+   * @param {(accountId: string) => string} url - The socket's address for an account.
+   * @returns {Promise<CdpSocket>} The open socket.
+   */
+  private async openCdp(url: (accountId: string) => string): Promise<CdpSocket> {
+    const { CdpSocket: Socket } = await import("../core/webmcp.ts");
+    const first = await this.credentials(false);
+    const auth = (credentials: Readonly<CloudflareCredentials>): Record<string, string> => ({
+      Authorization: `Bearer ${credentials.token}`,
+    });
+    try {
+      return await Socket.open(url(first.accountId), auth(first));
+    } catch (error) {
+      if (!first.renewable) throw error;
+    }
+    const renewed = await this.credentials(true);
+    return Socket.open(url(renewed.accountId), auth(renewed));
   }
 
   async checkAvailability(): Promise<void> {

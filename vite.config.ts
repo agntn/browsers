@@ -35,6 +35,7 @@ export default defineConfig({
               name: [
                 "BrowserProviderFactory",
                 "BrowserSession",
+                "CdpSocket",
                 "ClientOptions",
                 "CreateSessionOptions",
                 "CrawlOptions",
@@ -43,6 +44,7 @@ export default defineConfig({
                 "ProviderConfig",
                 "ScrapeOptions",
                 "ScreenshotOptions",
+                "WebMcpPage",
                 "WebSearchOptions",
               ],
             },

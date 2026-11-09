@@ -27,6 +27,7 @@ Steel scrapes in one HTTP call. Kernel wants a live session first. Browserbase h
 - ⏳ **A slow crawl keeps its job.** Cloudflare and Hyperbrowser wait two minutes, then hand back the job ID. Pass it as `jobId` with the same provider and browser, or `--job-id` in the CLI, and you wait for that job again. No second crawl.
 - 🔗 **Agent links come in pages.** 500 per call unless you pass `limit`, 5 000 at most. The answer counts the rest and names the `offset` to ask for next. The CLI pages too. Same `--limit`, same `--offset`.
 - ♿ **A form reads as its fields.** The accessibility tree gives one line per field, button or heading, with its state. The httpbin pizza form comes to about a thousand characters. Cloudflare only for now.
+- 🪄 **Some pages hand you their own tools.** List them and ask the page directly, without scraping HTML and guessing. A tool can change things, so check what it does first. [WebMCP](https://browsers.agntn.dev/guide/webmcp) runs on Cloudflare.
 - 🔐 **Keys in a URL get scrubbed.** Query params named `token` or `api_key` land in errors as `[REDACTED]`.
 
 ## 📦 Install
@@ -142,22 +143,24 @@ browsers session --provider kernel
 
 ### Commands
 
-| Command         | What it does                          | Example                                               |
-| --------------- | ------------------------------------- | ----------------------------------------------------- |
-| `scrape`        | Rendered page, markdown if it exists  | `browsers scrape https://example.com -p playwright`   |
-| `screenshot`    | Image to a file                       | `browsers screenshot https://example.com -o page.png` |
-| `crawl`         | Follow links, cap with `--max-pages`  | `browsers crawl https://example.com --max-pages 5`    |
-| `pdf`           | URL to a PDF file                     | `browsers pdf https://example.com -o page.pdf`        |
-| `links`         | Unique hrefs                          | `browsers links https://example.com -p playwright`    |
-| `accessibility` | Roles, names and states, one per line | `browsers accessibility https://example.com`          |
-| `search`        | Hyperbrowser web search               | `browsers search "browser automation"`                |
-| `extract`       | Structured extract with a prompt      | `browsers extract https://example.com --prompt "..."` |
-| `session`       | Open a session, ID only               | `browsers session -p kernel`                          |
-| `sessions`      | Active session IDs                    | `browsers sessions -p kernel`                         |
-| `release`       | Close one, stop the bill              | `browsers release <session-id> -p kernel`             |
-| `providers`     | Who is configured, what they can do   | `browsers providers`                                  |
-| `capabilities`  | What one provider can do              | `browsers capabilities cloudflare`                    |
-| `mcp`           | MCP server on stdio                   | `browsers mcp`                                        |
+| Command         | What it does                          | Example                                                                                   |
+| --------------- | ------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `scrape`        | Rendered page, markdown if it exists  | `browsers scrape https://example.com -p playwright`                                       |
+| `screenshot`    | Image to a file                       | `browsers screenshot https://example.com -o page.png`                                     |
+| `crawl`         | Follow links, cap with `--max-pages`  | `browsers crawl https://example.com --max-pages 5`                                        |
+| `pdf`           | URL to a PDF file                     | `browsers pdf https://example.com -o page.pdf`                                            |
+| `links`         | Unique hrefs                          | `browsers links https://example.com -p playwright`                                        |
+| `accessibility` | Roles, names and states, one per line | `browsers accessibility https://example.com`                                              |
+| `webmcp-tools`  | The WebMCP tools a page registers     | `browsers webmcp-tools https://radar.cloudflare.com/`                                     |
+| `webmcp-call`   | Run one of them with JSON input       | `browsers webmcp-call https://radar.cloudflare.com/ search --input '{"query":"1.1.1.1"}'` |
+| `search`        | Hyperbrowser web search               | `browsers search "browser automation"`                                                    |
+| `extract`       | Structured extract with a prompt      | `browsers extract https://example.com --prompt "..."`                                     |
+| `session`       | Open a session, ID only               | `browsers session -p kernel`                                                              |
+| `sessions`      | Active session IDs                    | `browsers sessions -p kernel`                                                             |
+| `release`       | Close one, stop the bill              | `browsers release <session-id> -p kernel`                                                 |
+| `providers`     | Who is configured, what they can do   | `browsers providers`                                                                      |
+| `capabilities`  | What one provider can do              | `browsers capabilities cloudflare`                                                        |
+| `mcp`           | MCP server on stdio                   | `browsers mcp`                                                                            |
 
 ## 🧠 Library
 
@@ -178,18 +181,18 @@ That's most of it, really. `create("steel")` if you have `STEEL_API_KEY`. `resol
 
 ## 🗺️ Providers
 
-| Provider         | Auth                                                   | Capabilities                                                                                                                              |
-| ---------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **steel**        | `STEEL_API_KEY`                                        | scrape, screenshot (session), sessions, CDP                                                                                               |
-| **browserbase**  | `BROWSERBASE_API_KEY`                                  | scrape, sessions, CDP                                                                                                                     |
-| **kernel**       | `KERNEL_API_KEY`                                       | scrape (session), scrape waitFor, screenshot (session), navigate, evaluate, sessions, CDP                                                 |
-| **browserless**  | `BROWSERLESS_API_KEY`                                  | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, navigate, evaluate, sessions, CDP, PDF                        |
-| **hyperbrowser** | `HYPERBROWSER_API_KEY`                                 | scrape, screenshot, sessions, CDP, crawl, search, extract                                                                                 |
-| **anchor**       | `ANCHOR_API_KEY`                                       | screenshot (session), sessions, CDP                                                                                                       |
-| **cloudflare**   | `cf auth login` or `CLOUDFLARE_API_TOKEN` + account ID | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, sessions, CDP, crawl, PDF, links, extract, accessibility tree |
-| **playwright**   | none, local                                            | scrape, scrape waitFor, screenshot (session), element screenshot, screenshot waitFor, navigate, evaluate, sessions, crawl, PDF, links     |
-| **lightpanda**   | none, local, or `LIGHTPANDA_API_KEY` for its cloud     | scrape, scrape waitFor, navigate, evaluate, sessions, CDP, links                                                                          |
-| **attach**       | none, your own browser on port 9222 or `ATTACH_URL`    | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, evaluate, sessions, links                                     |
+| Provider         | Auth                                                   | Capabilities                                                                                                                                      |
+| ---------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **steel**        | `STEEL_API_KEY`                                        | scrape, screenshot (session), sessions, CDP                                                                                                       |
+| **browserbase**  | `BROWSERBASE_API_KEY`                                  | scrape, sessions, CDP                                                                                                                             |
+| **kernel**       | `KERNEL_API_KEY`                                       | scrape (session), scrape waitFor, screenshot (session), navigate, evaluate, sessions, CDP                                                         |
+| **browserless**  | `BROWSERLESS_API_KEY`                                  | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, navigate, evaluate, sessions, CDP, PDF                                |
+| **hyperbrowser** | `HYPERBROWSER_API_KEY`                                 | scrape, screenshot, sessions, CDP, crawl, search, extract                                                                                         |
+| **anchor**       | `ANCHOR_API_KEY`                                       | screenshot (session), sessions, CDP                                                                                                               |
+| **cloudflare**   | `cf auth login` or `CLOUDFLARE_API_TOKEN` + account ID | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, sessions, CDP, crawl, PDF, links, extract, accessibility tree, WebMCP |
+| **playwright**   | none, local                                            | scrape, scrape waitFor, screenshot (session), element screenshot, screenshot waitFor, navigate, evaluate, sessions, crawl, PDF, links             |
+| **lightpanda**   | none, local, or `LIGHTPANDA_API_KEY` for its cloud     | scrape, scrape waitFor, navigate, evaluate, sessions, CDP, links                                                                                  |
+| **attach**       | none, your own browser on port 9222 or `ATTACH_URL`    | scrape, scrape waitFor, screenshot, element screenshot, screenshot waitFor, evaluate, sessions, links                                             |
 
 Anchor does not scrape. The row stays, because someone will look for it. Cloudflare can use your `cf auth login`, so there's no token to export. An exported `CLOUDFLARE_API_TOKEN` still needs an account variable.
 
@@ -209,7 +212,7 @@ omp install @agntn/browsers
 }
 ```
 
-Twelve tools, `browsers_scrape` through `browsers_capabilities`, the same twelve on MCP, Pi and OMP. Cloudflare calls backed by Browser Run take `browser: "kitesurf"`. No `provider` needed then. They do not drive a session you already opened.
+Every tool, `browsers_scrape` through `browsers_capabilities`, is the same on MCP, Pi and OMP. Cloudflare calls backed by Browser Run take `browser: "kitesurf"`. No `provider` needed then. They do not drive a session you already opened.
 
 `browsers_screenshot` hands the image back to the model. A full page too big for that goes to a file: pass `path`, and it refuses to overwrite one that exists. `browsers_pdf` always writes to `path`, under the same rule, since a PDF cannot go back to the model.
 

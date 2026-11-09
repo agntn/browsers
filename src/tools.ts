@@ -423,6 +423,77 @@ export const accessibilityTool = defineTool({
     (await loadOperations()).browserAccessibility(input, { signal }),
 });
 
+export const webmcpToolsTool = defineTool({
+  name: "browsers_webmcp_tools",
+  title: browserToolLabels.browsers_webmcp_tools,
+  description: browserToolDescriptions.browsers_webmcp_tools,
+  snippet: "List the WebMCP tools a webpage registers for agents.",
+  guidelines: [
+    "Use browsers_webmcp_tools before scraping a site that may expose its own tools, like a search or a filter; a page tool answers more exactly than its HTML.",
+    "Pass a tool from the list to browsers_webmcp_call with input matching its input schema.",
+    "Each call loads the page fresh, so tools a page adds only after another tool ran never show up.",
+  ],
+  effect: "read",
+  idempotent: false,
+  openWorld: true,
+  input: Type.Object(
+    {
+      url: Type.String({ description: "URL of the page whose tools to list" }),
+      provider: providerOf("cloudflare"),
+      browser,
+      maxChars: maxChars("listing characters to return"),
+    },
+    { additionalProperties: false },
+  ),
+  cli: {
+    description: "List the WebMCP tools a page registers.",
+    positional: ["url"],
+    short: shortProvider,
+  },
+  execute: async (input, { signal }) =>
+    (await loadOperations()).browserWebMcpTools(input, { signal }),
+});
+
+export const webmcpCallTool = defineTool({
+  name: "browsers_webmcp_call",
+  title: browserToolLabels.browsers_webmcp_call,
+  description: browserToolDescriptions.browsers_webmcp_call,
+  snippet: "Run one WebMCP tool a webpage registers and return its answer.",
+  guidelines: [
+    "List the page's tools with browsers_webmcp_tools first, then pass one name as tool.",
+    "Check the hints: don't run a consequential tool the user didn't ask for.",
+    "Nothing a tool changes in the tab carries over to the next call, since each opens the page fresh.",
+  ],
+  effect: "write",
+  openWorld: true,
+  input: Type.Object(
+    {
+      url: Type.String({ description: "URL of the page that registers the tool" }),
+      tool: Type.String({
+        minLength: 1,
+        description: "Name of the page tool, as browsers_webmcp_tools lists it",
+      }),
+      input: Type.Optional(
+        Type.Record(Type.String(), Type.Unknown(), {
+          description: "Arguments for the tool, matching its input schema. Default: {}.",
+        }),
+      ),
+      provider: providerOf("cloudflare"),
+      browser,
+      maxChars: maxChars("answer characters to return"),
+    },
+    { additionalProperties: false },
+  ),
+  cli: {
+    description: "Run one WebMCP tool a page registers.",
+    positional: ["url", "tool"],
+    plain: ["tool"],
+    short: shortProvider,
+  },
+  execute: async (input, { signal }) =>
+    (await loadOperations()).browserWebMcpCall(input, { signal }),
+});
+
 export const searchTool = defineTool({
   name: "browsers_search",
   title: browserToolLabels.browsers_search,
@@ -488,6 +559,8 @@ export const browserTools = [
   pdfTool,
   linksTool,
   accessibilityTool,
+  webmcpToolsTool,
+  webmcpCallTool,
   searchTool,
   capabilitiesTool,
 ] as const satisfies readonly ToolDefinition[];

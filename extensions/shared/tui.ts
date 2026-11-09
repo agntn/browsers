@@ -35,6 +35,8 @@ export const BROWSER_TOOL_SYMBOLS: Readonly<Record<BrowserToolName, string>> = {
   browsers_pdf: "📄",
   browsers_links: "🔗",
   browsers_accessibility: "♿",
+  browsers_webmcp_tools: "🧩",
+  browsers_webmcp_call: "🪄",
   browsers_search: "🔎",
   browsers_capabilities: "🧰",
 };
@@ -206,6 +208,14 @@ const CALL_DESCRIPTIONS: Readonly<Record<BrowserToolName, CallDescriber>> = {
       record.interestingOnly === false ? "all nodes" : undefined,
       countedField(record, "maxChars", "char"),
     ]),
+  browsers_webmcp_tools: (record) =>
+    urlCall(record, [scalar(record, "browser"), countedField(record, "maxChars", "char")]),
+  browsers_webmcp_call: (record) =>
+    urlCall(record, [
+      prefixedField(record, "tool", "tool"),
+      scalar(record, "browser"),
+      countedField(record, "maxChars", "char"),
+    ]),
   browsers_search: (record) => ({ subject: scalar(record, "query"), meta: [] }),
   browsers_capabilities: (record) => ({ subject: provider(record), meta: [] }),
 };
@@ -309,6 +319,15 @@ const RESULT_META: Readonly<Record<BrowserToolName, ResultMetaRenderer>> = {
   },
   browsers_accessibility: (details) =>
     compact([scalar(details, "provider"), countedField(details, "nodes", "node")]),
+  browsers_webmcp_tools: (details) => {
+    const length = listLength(details, "tools");
+    return compact([
+      scalar(details, "provider"),
+      length === undefined ? undefined : count(length, "tool"),
+    ]);
+  },
+  browsers_webmcp_call: (details) =>
+    compact([scalar(details, "provider"), countedField(details, "contentLength", "char")]),
   browsers_search: (details) => {
     const length = listLength(details, "results");
     return length === undefined ? [] : [count(length, "result")];

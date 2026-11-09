@@ -190,6 +190,47 @@ export interface AccessibilityTreeResult {
   tree: AccessibilityNode | null;
 }
 
+/** Hints a page attaches to a WebMCP tool. They are the page's claims, not checked. */
+export interface WebMcpAnnotations {
+  /** The tool changes nothing. */
+  readonly readOnly?: boolean;
+  /** Its output may carry text the site does not control, like user posts. */
+  readonly untrustedContent?: boolean;
+  /** Calling it has real consequences, like a booking or a payment. */
+  readonly consequential?: boolean;
+}
+
+/** One tool a page registered through WebMCP (`document.modelContext.registerTool`). */
+export interface WebMcpTool {
+  readonly name: string;
+  readonly description: string;
+  /** JSON Schema of the tool's input, as the page declared it. */
+  readonly inputSchema?: Readonly<Record<string, unknown>>;
+  readonly annotations?: WebMcpAnnotations;
+}
+
+export interface WebMcpToolsResult {
+  url: string;
+  /** Tools on the page once it loaded and stopped registering new ones. */
+  tools: WebMcpTool[];
+}
+
+export interface WebMcpCallOptions extends AbortOptions {
+  /** Name of the page tool to run. */
+  tool: string;
+  /** Arguments for it, matching its `inputSchema`. Defaults to `{}`. */
+  input?: Readonly<Record<string, unknown>>;
+}
+
+export interface WebMcpCallResult {
+  url: string;
+  tool: string;
+  /** What the page's `execute` returned, parsed from JSON when the browser sent a string. */
+  output: unknown;
+  /** The text parts of an output in MCP form joined, or the output as JSON. */
+  text: string;
+}
+
 /** Declares which optional operations a provider supports. */
 export interface ProviderCapabilities {
   scrape: boolean;
@@ -213,6 +254,8 @@ export interface ProviderCapabilities {
   extract: boolean;
   /** Reads a page's accessibility tree. Missing means it cannot. */
   accessibilityTree?: boolean;
+  /** Lists and calls the tools a page registers through WebMCP. Missing means it cannot. */
+  webmcp?: boolean;
 }
 
 export interface BrowserProvider {
@@ -247,6 +290,10 @@ export interface BrowserProvider {
     options?: Readonly<AccessibilityTreeOptions>,
     session?: BrowserSession,
   ): Promise<AccessibilityTreeResult>;
+  /** Open the page in a fresh browser and list the WebMCP tools it registers. */
+  webmcpTools?(url: string, options?: Readonly<AbortOptions>): Promise<WebMcpToolsResult>;
+  /** Open the page in a fresh browser and run one of its WebMCP tools. */
+  webmcpCall?(url: string, call: Readonly<WebMcpCallOptions>): Promise<WebMcpCallResult>;
 
   getCdpUrl?(session: BrowserSession): string | undefined;
   /** Resolves when the provider answers with this config, rejects with the error saying why not. */

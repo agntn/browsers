@@ -6,6 +6,7 @@ const NAV_ICONS: Record<string, string> = {
   "/guide/scrape": "i-lucide-file-text",
   "/guide/captures": "i-lucide-camera",
   "/guide/reading": "i-lucide-list-tree",
+  "/guide/webmcp": "i-lucide-wand-sparkles",
   "/guide/crawl": "i-lucide-network",
   "/guide/sessions": "i-lucide-plug",
   "/guide/cli": "i-lucide-terminal",

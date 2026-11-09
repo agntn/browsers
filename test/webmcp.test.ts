@@ -60,7 +60,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await browser.stop();
   await new Promise((resolve) => site.close(resolve));
-  await rm(scratch, { recursive: true, force: true });
+  await rm(scratch, { recursive: true, force: true, maxRetries: 5 });
 });
 
 describe("WebMCP over CDP", () => {

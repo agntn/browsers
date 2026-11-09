@@ -40,8 +40,8 @@ const CLOUD_URL = "https://euwest.cloud.lightpanda.io";
 /** Milliseconds a scrape waits for `waitFor` once the page has loaded. */
 const WAIT_FOR_TIMEOUT = 25_000;
 
-/** Milliseconds a fresh `lightpanda serve` gets to answer on its port. */
-const SERVE_START_TIMEOUT = 10_000;
+/** Milliseconds a fresh `lightpanda serve` gets to answer, with room for a crowded host. */
+const SERVE_START_TIMEOUT = 30_000;
 
 /** Milliseconds one `lightpanda fetch` may run before it is killed. */
 const FETCH_TIMEOUT = 60_000;
@@ -204,16 +204,16 @@ async function advertisedSocket(versionUrl: string): Promise<string | undefined>
  * Polls the server's `/json/version` until it advertises its WebSocket.
  *
  * @param {string} versionUrl - The server's version route.
- * @param {Promise<never>} died - Rejects when the process exits or fails to start.
+ * @param {Promise<never>} failed - Rejects when the server dies or the caller aborts.
  * @returns {Promise<string>} The CDP WebSocket address.
  */
 async function waitUntilServing(
   versionUrl: string,
-  died: Readonly<Promise<never>>,
+  failed: Readonly<Promise<never>>,
 ): Promise<string> {
   const deadline = Date.now() + SERVE_START_TIMEOUT;
   while (Date.now() < deadline) {
-    const socket = await Promise.race([advertisedSocket(versionUrl), died]);
+    const socket = await Promise.race([advertisedSocket(versionUrl), failed]);
     if (socket) return socket;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
@@ -255,10 +255,12 @@ function dropServer(stop: () => void): void {
  * Starts `lightpanda serve` on a free loopback port and waits until it answers.
  *
  * @param {string} executable - The Lightpanda binary.
+ * @param {AbortSignal} [signal] - Stops the wait, and the server, when the caller gives up.
  * @returns {Promise<Endpoint>} Its CDP address, and a stop that kills the process.
  */
-async function launchServer(executable: string): Promise<Endpoint> {
+async function launchServer(executable: string, signal?: AbortSignal): Promise<Endpoint> {
   const port = await freePort();
+  signal?.throwIfAborted();
   const child = spawn(executable, ["serve", "--host", "127.0.0.1", "--port", String(port)], {
     stdio: "ignore",
   });
@@ -268,18 +270,22 @@ async function launchServer(executable: string): Promise<Endpoint> {
   };
   holdServer(stop);
   child.once("exit", () => dropServer(stop));
-  const died = new Promise<never>((_resolve, reject) => {
-    child.once("error", reject);
-    child.once("exit", (code) => {
-      reject(new BrowserError(`lightpanda serve exited with code ${code ?? "null"}`));
-    });
+  const failed = Promise.withResolvers<never>();
+  child.once("error", failed.reject);
+  child.once("exit", (code) => {
+    failed.reject(new BrowserError(`lightpanda serve exited with code ${code ?? "null"}`));
   });
-  died.catch(() => {});
+  const giveUp = (): void => failed.reject(signal?.reason);
+  failed.promise.catch(() => {});
+  signal?.addEventListener("abort", giveUp, { once: true });
+  const versionUrl = `http://127.0.0.1:${port}/json/version`;
   try {
-    return { url: await waitUntilServing(`http://127.0.0.1:${port}/json/version`, died), stop };
+    return { url: await waitUntilServing(versionUrl, failed.promise), stop };
   } catch (error) {
     stop();
     throw launchFailure(error, executable);
+  } finally {
+    signal?.removeEventListener("abort", giveUp);
   }
 }
 
@@ -287,10 +293,11 @@ async function launchServer(executable: string): Promise<Endpoint> {
  * The CDP endpoint for one connection to a target.
  *
  * @param {Target} target - Where the browser runs.
+ * @param {AbortSignal} [signal] - Cancels a server start still under way.
  * @returns {Promise<Endpoint>} The address, with a stop for a server this call started.
  */
-async function openEndpoint(target: Readonly<Target>): Promise<Endpoint> {
-  if (target.kind === "launch") return launchServer(target.executable);
+async function openEndpoint(target: Readonly<Target>, signal?: AbortSignal): Promise<Endpoint> {
+  if (target.kind === "launch") return launchServer(target.executable, signal);
   const stop = (): void => {};
   if (target.kind === "attach") return { url: target.endpoint, stop };
   const socket = target.baseURL.replace(/^http/, "ws");
@@ -644,7 +651,7 @@ class LightpandaProvider implements BrowserProvider {
     operation: (page: Page) => Promise<T>,
     signal?: AbortSignal,
   ): Promise<T> {
-    const connection = await connect(await openEndpoint(this.target));
+    const connection = await connect(await openEndpoint(this.target, signal));
     const close = (): void => {
       void disconnect(connection);
     };

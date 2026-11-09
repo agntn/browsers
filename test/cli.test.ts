@@ -140,29 +140,35 @@ describe("browsers session", { timeout: 60_000 }, () => {
     await rm(profiles, { recursive: true, force: true });
   });
 
-  it.each(["playwright", "lightpanda"])("prints a %s session, closes it and exits", (provider) => {
-    const child = spawnSync(process.execPath, ["src/cli.ts", "session", "-p", provider], {
-      cwd: repoRoot,
-      encoding: "utf8",
-      env: {
-        PATH: process.env.PATH,
-        HOME: profiles,
-        TMPDIR: profiles,
-        BROWSERS_TEST_LIGHTPANDA_CHROME: systemChromium() ?? chromium.executablePath(),
-        BROWSERS_TEST_LIGHTPANDA_PROFILE: profiles,
-      },
-      input: "",
-      timeout: 30_000,
-    });
-    const id = /Session created: (\S+)/.exec(child.stdout)?.[1];
+  it.each(["playwright", "lightpanda"])(
+    "prints a %s session, closes it and exits",
+    async (provider) => {
+      const child = spawnSync(process.execPath, ["src/cli.ts", "session", "-p", provider], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: {
+          PATH: process.env.PATH,
+          HOME: profiles,
+          TMPDIR: profiles,
+          BROWSERS_TEST_LIGHTPANDA_CHROME: systemChromium() ?? chromium.executablePath(),
+          BROWSERS_TEST_LIGHTPANDA_PROFILE: profiles,
+        },
+        input: "",
+        timeout: 30_000,
+      });
+      const id = /Session created: (\S+)/.exec(child.stdout)?.[1];
 
-    /* Playwright exits 0 on the timeout SIGTERM, so only `error` gives a hang away. */
-    expect(child.error).toBeUndefined();
-    expect(child.status).toBe(0);
-    expect(id).toBeDefined();
-    expect(child.stderr).toBe(
-      `[provider=${provider}] Session ${id} released: it lived in this process.\n`,
-    );
-    expect(spawnSync("pgrep", ["-f", profiles]).status).toBe(1);
-  });
+      /* Playwright exits 0 on the timeout SIGTERM, so only `error` gives a hang away. */
+      expect(child.error).toBeUndefined();
+      expect(child.status).toBe(0);
+      expect(id).toBeDefined();
+      expect(child.stderr).toBe(
+        `[provider=${provider}] Session ${id} released: it lived in this process.\n`,
+      );
+      /* Chrome may take a moment to leave after the CLI exits; a leaked one stays. */
+      await expect
+        .poll(() => spawnSync("pgrep", ["-f", profiles]).status, { timeout: 10_000 })
+        .toBe(1);
+    },
+  );
 });

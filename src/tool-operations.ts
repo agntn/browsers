@@ -188,7 +188,7 @@ function content(text: string): Array<{ type: "text"; text: string }> {
  * @returns {string} A terminal safe single-line value.
  */
 export function sanitizeField(value: string): string {
-  return value.replace(UNSAFE_CHARACTERS, " ").replaceAll(/ +/g, " ").trim();
+  return value.replaceAll(UNSAFE_CHARACTERS, " ").replaceAll(/ +/g, " ").trim();
 }
 
 /**

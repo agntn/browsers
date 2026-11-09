@@ -50,6 +50,8 @@ describe("browsers MCP server", () => {
       "browsers_pdf",
       "browsers_links",
       "browsers_accessibility",
+      "browsers_webmcp_tools",
+      "browsers_webmcp_call",
       "browsers_search",
       "browsers_capabilities",
     ]);

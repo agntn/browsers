@@ -131,11 +131,19 @@ describe("browsers OMP extension", () => {
       "browsers_pdf",
       "browsers_links",
       "browsers_accessibility",
+      "browsers_webmcp_tools",
+      "browsers_webmcp_call",
       "browsers_search",
       "browsers_capabilities",
     ]);
-    /** Screenshot and PDF write a file, so OMP asks first, as MCP's annotations say. */
-    const writes = ["browsers_session", "browsers_release", "browsers_screenshot", "browsers_pdf"];
+    /** Tools that leave something behind, a file, a session or a page tool's work, ask first. */
+    const writes = [
+      "browsers_session",
+      "browsers_release",
+      "browsers_screenshot",
+      "browsers_pdf",
+      "browsers_webmcp_call",
+    ];
     for (const name of tools.keys()) {
       expect(requireTool(tools, name).approval).toBe(writes.includes(name) ? "write" : "read");
     }
@@ -215,6 +223,20 @@ describe("browsers OMP extension", () => {
             maxChars: 500,
           },
           invalid: { url: "https://example.test", root: "" },
+        },
+        browsers_webmcp_tools: {
+          valid: { url: "https://example.test", browser: "kitesurf", maxChars: 500 },
+          invalid: { url: "https://example.test", maxChars: 0 },
+        },
+        browsers_webmcp_call: {
+          valid: {
+            url: "https://example.test",
+            tool: "search",
+            input: { query: "dns" },
+            browser: "kitesurf",
+            maxChars: 500,
+          },
+          invalid: { url: "https://example.test", tool: "" },
         },
         browsers_search: {
           valid: { query: "browser agents", maxResults: 3 },

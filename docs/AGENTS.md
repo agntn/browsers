@@ -22,7 +22,7 @@ docs/
 ├── app/utils/                     # providers (names, glyphs, blurbs, operations over the registry), samples, tokens, roster, formatting
 ├── public/                        # fonts, favicon.svg and the icons and manifest cut from it
 ├── content/index.md               # landing
-├── content/1.guide/               # getting started, scrape, captures, reading, crawl, sessions, CLI, agents, errors, custom
+├── content/1.guide/               # getting started, scrape, captures, reading, WebMCP, crawl, sessions, CLI, agents, errors, custom
 └── content/2.providers/           # overview, one page per provider in registry order
 ```
 

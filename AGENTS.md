@@ -12,6 +12,7 @@ Unified browser-as-a-service provider library for AI agents. One registry, a fil
 - `src/core/lazy.ts` - one-shot async memo used by the registry
 - `src/core/cloudflare.ts` - Cloudflare token and account from `@agntn/credentials`, looked up per request. Tests put a stand-in `cf` from `test/fixtures/bin` first on `PATH`
 - `src/core/process-sessions.ts` - sessions whose browser lives in this process (Playwright, Lightpanda); the CLI releases them before it exits
+- `src/core/webmcp.ts` - a CDP client on Node's `WebSocket` and the WebMCP flow on one tab: list the tools a page registers, run one. Cloudflare opens the socket; Playwright can't attach to Kitesurf
 - `src/core/block-page.ts` - recognizes block and captcha pages; every provider's `scrape` returns through `rejectBlockPage`
 - `src/core/errors.ts` - typed error hierarchy (BrowserError, HTTPError, AuthError, SessionError, etc.)
 - `src/tools.ts` - one `defineTool` per tool from `@agntn/tools`, the list MCP, Pi, OMP, the AI SDK and the CLI all serve

@@ -24,6 +24,8 @@ export const browserToolNames = [
   "browsers_pdf",
   "browsers_links",
   "browsers_accessibility",
+  "browsers_webmcp_tools",
+  "browsers_webmcp_call",
   "browsers_search",
   "browsers_capabilities",
 ] as const;
@@ -45,6 +47,9 @@ export const MAX_LINKS_LIMIT = 5_000;
 /** Results on one Hyperbrowser search page, the most one browser search call returns. */
 export const MAX_SEARCH_RESULTS = 10;
 
+/** Longest a WebMCP page tool may run; one that waits for a person to confirm never answers. */
+export const WEBMCP_CALL_TIMEOUT = 60_000;
+
 /** Human-facing labels for each browser tool. */
 export const browserToolLabels: Readonly<Record<BrowserToolName, string>> = {
   browsers_scrape: "Browser Scrape",
@@ -57,6 +62,8 @@ export const browserToolLabels: Readonly<Record<BrowserToolName, string>> = {
   browsers_pdf: "Browser PDF",
   browsers_links: "Browser Links",
   browsers_accessibility: "Browser Accessibility",
+  browsers_webmcp_tools: "Browser WebMCP Tools",
+  browsers_webmcp_call: "Browser WebMCP Call",
   browsers_search: "Browser Search",
   browsers_capabilities: "Browser Capabilities",
 };
@@ -83,6 +90,9 @@ export const browserToolDescriptions: Readonly<Record<BrowserToolName, string>> 
     "Extract the unique links of a webpage in page order. Returns up to `limit` links from `offset` with the total count; when links remain, call again with the next offset it reports. Each call reads the page again, so a changed total means the page changed between calls. Cloudflare, Playwright, Lightpanda and attach support stateless link extraction.",
   browsers_accessibility:
     "Read a webpage's accessibility tree: the roles, names, values and states (checked, disabled, expanded) of its headings, links, buttons and form fields, one node per indented line. Use it to find what a page offers or what a form asks for, which scraped markdown leaves out. `root` limits it to the subtree of one CSS selector, generic nodes included; a selector that matches nothing is an error. Cloudflare supports it.",
+  browsers_webmcp_tools:
+    "List the WebMCP tools a webpage registers for agents (`document.modelContext.registerTool`): each tool's name, description, input JSON schema and the page's own hints (read-only, untrusted content, consequential). A page that has the tool you need answers through it, so you don't scrape its HTML and guess. Run one with browsers_webmcp_call. Every call loads the page in a fresh browser, so you see the tools it has once loaded; a tool a page adds only after another one ran never shows up. A page with none answers with an empty list. Cloudflare supports it, on Chromium by default or Kitesurf with `browser: \"kitesurf\"`.",
+  browsers_webmcp_call: `Run one WebMCP tool a webpage registers, with \`input\` matching its inputSchema from browsers_webmcp_tools, and return the tool's answer. Not read-only: a page tool does whatever the site wrote it to do, from a search to changing a setting or booking something, so check its hints first and don't run a consequential one the user didn't ask for. Each call opens the page in a fresh browser, so nothing a tool changes in the tab carries over to the next call. A tool that waits for a person to confirm never answers and fails after ${WEBMCP_CALL_TIMEOUT / 1000} seconds. Cloudflare supports it, on Chromium by default or Kitesurf with \`browser: "kitesurf"\`.`,
   browsers_search: "Web search via browser provider. Hyperbrowser supports native web search.",
   browsers_capabilities:
     "Read-only: report which library operations a browser provider supports, including scrape, screenshot, element screenshot, navigate, evaluate, sessions, CDP, and stateless modes. Navigate and evaluate flags describe the provider API, not extra tools.",

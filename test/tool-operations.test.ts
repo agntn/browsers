@@ -16,6 +16,8 @@ import {
   browserSession,
   browserScreenshot,
   browserSearch,
+  browserWebMcpCall,
+  browserWebMcpTools,
   listBrowserProviders,
   listBrowserSessions,
   releaseBrowserSession,
@@ -45,6 +47,8 @@ const crawl = vi.fn<NonNullable<BrowserProvider["crawl"]>>();
 const resumeCrawl = vi.fn<NonNullable<BrowserProvider["resumeCrawl"]>>();
 const accessibilityTree = vi.fn<NonNullable<BrowserProvider["accessibilityTree"]>>();
 const search = vi.fn<NonNullable<BrowserProvider["search"]>>();
+const webmcpTools = vi.fn<NonNullable<BrowserProvider["webmcpTools"]>>();
+const webmcpCall = vi.fn<NonNullable<BrowserProvider["webmcpCall"]>>();
 
 function toolTestProvider(): BrowserProvider {
   return {
@@ -66,6 +70,7 @@ function toolTestProvider(): BrowserProvider {
       search: false,
       extract: false,
       accessibilityTree: true,
+      webmcp: true,
     }),
     createSession,
     getSession: vi.fn().mockResolvedValue(null),
@@ -80,6 +85,8 @@ function toolTestProvider(): BrowserProvider {
     crawl,
     resumeCrawl,
     accessibilityTree,
+    webmcpTools,
+    webmcpCall,
   };
 }
 
@@ -1043,4 +1050,154 @@ describe("browser tool operations", () => {
     ).rejects.toThrow("maxChars must be an integer between 1 and 200000.");
     expect(accessibilityTree).not.toHaveBeenCalled();
   });
+});
+
+describe("browser WebMCP tools", () => {
+  const search = {
+    name: "search",
+    description: "Search the shop.\u001B[31m Red\u2028line",
+    inputSchema: { type: "object", properties: { query: { type: "string" } } },
+    annotations: { readOnly: true, untrustedContent: true, consequential: false },
+  };
+
+  it("lists each tool with its hints, description and input schema on single lines", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    webmcpTools.mockResolvedValueOnce({
+      url: "https://shop.test",
+      tools: [search, { name: "book", description: "", annotations: { consequential: true } }],
+    });
+
+    const result = await browserWebMcpTools({ provider: "tooltest", url: "https://shop.test" });
+
+    expect(result.content[0]?.text).toBe(
+      [
+        "[provider=tooltest] https://shop.test: 2 WebMCP tools",
+        "",
+        "search (read-only, untrusted content)",
+        "  Search the shop. [31m Red line",
+        '  input: {"type":"object","properties":{"query":{"type":"string"}}}',
+        "",
+        "book (consequential)",
+      ].join("\n"),
+    );
+    expect(result.details.tools).toHaveLength(2);
+    expect(webmcpTools).toHaveBeenLastCalledWith("https://shop.test", { signal: undefined });
+  });
+
+  it("says when a page registers no tools", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    webmcpTools.mockResolvedValueOnce({ url: "https://plain.test", tools: [] });
+
+    const result = await browserWebMcpTools({ provider: "tooltest", url: "https://plain.test" });
+
+    expect(result.content[0]?.text).toBe(
+      "[provider=tooltest] https://plain.test: no WebMCP tools. The page registered none once it loaded.",
+    );
+  });
+
+  it("cuts a long listing between two tools and says how much went", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    webmcpTools.mockResolvedValueOnce({
+      url: "https://shop.test",
+      tools: [
+        { name: "first", description: "a".repeat(40) },
+        { name: "second", description: "b".repeat(40) },
+      ],
+    });
+
+    const result = await browserWebMcpTools({
+      provider: "tooltest",
+      url: "https://shop.test",
+      maxChars: 60,
+    });
+
+    expect(result.content[0]?.text).toBe(
+      `[provider=tooltest] https://shop.test: 2 WebMCP tools\n\nfirst\n  ${"a".repeat(40)}\n\n[truncated 51 of 99 characters]`,
+    );
+    expect(result.details.contentLength).toBe(99);
+  });
+
+  it("returns a tool's answer without escape sequences or forged line breaks", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    const output = { content: [{ type: "text", text: "x" }] };
+    webmcpCall.mockResolvedValueOnce({
+      url: "https://shop.test",
+      tool: "search",
+      output,
+      text: "head\u001B[31mred\u001B[0m\r\n\tindent\u2028line\u202Edrop 👩\u200D💻 می\u200Cخواهم",
+    });
+
+    const result = await browserWebMcpCall({
+      provider: "tooltest",
+      url: "https://shop.test",
+      tool: "search",
+      input: { query: "socks" },
+    });
+
+    expect(result.content[0]?.text).toBe(
+      "[provider=tooltest] https://shop.test search:\n\nheadred\n\tindent linedrop 👩\u200D💻 می\u200Cخواهم",
+    );
+    expect(result.details).toEqual({
+      url: "https://shop.test",
+      provider: "tooltest",
+      tool: "search",
+      output,
+      contentLength: 39,
+    });
+    expect(webmcpCall).toHaveBeenLastCalledWith("https://shop.test", {
+      tool: "search",
+      input: { query: "socks" },
+      signal: undefined,
+    });
+  });
+
+  it("cuts a long answer and marks an empty one", async () => {
+    process.env.TOOLTEST_API_KEY = "test";
+    webmcpCall
+      .mockResolvedValueOnce({
+        url: "https://shop.test",
+        tool: "t",
+        output: "",
+        text: "0123456789",
+      })
+      .mockResolvedValueOnce({ url: "https://shop.test", tool: "t", output: "", text: "" });
+
+    const long = await browserWebMcpCall({
+      provider: "tooltest",
+      url: "https://shop.test",
+      tool: "t",
+      maxChars: 4,
+    });
+    const empty = await browserWebMcpCall({
+      provider: "tooltest",
+      url: "https://shop.test",
+      tool: "t",
+    });
+
+    expect(long.content[0]?.text).toBe(
+      "[provider=tooltest] https://shop.test t:\n\n0123\n\n[truncated 6 of 10 characters]",
+    );
+    expect(empty.content[0]?.text).toBe(
+      "[provider=tooltest] https://shop.test t:\n\n(the tool returned no text)",
+    );
+  });
+
+  it.each([[[1]], [null], ["query"]])(
+    "refuses input %j before opening a browser",
+    async (input) => {
+      process.env.TOOLTEST_API_KEY = "test";
+
+      await expect(
+        browserWebMcpCall({
+          provider: "tooltest",
+          url: "https://shop.test",
+          tool: "search",
+          input: input as unknown as Record<string, unknown>,
+        }),
+      ).rejects.toThrow(
+        new InvalidInputError("input must be a JSON object of the tool's arguments."),
+      );
+      expect(webmcpCall).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -1,25 +1,17 @@
-import { execSync, spawn } from "node:child_process";
-import { once } from "node:events";
+import { execSync } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createInterface } from "node:readline";
 import { chromium } from "playwright-core";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 import { BrowserError, InvalidInputError, UnsupportedOperationError } from "../src/core/errors";
 import { create, register } from "../src/core/registry";
 import { _autoSelectable, createCapableProvider, resolveProvider } from "../src/core/resolve";
 import { builtins } from "../src/providers/index";
-import { systemChromium } from "./chromium";
-
-/* A browser the test started, the http:// address of its debugging port, and how to stop it. */
-interface Running {
-  readonly endpoint: string;
-  readonly stop: () => Promise<void>;
-}
+import { launch, type Running, systemChromium } from "./chromium";
 
 /* The first Firefox build on PATH. CI runners ship firefox; a desk may have a fork instead. */
 function systemFirefox(): string | undefined {
@@ -34,39 +26,6 @@ function systemFirefox(): string | undefined {
     }
   }
   return undefined;
-}
-
-/* Starts a browser on port 0 and reads its port from stderr. A cold Firefox on CI took 30s. */
-async function launch(command: string, args: readonly string[]): Promise<Running> {
-  const child = spawn(command, args, { stdio: ["ignore", "ignore", "pipe"] });
-  const lines = createInterface({ input: child.stderr });
-  const seen: string[] = [];
-  const socket = await new Promise<string>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      child.kill();
-      reject(
-        new Error(`${command} printed no debugging address in 60s:\n${seen.slice(-20).join("\n")}`),
-      );
-    }, 60_000);
-    lines.on("line", (line) => {
-      seen.push(line);
-      const address = /listening on (ws:\/\/\S+)/.exec(line)?.[1];
-      if (!address) return;
-      clearTimeout(timer);
-      resolve(address);
-    });
-    child.once("exit", (code) => {
-      clearTimeout(timer);
-      reject(new Error(`${command} exited with ${code}:\n${seen.slice(-20).join("\n")}`));
-    });
-  });
-  return {
-    endpoint: `http://${new URL(socket).host}`,
-    stop: async () => {
-      child.kill();
-      if (child.exitCode === null) await once(child, "exit");
-    },
-  };
 }
 
 /* Width and height from a PNG's IHDR chunk. */

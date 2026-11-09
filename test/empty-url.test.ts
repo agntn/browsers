@@ -17,6 +17,7 @@ const calls = {
   extract: (provider, url) => provider.extract?.(url, { prompt: "title" }),
   links: (provider, url) => provider.links?.(url),
   accessibilityTree: (provider, url) => provider.accessibilityTree?.(url),
+  webmcp: (provider, url) => provider.webmcpTools?.(url),
 } satisfies Record<
   string,
   (provider: BrowserProvider, url: string) => Promise<unknown> | undefined

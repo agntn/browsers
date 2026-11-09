@@ -2,7 +2,15 @@ import { wireSchema } from "@agntn/tools";
 import { describe, expect, it } from "vite-plus/test";
 import type { ProviderOperation } from "../src/core/resolve";
 import { builtins } from "../src/providers/index";
-import { accessibilityTool, crawlTool, extractTool, linksTool, pdfTool } from "../src/tools";
+import {
+  accessibilityTool,
+  crawlTool,
+  extractTool,
+  linksTool,
+  pdfTool,
+  webmcpCallTool,
+  webmcpToolsTool,
+} from "../src/tools";
 
 /** Tools whose `provider` takes only some providers; its description is their `-p` help. */
 const tools = [
@@ -11,6 +19,8 @@ const tools = [
   { tool: extractTool, operation: "extract" },
   { tool: linksTool, operation: "links" },
   { tool: pdfTool, operation: "pdf" },
+  { tool: webmcpToolsTool, operation: "webmcpTools" },
+  { tool: webmcpCallTool, operation: "webmcpCall" },
 ] as const;
 
 /**

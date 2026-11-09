@@ -92,7 +92,9 @@ export type ProviderOperation =
   | "search"
   | "extract"
   | "links"
-  | "accessibilityTree";
+  | "accessibilityTree"
+  | "webmcpTools"
+  | "webmcpCall";
 
 /** A provider known to implement `O`. */
 export type ProviderWith<O extends ProviderOperation> = BrowserProvider &
@@ -106,6 +108,8 @@ const operationLabels: Readonly<Record<ProviderOperation, string>> = {
   extract: "structured extraction",
   links: "link extraction",
   accessibilityTree: "accessibility trees",
+  webmcpTools: "WebMCP tools",
+  webmcpCall: "WebMCP tool calls",
 };
 
 function supports<O extends ProviderOperation>(

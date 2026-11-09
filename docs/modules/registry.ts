@@ -42,14 +42,10 @@ async function withProviderEnv<T>(value: string, callback: () => T | Promise<T>)
 }
 
 /**
- * Ships the registry as `#browsers-registry`, one template Nuxt bundles. The template is plain
- * JavaScript: a production build keeps it under `node_modules/.cache`, where Nitro strips no types. The provider
- * modules import `node:child_process` (Playwright) and would each pull an HTTP client into the
- * page, so they run once here, in Node, when Nuxt starts. Nothing under `src/core`,
- * `src/providers` or `src/tool-operations.ts` imports an npm package at module scope, which is
- * what lets Workers Builds skip installing the repo root. No request leaves the build: the
- * placeholder keys only get `browsers_capabilities` past its credential check, and the flags it
- * reports don't depend on them.
+ * Ships the registry as `#browsers-registry`, one template Nuxt bundles. The provider modules
+ * import `node:child_process` (Playwright) and would each pull an HTTP client into the page, so
+ * they run once here, in Node, when Nuxt starts. No request leaves the build: the placeholder keys
+ * only get `browsers_capabilities` past its credential check.
  */
 export default defineNuxtModule({
   meta: { name: "browsers-registry" },

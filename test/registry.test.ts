@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, it, expect, beforeEach } from "vite-plus/test";
 import { create, providers, has } from "../src/core/registry";
 import { resetDefaultClientForTests } from "../src/core/client";
@@ -58,6 +58,14 @@ describe("built-in manifest", () => {
       const factory = await entry.load();
       const provider = factory({ apiKey: "test-key", accountID: "test-account" });
       expect(provider.name()).toBe(entry.key);
+    }
+  });
+
+  it("hands every scrape through rejectBlockPage, so a captcha never comes back as content", () => {
+    for (const { key } of builtins) {
+      const source = readFileSync(new URL(`../src/providers/${key}.ts`, import.meta.url), "utf8");
+      if (source.includes(`notSupportedViaRest("${key}", "scrape")`)) continue;
+      expect({ key, rejects: source.includes("rejectBlockPage(") }).toEqual({ key, rejects: true });
     }
   });
 });

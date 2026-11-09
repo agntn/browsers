@@ -81,7 +81,7 @@ function closedSocket(): BrowserError {
 }
 
 /** Node's `WebSocket` (undici) takes `{ headers }` second; `lib.dom` knows only protocols there. */
-const NodeWebSocket = WebSocket as unknown as new (
+type NodeWebSocket = new (
   url: string,
   init?: { readonly headers: Readonly<Record<string, string>> },
 ) => WebSocket;
@@ -94,7 +94,8 @@ export class CdpSocket {
   private lastId = 0;
 
   private constructor(url: string, headers?: Readonly<Record<string, string>>) {
-    this.socket = new NodeWebSocket(url, headers ? { headers } : undefined);
+    const Socket = globalThis.WebSocket as unknown as NodeWebSocket;
+    this.socket = new Socket(url, headers ? { headers } : undefined);
     this.socket.addEventListener("message", (event) => this.settle(String(event.data)));
     this.socket.addEventListener("close", () => this.failAll());
   }

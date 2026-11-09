@@ -791,3 +791,64 @@ describe("cloudflare WebMCP sockets", () => {
     expect(RefusedSocket.opened).toEqual([]);
   });
 });
+
+/* A WebSocket that opens, records each command and refuses it, and closes when told. */
+class OpenSocket extends EventTarget {
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static sent: string[] = [];
+  readyState = 0;
+
+  constructor() {
+    super();
+    queueMicrotask(() => {
+      this.readyState = 1;
+      this.dispatchEvent(new Event("open"));
+    });
+  }
+
+  send(data: string): void {
+    OpenSocket.sent.push(data);
+    const { id } = JSON.parse(data) as { readonly id: number };
+    const reply = JSON.stringify({ id, error: { code: -32_000, message: "refused" } });
+    queueMicrotask(() => this.dispatchEvent(new MessageEvent("message", { data: reply })));
+  }
+
+  close(): void {
+    this.readyState = 3;
+    this.dispatchEvent(new Event("close"));
+  }
+}
+
+describe("cloudflare WebMCP cancellation", () => {
+  it("drops a call cancelled while its session opens, and releases that session", async () => {
+    OpenSocket.sent = [];
+    const controller = new AbortController();
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input);
+        const method = init?.method ?? "GET";
+        calls.push(`${method} ${url}`);
+        if (method === "POST") controller.abort(new Error("cancelled during setup"));
+        return cloudflareResponse(url);
+      }),
+    );
+    vi.stubGlobal("WebSocket", OpenSocket);
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+
+    await expect(
+      provider.webmcpCall?.("https://shop.test", { tool: "book", signal: controller.signal }),
+    ).rejects.toThrow("cancelled during setup");
+    expect(OpenSocket.sent).toEqual([]);
+    expect(calls).toEqual([
+      "POST https://api.cloudflare.com/client/v4/accounts/test-account/browser-rendering/devtools/browser",
+      "DELETE https://api.cloudflare.com/client/v4/accounts/test-account/browser-rendering/devtools/browser/session-1",
+    ]);
+  });
+});

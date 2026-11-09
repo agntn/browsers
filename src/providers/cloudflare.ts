@@ -827,7 +827,7 @@ class CloudflareProvider implements BrowserProvider {
   }
 
   /**
-   * Opens `url` in a browser of its own for `use`, and closes it after or on cancel.
+   * Opens `url` in a browser of its own for `use`, closed after or on cancel, even mid setup.
    *
    * @param {object} target - Page to open, and its cancellation.
    * @param {string} target.url - Page to open.
@@ -848,6 +848,7 @@ class CloudflareProvider implements BrowserProvider {
     const stop = (): void => browser.socket.close();
     signal?.addEventListener("abort", stop, { once: true });
     try {
+      signal?.throwIfAborted();
       return await use(await Page.open(browser.socket, { url, provider: "cloudflare" }));
     } catch (error) {
       signal?.throwIfAborted();

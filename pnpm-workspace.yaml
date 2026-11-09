@@ -15,8 +15,8 @@ minimumReleaseAgeExclude:
   - "@agntn/*"
 
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@1.0.0
-  vite-plus: 1.0.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.5.0
+  vite-plus: 1.5.0
 
 # One version per name for the library and docs/, which reads the library from ../src.
 catalogs:
@@ -27,7 +27,7 @@ catalogs:
     "@vueuse/core": 15.0.0
     docus: 5.15.0
     nuxt: 4.6.4
-    playwright-core: 1.60.0
+    playwright-core: 1.65.0
     string-width: 7.2.0
     strip-ansi: 7.2.0
     ufo: 1.6.4
@@ -46,10 +46,10 @@ catalogs:
     "@types/node": 26.6.6
     ai: 7.0.163
     obuild: 0.4.43
-    shiki: 4.5.0
-    tsx: 4.22.5
+    shiki: 4.6.0
+    tsx: 4.23.15
     typescript: 7.0.2
-    wrangler: 4.128.0
+    wrangler: 4.158.0
   # Docus parses through @typescript-eslint, whose peer stops below TypeScript 6.1, so the site keeps its own.
   docs:
     typescript: 5.9.3

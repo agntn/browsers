@@ -336,8 +336,8 @@ async function serving(cdpUrl: string): Promise<boolean> {
   );
 }
 
-/* A cold Chrome launch on a CI runner takes longer than the vitest defaults. */
-const chromeTimeout = 30_000;
+/* Outlasts the provider's 30 s start budget, so a slow start fails with its own message. */
+const chromeTimeout = 60_000;
 
 /* Runs the host fixture on its own profile, so whatever outlives it can be found and killed. */
 async function hostSession(...args: string[]) {
@@ -418,6 +418,21 @@ describe("lightpanda over CDP", { timeout: chromeTimeout }, () => {
     expect((await provider.links?.(page))?.links).toEqual([
       { href: page.replace("/page", "/next"), text: "Next", rel: "next" },
     ]);
+  });
+
+  it("stops waiting for lightpanda serve once the caller aborts", async () => {
+    process.env.BROWSERS_TEST_LIGHTPANDA_CHROME = fileURLToPath(
+      new URL("fixtures/silent-chrome", import.meta.url),
+    );
+    const provider = await create("lightpanda");
+    const controller = new AbortController();
+    const started = Date.now();
+
+    const scrape = provider.scrape(page, { waitFor: "p", signal: controller.signal });
+    const outcome = expect(scrape).rejects.toThrow("This operation was aborted");
+    setTimeout(() => controller.abort(), 200);
+    await outcome;
+    expect(Date.now() - started).toBeLessThan(5_000);
   });
 
   it("attaches to a running CDP server and leaves it running", async () => {

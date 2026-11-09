@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stands in for a Chrome that starts and never answers on its debugging port.
+exec sleep 60

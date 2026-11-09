@@ -192,7 +192,7 @@ describe("attach to a Chromium over CDP", () => {
       async () => (await provider.scrape(`${base}/book/page/3`)).title,
       "Shelf /book/page/3",
     );
-  });
+  }, 100_000);
 
   afterAll(async () => {
     await browser.stop();

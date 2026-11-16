@@ -15,8 +15,8 @@ minimumReleaseAgeExclude:
   - "@agntn/*"
 
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@1.5.0
-  vite-plus: 1.5.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.5.1
+  vite-plus: 1.5.1
 
 # One version per name for the library and docs/, which reads the library from ../src.
 catalogs:
@@ -44,8 +44,8 @@ catalogs:
     "@oh-my-pi/omptype": 18.4.12
     "@oh-my-pi/pi-coding-agent": 18.4.12
     "@types/node": 26.6.6
-    ai: 7.0.163
-    obuild: 0.4.43
+    ai: 7.0.171
+    obuild: 0.4.45
     shiki: 4.6.0
     tsx: 4.23.15
     typescript: 7.0.2

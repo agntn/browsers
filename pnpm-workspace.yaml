@@ -22,7 +22,7 @@ catalog:
 catalogs:
   deps:
     "@agntn/credentials": 0.0.2
-    "@agntn/tools": 0.3.0
+    "@agntn/tools": 0.3.1
     "@modelcontextprotocol/server": 2.4.0
     "@vueuse/core": 15.0.0
     docus: 5.15.0

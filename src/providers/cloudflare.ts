@@ -123,9 +123,14 @@ type CfAccessibilityTreeResponse = CfPageResponse<{
 }>;
 
 /** Outputs `/snapshot` renders, keyed by the format that asked for them. */
-type CfSnapshotFormat = "content" | "markdown" | "screenshot";
+type CfSnapshotFormat = "content" | "markdown" | "screenshot" | "links";
 
-type CfSnapshotResult = { readonly [F in CfSnapshotFormat]?: string };
+interface CfSnapshotResult {
+  readonly content?: string;
+  readonly markdown?: string;
+  readonly screenshot?: string;
+  readonly links?: readonly string[];
+}
 
 interface CfScreenshotResult {
   readonly image?: string;
@@ -162,6 +167,7 @@ function scrapeFormats(options: ScrapeOptions = {}): CfSnapshotFormat[] {
   if (requested.includes("markdown")) formats.push("markdown");
   if (formats.length === 0) formats.push("content");
   if (options.screenshot) formats.push("screenshot");
+  if (options.links) formats.push("links");
   return formats;
 }
 
@@ -178,21 +184,22 @@ function pageMeta(meta?: CfPageMeta): Pick<ScrapeResult, "title" | "statusCode">
   };
 }
 
+type PageOutput = "html" | "markdown" | "screenshot" | "links";
+
 /**
  * The outputs a scrape got back, each only when Cloudflare sent it.
  *
  * @param {CfSnapshotResult} outputs Rendered outputs by format.
- * @returns {Pick<ScrapeResult, "html" | "markdown" | "screenshot">} The fields Cloudflare filled.
+ * @returns {Pick<ScrapeResult, PageOutput>} The fields Cloudflare filled.
  */
-function pageOutputs(
-  outputs: CfSnapshotResult,
-): Pick<ScrapeResult, "html" | "markdown" | "screenshot"> {
+function pageOutputs(outputs: CfSnapshotResult): Pick<ScrapeResult, PageOutput> {
   return {
     ...(outputs.content === undefined ? {} : { html: outputs.content }),
     ...(outputs.markdown === undefined ? {} : { markdown: outputs.markdown }),
     ...(outputs.screenshot === undefined
       ? {}
       : { screenshot: `data:image/png;base64,${outputs.screenshot}` }),
+    ...(outputs.links === undefined ? {} : { links: [...new Set(outputs.links)] }),
   };
 }
 
@@ -498,7 +505,7 @@ class CloudflareProvider implements BrowserProvider {
    * `/snapshot` refuses, and `/markdown` spends a fraction of the characters `/content` does.
    *
    * @param {string} url Page to read.
-   * @param {ScrapeOptions} [options] Formats, screenshot and wait options.
+   * @param {ScrapeOptions} [options] Formats, screenshot, links and wait options.
    * @param {BrowserSession} [_session] Unused, scrape needs no session.
    * @returns {Promise<ScrapeResult>} The outputs asked for, with the page's status and title.
    */

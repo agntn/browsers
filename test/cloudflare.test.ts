@@ -326,6 +326,51 @@ describe("cloudflare scrape", () => {
     expect(body).toEqual({ url: "https://example.test", formats: ["markdown", "screenshot"] });
   });
 
+  it("reads the links in the same render as the markdown", async () => {
+    const requests: Array<{ url: string; body: unknown }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        requests.push({
+          url: input instanceof Request ? input.url : String(input),
+          body: JSON.parse(init?.body as string),
+        });
+        return jsonResponse({
+          success: true,
+          result: {
+            markdown: "# Hi",
+            links: ["https://example.test/a", "https://example.test/b", "https://example.test/a"],
+          },
+          meta: { status: 200, title: "Hi" },
+        });
+      }),
+    );
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+    });
+
+    const page = await provider.scrape("https://example.test", {
+      formats: ["markdown"],
+      links: true,
+    });
+
+    expect(page).toEqual({
+      url: "https://example.test",
+      markdown: "# Hi",
+      links: ["https://example.test/a", "https://example.test/b"],
+      title: "Hi",
+      statusCode: 200,
+    });
+    expect(requests).toEqual([
+      {
+        url: "https://api.cloudflare.com/client/v4/accounts/test-account/browser-rendering/snapshot",
+        body: { url: "https://example.test", formats: ["markdown", "links"] },
+      },
+    ]);
+  });
+
   it("sends scrape options in the shape Browser Run accepts", async () => {
     let body: unknown;
     vi.stubGlobal(

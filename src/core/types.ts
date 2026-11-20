@@ -47,6 +47,8 @@ export interface ScrapeOptions extends AbortOptions {
   waitFor?: string;
   waitForNetworkIdle?: boolean;
   screenshot?: boolean;
+  /** Return the page's links too. Cloudflare waits to be asked. */
+  links?: boolean;
   maxChars?: number;
   timeout?: number;
   script?: string;

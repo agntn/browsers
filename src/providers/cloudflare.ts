@@ -132,6 +132,12 @@ interface CfSnapshotResult {
   readonly links?: readonly string[];
 }
 
+/** What a scrape rendered, and the page meta when a route sends it. */
+interface CfRender {
+  readonly outputs: CfSnapshotResult;
+  readonly meta?: CfPageMeta;
+}
+
 interface CfScreenshotResult {
   readonly image?: string;
   readonly [key: string]: unknown;
@@ -503,6 +509,7 @@ class CloudflareProvider implements BrowserProvider {
   /**
    * Several outputs share one `/snapshot` render. A single one goes to its own endpoint, which
    * `/snapshot` refuses, and `/markdown` spends a fraction of the characters `/content` does.
+   * Kitesurf's `/snapshot` refuses every body with a 422, so each output takes its own route.
    *
    * @param {string} url Page to read.
    * @param {ScrapeOptions} [options] Formats, screenshot, links and wait options.
@@ -517,30 +524,118 @@ class CloudflareProvider implements BrowserProvider {
     assertUrl(url);
     try {
       const formats = scrapeFormats(options);
-      const format = formats[0]!;
-      const snapshot = formats.length > 1;
       const body = createScrapeBody(url, options);
-      if (snapshot) body.formats = formats;
       const signal = options?.signal;
-      const res = await this.request({
-        url: this.browserEndpoint(snapshot ? "/snapshot" : `/${format}`),
-        send: (target, headers) =>
-          this.client.postJSON<CfPageResponse<CfSnapshotResult | CfContentResult | string>>(
-            target,
-            body,
-            headers,
-            signal,
-          ),
-      });
-      const result = this.unwrap(res);
-      const outputs: CfSnapshotResult = snapshot
-        ? (result as CfSnapshotResult)
-        : { [format]: typeof result === "string" ? result : result.content };
+      const render =
+        formats.length > 1 && this.browser !== "kitesurf"
+          ? await this.renderSnapshot(formats, body, signal)
+          : await this.renderEach(formats, body, signal);
 
-      return rejectBlockPage({ url, ...pageOutputs(outputs), ...pageMeta(res.meta) }, "cloudflare");
+      return rejectBlockPage(
+        { url, ...pageOutputs(render.outputs), ...pageMeta(render.meta) },
+        "cloudflare",
+      );
     } catch (error) {
       throw this.fail(error);
     }
+  }
+
+  /**
+   * All outputs from one `/snapshot` render.
+   *
+   * @param {readonly CfSnapshotFormat[]} formats Outputs to render.
+   * @param {Readonly<Record<string, unknown>>} body Scrape body without formats.
+   * @param {AbortSignal} [signal] Cancellation signal.
+   * @returns {Promise<CfRender>} The outputs and the page's meta.
+   */
+  private async renderSnapshot(
+    formats: readonly CfSnapshotFormat[],
+    body: Readonly<Record<string, unknown>>,
+    signal?: AbortSignal,
+  ): Promise<CfRender> {
+    const res = await this.request({
+      url: this.browserEndpoint("/snapshot"),
+      send: (target, headers) =>
+        this.client.postJSON<CfPageResponse<CfSnapshotResult>>(
+          target,
+          { ...body, formats },
+          headers,
+          signal,
+        ),
+    });
+    return { outputs: this.unwrap(res), meta: res.meta };
+  }
+
+  /**
+   * Each output from its own route, side by side, with the first route's meta.
+   *
+   * @param {readonly CfSnapshotFormat[]} formats Outputs to render, a page format first.
+   * @param {Readonly<Record<string, unknown>>} body Scrape body.
+   * @param {AbortSignal} [signal] Cancellation signal.
+   * @returns {Promise<CfRender>} The outputs merged, and the first route's meta.
+   */
+  private async renderEach(
+    formats: readonly CfSnapshotFormat[],
+    body: Readonly<Record<string, unknown>>,
+    signal?: AbortSignal,
+  ): Promise<CfRender> {
+    const renders = await Promise.all(
+      formats.map((format) =>
+        format === "screenshot"
+          ? this.renderScreenshot(body, signal)
+          : this.renderRoute(format, body, signal),
+      ),
+    );
+    return {
+      outputs: Object.assign({}, ...renders.map((render) => render.outputs)) as CfSnapshotResult,
+      meta: renders[0]?.meta,
+    };
+  }
+
+  /**
+   * One output from the route of the same name.
+   *
+   * @param {Exclude<CfSnapshotFormat, "screenshot">} format Output to render.
+   * @param {Readonly<Record<string, unknown>>} body Scrape body.
+   * @param {AbortSignal} [signal] Cancellation signal.
+   * @returns {Promise<CfRender>} The output and the route's meta.
+   */
+  private async renderRoute(
+    format: Exclude<CfSnapshotFormat, "screenshot">,
+    body: Readonly<Record<string, unknown>>,
+    signal?: AbortSignal,
+  ): Promise<CfRender> {
+    const res = await this.request({
+      url: this.browserEndpoint(`/${format}`),
+      send: (target, headers) =>
+        this.client.postJSON<CfPageResponse<CfContentResult | string | string[]>>(
+          target,
+          body,
+          headers,
+          signal,
+        ),
+    });
+    const result = this.unwrap(res);
+    const output = typeof result === "string" || Array.isArray(result) ? result : result.content;
+    return { outputs: { [format]: output }, meta: res.meta };
+  }
+
+  /**
+   * The image from `/screenshot`, as base64 like `/snapshot` sends it.
+   *
+   * @param {Readonly<Record<string, unknown>>} body Scrape body.
+   * @param {AbortSignal} [signal] Cancellation signal.
+   * @returns {Promise<CfRender>} The screenshot, without meta.
+   */
+  private async renderScreenshot(
+    body: Readonly<Record<string, unknown>>,
+    signal?: AbortSignal,
+  ): Promise<CfRender> {
+    const res = await this.request({
+      url: this.browserEndpoint("/screenshot"),
+      send: (target, headers) => this.client.postRaw(target, body, headers, signal),
+    });
+    return { outputs: { screenshot: Buffer.from(res).toString("base64") } };
   }
 
   async screenshot(

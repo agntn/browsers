@@ -121,6 +121,93 @@ describe("cloudflare browser selection", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  /* Kitesurf's `/snapshot` answers 422 to every body, even `{ url }` alone. */
+  it("sends each Kitesurf output to its own route", async () => {
+    const requests: Array<{ url: string; body: unknown }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input);
+        requests.push({ url, body: JSON.parse(init?.body as string) });
+        if (url.includes("/markdown")) {
+          return jsonResponse({
+            success: true,
+            result: "# Kitesurf",
+            meta: { status: 200, title: "Kite" },
+          });
+        }
+        if (url.includes("/links")) {
+          return jsonResponse({
+            success: true,
+            result: ["https://example.test/a", "https://example.test/a"],
+            meta: { status: 200, title: "" },
+          });
+        }
+        return cloudflareResponse(url);
+      }),
+    );
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+      browser: "kitesurf",
+    });
+
+    const page = await provider.scrape("https://example.test", {
+      formats: ["html", "markdown"],
+      screenshot: true,
+      links: true,
+      waitForNetworkIdle: true,
+    });
+
+    expect(page).toEqual({
+      url: "https://example.test",
+      html: "<html>Kitesurf</html>",
+      markdown: "# Kitesurf",
+      screenshot: "data:image/png;base64,iVBORw==",
+      links: ["https://example.test/a"],
+    });
+    const body = { url: "https://example.test", gotoOptions: { waitUntil: "networkidle0" } };
+    const route = "https://api.cloudflare.com/client/v4/accounts/test-account/browser-run";
+    expect(requests).toEqual([
+      { url: `${route}/content?browser=kitesurf`, body },
+      { url: `${route}/markdown?browser=kitesurf`, body },
+      { url: `${route}/screenshot?browser=kitesurf`, body },
+      { url: `${route}/links?browser=kitesurf`, body },
+    ]);
+  });
+
+  it("takes the Kitesurf title and status from the page route", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = input instanceof Request ? input.url : String(input);
+        const result = url.includes("/links") ? ["https://example.test/a"] : "# Kitesurf";
+        const title = url.includes("/links") ? "" : "Kite";
+        return jsonResponse({ success: true, result, meta: { status: 200, title } });
+      }),
+    );
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+      browser: "kitesurf",
+    });
+
+    const page = await provider.scrape("https://example.test", {
+      formats: ["markdown"],
+      links: true,
+    });
+
+    expect(page).toEqual({
+      url: "https://example.test",
+      markdown: "# Kitesurf",
+      links: ["https://example.test/a"],
+      title: "Kite",
+      statusCode: 200,
+    });
+  });
+
   it("selects Cloudflare automatically when an agent requests Kitesurf", async () => {
     const urls: string[] = [];
     process.env.CLOUDFLARE_API_TOKEN = "test-token";

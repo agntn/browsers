@@ -15,8 +15,8 @@ minimumReleaseAgeExclude:
   - "@agntn/*"
 
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@1.5.0
-  vite-plus: 1.5.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.5.1
+  vite-plus: 1.5.1
 
 # One version per name for the library and docs/, which reads the library from ../src.
 catalogs:
@@ -27,7 +27,7 @@ catalogs:
     "@vueuse/core": 15.0.0
     docus: 5.15.0
     nuxt: 4.6.4
-    playwright-core: 1.65.0
+    playwright-core: 1.65.1
     string-width: 7.2.0
     strip-ansi: 7.2.0
     ufo: 1.6.4
@@ -40,12 +40,12 @@ catalogs:
     "@iconify-json/vscode-icons": 1.2.96
     "@modelcontextprotocol/client": 2.4.0
     "@nuxt/content": 3.16.2
-    "@nuxt/ui": 4.12.0
+    "@nuxt/ui": 4.12.2
     "@oh-my-pi/omptype": 18.4.12
     "@oh-my-pi/pi-coding-agent": 18.4.12
     "@types/node": 26.6.6
-    ai: 7.0.163
-    obuild: 0.4.43
+    ai: 7.0.177
+    obuild: 0.4.45
     shiki: 4.6.0
     tsx: 4.23.15
     typescript: 7.0.2

@@ -132,6 +132,9 @@ interface CfSnapshotResult {
   readonly links?: readonly string[];
 }
 
+/** What `Client.postResponse` hands back for a `/screenshot` call. */
+type CfScreenshotResponse = Awaited<ReturnType<Client["postResponse"]>>;
+
 /** What a scrape rendered, and the page meta when a route sends it. */
 interface CfRender {
   readonly outputs: CfSnapshotResult;
@@ -633,9 +636,36 @@ class CloudflareProvider implements BrowserProvider {
   ): Promise<CfRender> {
     const res = await this.request({
       url: this.browserEndpoint("/screenshot"),
-      send: (target, headers) => this.client.postRaw(target, body, headers, signal),
+      send: (target, headers) => this.client.postResponse(target, body, headers, signal),
     });
-    return { outputs: { screenshot: Buffer.from(res).toString("base64") } };
+    const { data } = await this.readScreenshot(res, "png");
+    return { outputs: { screenshot: data.replace(/^data:[^,]*,/, "") } };
+  }
+
+  /**
+   * The `/screenshot` reply, raw image bytes or a JSON envelope.
+   *
+   * @param {CfScreenshotResponse} res Response from `/screenshot`.
+   * @param {string} format Image type for an envelope.
+   * @returns {Promise<ScreenshotResult>} The image and its type.
+   */
+  private async readScreenshot(
+    res: Readonly<CfScreenshotResponse>,
+    format: string,
+  ): Promise<ScreenshotResult> {
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("image")) {
+      const mimeType = contentType.split(";")[0]!.trim();
+      const buf = await res.arrayBuffer();
+      return {
+        data: `data:${mimeType};base64,${Buffer.from(buf).toString("base64")}`,
+        mimeType,
+      };
+    }
+
+    const data = (await res.json()) as CfEnvelope<CfScreenshotResult>;
+    const result = this.unwrap(data);
+    return { data: result.image ?? "", mimeType: `image/${format}` };
   }
 
   async screenshot(
@@ -650,23 +680,7 @@ class CloudflareProvider implements BrowserProvider {
         url: this.browserEndpoint("/screenshot"),
         send: (url, headers) => this.client.postResponse(url, body, headers),
       });
-
-      const contentType = res.headers.get("content-type") ?? "";
-      if (contentType.includes("image")) {
-        const mimeType = contentType.split(";")[0]!.trim();
-        const buf = await res.arrayBuffer();
-        return {
-          data: `data:${mimeType};base64,${Buffer.from(buf).toString("base64")}`,
-          mimeType,
-        };
-      }
-
-      const data = (await res.json()) as CfEnvelope<CfScreenshotResult>;
-      const result = this.unwrap(data);
-      return {
-        data: result.image ?? "",
-        mimeType: `image/${options.format ?? "png"}`,
-      };
+      return await this.readScreenshot(res, options.format ?? "png");
     } catch (error) {
       throw this.fail(error);
     }

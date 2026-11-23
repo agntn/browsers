@@ -177,6 +177,34 @@ describe("cloudflare browser selection", () => {
     ]);
   });
 
+  it("unwraps a Kitesurf screenshot sent as a JSON envelope", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = input instanceof Request ? input.url : String(input);
+        const result = url.includes("/screenshot") ? { image: "AAAA" } : "# Kitesurf";
+        return jsonResponse({ success: true, result });
+      }),
+    );
+    resetDefaultClientForTests();
+    const provider = await create("cloudflare", {
+      apiKey: "test-token",
+      accountID: "test-account",
+      browser: "kitesurf",
+    });
+
+    const page = await provider.scrape("https://example.test", {
+      formats: ["markdown"],
+      screenshot: true,
+    });
+
+    expect(page).toEqual({
+      url: "https://example.test",
+      markdown: "# Kitesurf",
+      screenshot: "data:image/png;base64,AAAA",
+    });
+  });
+
   it("takes the Kitesurf title and status from the page route", async () => {
     vi.stubGlobal(
       "fetch",

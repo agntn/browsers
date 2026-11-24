@@ -68,7 +68,8 @@ if (servesStdio(argv)) {
       {
         name: "browsers",
         version,
-        description: "Unified browser-as-a-service provider for agents and CLI",
+        description:
+          "Unified browser-as-a-service provider for humans and agents, as a library and CLI",
         tools: browserTools,
         commands: [sessionsCommand],
         fallback: "scrape",

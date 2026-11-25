@@ -11,8 +11,8 @@ catalogs:
       version: 1.5.0
   deps:
     '@agntn/credentials':
-      specifier: 0.0.2
-      version: 0.0.2
+      specifier: 0.1.1
+      version: 0.1.1
     '@agntn/tools':
       specifier: 0.3.1
       version: 0.3.1
@@ -109,7 +109,7 @@ importers:
     dependencies:
       '@agntn/credentials':
         specifier: catalog:deps
-        version: 0.0.2(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.92)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.22.1)(zod@4.6.7))(@oh-my-pi/pi-coding-agent@18.4.12(@types/node@26.6.6))(ai@7.0.163(zod@4.6.7))
+        version: 0.1.1(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.92)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.22.1)(zod@4.6.7))(@oh-my-pi/pi-coding-agent@18.4.12(@types/node@26.6.6))(ai@7.0.163(zod@4.6.7))(zod@4.6.7)
       '@agntn/tools':
         specifier: catalog:deps
         version: 0.3.1(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.92)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.22.1)(zod@4.6.7))(@modelcontextprotocol/server@2.4.0)(@oh-my-pi/pi-coding-agent@18.4.12(@types/node@26.6.6))(ai@7.0.163(zod@4.6.7))(zod@4.6.7)
@@ -205,8 +205,8 @@ importers:
 
 packages:
 
-  '@agntn/credentials@0.0.2':
-    resolution: {integrity: sha512-q3UStfdSSlbUU5D5xqzG2BplgJ3/5Bb544F+6Bvpo1LmQKLsTseWO3PoPOKGg76Stbi8guPYemhEj+4L1gPedQ==}
+  '@agntn/credentials@0.1.1':
+    resolution: {integrity: sha512-J5JQid2ZrV3JZdhElcdLRJ6CtNOX3zdu5RQ690ktmqDTF4lw/7P1op5l7P85cGY2PYf2G7kqRjJMPUT/HcH+3Q==}
     engines: {node: '>=26'}
     hasBin: true
     peerDependencies:
@@ -229,8 +229,8 @@ packages:
       oxlint: '>=1.78.0'
       oxlint-tsgolint: '>=7.0.2001'
 
-  '@agntn/tools@0.2.1':
-    resolution: {integrity: sha512-+wvN9R6NRozD4Mk9w9I9qJZIUKkPhalwVcAcvvx9lG2Msp0CdOVrVVusPK58MrGBvmUfhJWu+Re4E0ZCmpXU6w==}
+  '@agntn/tools@0.3.0':
+    resolution: {integrity: sha512-opDmmURapVZBZ2f4OfbVSY5KpVwEh9cON5bIVpbeLIvn+l+o0sSuIvi2+42Tfrn73NK2Dp4r+m+aP3bk248Zaw==}
     engines: {node: '>=26'}
     peerDependencies:
       '@earendil-works/pi-coding-agent': '>=0.84.2 <2'
@@ -238,6 +238,7 @@ packages:
       '@oh-my-pi/pi-coding-agent': '>=18.0.0 <19'
       ai: '>=7.0.0 <8'
       h3-mcp: '>=0.2.0 <0.3'
+      zod: '>=4.1.13 <5'
     peerDependenciesMeta:
       '@earendil-works/pi-coding-agent':
         optional: true
@@ -248,6 +249,8 @@ packages:
       ai:
         optional: true
       h3-mcp:
+        optional: true
+      zod:
         optional: true
 
   '@agntn/tools@0.3.1':
@@ -1511,10 +1514,6 @@ packages:
     resolution: {integrity: sha512-LgrD2OphHuG12vfKFKz6SOnq7bKHQmhGJIAYdD+MZBn2npHEyry6uD8zvktodtl5CQM85MO0anUyD9JwmUmxww==}
     engines: {node: '>=20'}
 
-  '@modelcontextprotocol/core@2.2.0':
-    resolution: {integrity: sha512-iLhmprRmWI8EcosOA3wVvww22z02NkgqhV4fBH6f/odQBsi7xnJc0HGmi21yWO+/iKw2yzqVE127Zhna5/+JXw==}
-    engines: {node: '>=20'}
-
   '@modelcontextprotocol/core@2.4.0':
     resolution: {integrity: sha512-z8QBKqdfXLPzkLQuG4xp8hrVEMm1PZ1IgxMN2sMbJiFiAKOWXnAzogXn2W4aqIBlP1ea6U5yiqVquvUNM1Cj6Q==}
     engines: {node: '>=20'}
@@ -1528,10 +1527,6 @@ packages:
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
-
-  '@modelcontextprotocol/server@2.2.0':
-    resolution: {integrity: sha512-qFnltjus6Gk8Lx6J1w2RXmr3YPN22MNT6qD6zjAkaiWIlFIFxWClz0rXHNuJF/KSUyn5YGhkSvXkWDbQHVLFEQ==}
-    engines: {node: '>=20'}
 
   '@modelcontextprotocol/server@2.4.0':
     resolution: {integrity: sha512-rgR9yxSaAJ+bcsi/XroT/S2AfPiIWloXAnrdfYSCms9ivVju0ishu/wW0J21Ho6+ZOR1r7RyeRbjiRuF87ix5Q==}
@@ -8470,18 +8465,22 @@ packages:
   yuku-ast@0.19.0:
     resolution: {integrity: sha512-PyCsiScaelhxBGzL8dyeJkLqvRZycoh78R31Vrt/WqYrm0hMFoKwIw/X7Dx5mBKLWAMlV9I9HEyBOHnj2gZVyw==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-codegen@0.19.0:
     resolution: {integrity: sha512-uymAKHjDuaP4BEpkXC/BSLz4DUEF5oArZ5AuD3888nb2miChjWSgpPdojEJxm3pjpXkgUaCRJQyNAbnMN33wHg==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-core@0.19.0:
     resolution: {integrity: sha512-kYK9e1XdfirNhkipzW0wmMcSWcVF/CWnuugodfVYRCUwvoBefweL9HzB96OiKEhsx78V5WbUxbJqlizMX869Qg==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-parser@0.19.0:
     resolution: {integrity: sha512-XrBh9ZiQK5mJVRxZBAvD6LwRyAYrK3MFtH3+onyuxFL5hFD44EC3QOmIC1FjTj6H2MMwq46/NAI+NZxLZPZgxg==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   zip-stream@7.0.5:
     resolution: {integrity: sha512-dSvYKdvLsAHCDqPOhIwk/q5CvuWtTB3Dgpoe0uVEFjTzIOAmsQpprX25InCvrvJsirEbu1OHyy67n/kAj1Sw/w==}
@@ -8503,16 +8502,17 @@ packages:
 
 snapshots:
 
-  '@agntn/credentials@0.0.2(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.92)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.22.1)(zod@4.6.7))(@oh-my-pi/pi-coding-agent@18.4.12(@types/node@26.6.6))(ai@7.0.163(zod@4.6.7))':
+  '@agntn/credentials@0.1.1(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.92)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.22.1)(zod@4.6.7))(@oh-my-pi/pi-coding-agent@18.4.12(@types/node@26.6.6))(ai@7.0.163(zod@4.6.7))(zod@4.6.7)':
     dependencies:
-      '@agntn/tools': 0.2.1(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.92)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.22.1)(zod@4.6.7))(@modelcontextprotocol/server@2.2.0)(@oh-my-pi/pi-coding-agent@18.4.12(@types/node@26.6.6))(ai@7.0.163(zod@4.6.7))
-      '@modelcontextprotocol/server': 2.2.0
+      '@agntn/tools': 0.3.0(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.92)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.22.1)(zod@4.6.7))(@modelcontextprotocol/server@2.4.0)(@oh-my-pi/pi-coding-agent@18.4.12(@types/node@26.6.6))(ai@7.0.163(zod@4.6.7))(zod@4.6.7)
+      '@modelcontextprotocol/server': 2.4.0
     optionalDependencies:
       '@earendil-works/pi-coding-agent': 1.4.0(@aws-sdk/credential-provider-node@3.972.92)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.22.1)(zod@4.6.7)
       '@oh-my-pi/pi-coding-agent': 18.4.12(@types/node@26.6.6)
       ai: 7.0.163(zod@4.6.7)
     transitivePeerDependencies:
       - h3-mcp
+      - zod
 
   '@agntn/ox@0.1.0(oxfmt@0.76.0(vite-plus@1.5.0(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(@vitest/ui@5.1.0)(@vue/language-core@3.3.14)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.0)))(oxlint-tsgolint@7.0.2005)(oxlint@1.91.0(oxlint-tsgolint@7.0.2005)(vite-plus@1.5.0(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(@vitest/ui@5.1.0)(@vue/language-core@3.3.14)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.0)))':
     dependencies:
@@ -8520,12 +8520,13 @@ snapshots:
       oxlint: 1.91.0(oxlint-tsgolint@7.0.2005)(vite-plus@1.5.0(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(@vitest/ui@5.1.0)(@vue/language-core@3.3.14)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.0))
       oxlint-tsgolint: 7.0.2005
 
-  '@agntn/tools@0.2.1(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.92)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.22.1)(zod@4.6.7))(@modelcontextprotocol/server@2.2.0)(@oh-my-pi/pi-coding-agent@18.4.12(@types/node@26.6.6))(ai@7.0.163(zod@4.6.7))':
+  '@agntn/tools@0.3.0(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.92)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.22.1)(zod@4.6.7))(@modelcontextprotocol/server@2.4.0)(@oh-my-pi/pi-coding-agent@18.4.12(@types/node@26.6.6))(ai@7.0.163(zod@4.6.7))(zod@4.6.7)':
     optionalDependencies:
       '@earendil-works/pi-coding-agent': 1.4.0(@aws-sdk/credential-provider-node@3.972.92)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.22.1)(zod@4.6.7)
-      '@modelcontextprotocol/server': 2.2.0
+      '@modelcontextprotocol/server': 2.4.0
       '@oh-my-pi/pi-coding-agent': 18.4.12(@types/node@26.6.6)
       ai: 7.0.163(zod@4.6.7)
+      zod: 4.6.7
 
   '@agntn/tools@0.3.1(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.92)(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.22.1)(zod@4.6.7))(@modelcontextprotocol/server@2.4.0)(@oh-my-pi/pi-coding-agent@18.4.12(@types/node@26.6.6))(ai@7.0.163(zod@4.6.7))(zod@4.6.7)':
     optionalDependencies:
@@ -9747,10 +9748,6 @@ snapshots:
       pkce-challenge: 5.0.1
       zod: 4.6.7
 
-  '@modelcontextprotocol/core@2.2.0':
-    dependencies:
-      zod: 4.6.7
-
   '@modelcontextprotocol/core@2.4.0':
     dependencies:
       zod: 4.6.7
@@ -9776,11 +9773,6 @@ snapshots:
       zod-to-json-schema: 3.25.2(zod@4.6.7)
     transitivePeerDependencies:
       - supports-color
-
-  '@modelcontextprotocol/server@2.2.0':
-    dependencies:
-      '@modelcontextprotocol/core': 2.2.0
-      zod: 4.6.7
 
   '@modelcontextprotocol/server@2.4.0':
     dependencies:
